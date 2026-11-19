@@ -5,27 +5,26 @@
 package l1s
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
-	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
-	"github.com/ava-labs/avalanchego/vms/evm/txgossip/txgossiptest"
+	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 
-	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
 )
 
@@ -38,22 +37,35 @@ const (
 
 // fetchStoredGasPriceConfig reads storage directly, so storage assertions don't
 // depend on [hooks.GasConfigAfter].
-func fetchStoredGasPriceConfig(t *testing.T, sut *l1SUT, blockNumber rpc.BlockNumber) commontype.GasPriceConfig {
+func fetchStoredGasPriceConfig(ctx context.Context, t *testing.T, sut *SUT, blockNumber rpc.BlockNumber) commontype.GasPriceConfig {
 	t.Helper()
-	stateDB, _, err := sut.vm.GethRPCBackends().StateAndHeaderByNumber(sut.ctx, blockNumber)
+	stateDB, _, err := sut.GethRPCBackends().StateAndHeaderByNumber(ctx, blockNumber)
 	require.NoError(t, err)
 	return gaspricemanager.GetStoredGasPriceConfig(stateDB, gaspricemanager.ContractAddress)
 }
 
 // settleGasPriceManagerMutation builds and returns a block after the previous
 // block has settled.
-func settleGasPriceManagerMutation(t *testing.T, sut *l1SUT) *blocks.Block {
+func settleGasPriceManagerMutation(ctx context.Context, t *testing.T, sut *SUT, wallet *saetest.Wallet) *blocks.Block {
 	t.Helper()
 	const fromIdx = 1
-	sut.advanceTime(t, settleAdvance)
-	tx := sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
-	txgossiptest.WaitUntilPending(t, sut.ctx, sut.vm.GethRPCBackends(), tx)
-	return sut.buildAcceptExecuteBlock(t)
+	sut.clock.Advance(settleAdvance)
+	sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+	return sut.RunConsensusLoop(ctx, t)
+}
+
+// withGasPriceManager enables gaspricemanager at genesis, administered by
+// admin and storing cfg.
+func withGasPriceManager(admin common.Address, cfg *commontype.GasPriceConfig) sutOption {
+	return withGenesisPrecompiles(extras.Precompiles{
+		gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
+			new(testGenesisTime),
+			[]common.Address{admin},
+			nil,
+			nil,
+			cfg,
+		),
+	})
 }
 
 // staticPricingConfig returns a config under which every block's base fee is
@@ -81,42 +93,29 @@ func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 	const pinnedMinPrice uint64 = 25_000_000_000
 	cfg := staticPricingConfig(pinnedMinPrice)
 
-	now := postIglooStartTime(t)
-	sut := newL1SUT(
+	wallet := newWallet(t, 2)
+	ctx, sut := newSUT(
 		t,
-		withFork(upgrade.Igloo),
-		withNumAccounts(2),
-		withNow(now),
-		withIglooGenesis(),
-		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
-			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					new(genesis.Timestamp),
-					[]common.Address{addresses[adminIdx]},
-					nil,
-					nil,
-					&cfg,
-				),
-			}
-		}),
+		withMaxAllocFor(wallet.Addresses()...),
+		withGasPriceManager(wallet.Addresses()[adminIdx], &cfg),
 	)
 
-	require.Equal(t, cfg, fetchStoredGasPriceConfig(t, sut, rpc.LatestBlockNumber),
+	require.Equal(t, cfg, fetchStoredGasPriceConfig(ctx, t, sut, rpc.LatestBlockNumber),
 		"genesis-stored gaspricemanager config must equal InitialGasPriceConfig")
 
 	wantPinned := uint256.NewInt(pinnedMinPrice)
 	for i := range 3 {
-		sut.advanceTime(t, blockBuildAdvance)
-		sut.sendTransferTx(t, fromIdx, toIdx, common.Big1)
-		built := sut.buildAcceptExecuteBlock(t)
+		sut.clock.Advance(blockBuildAdvance)
+		sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[toIdx], common.Big1))
+		built := sut.RunConsensusLoop(ctx, t)
 		require.Equal(t, wantPinned, built.ExecutedBaseFee(),
 			"static-pricing block %d ExecutedBaseFee", i)
 	}
 
-	_ = settleGasPriceManagerMutation(t, sut)
-	sut.advanceTime(t, blockBuildAdvance)
-	sut.sendTransferTx(t, fromIdx, toIdx, common.Big1)
-	post := sut.buildAcceptExecuteBlock(t)
+	_ = settleGasPriceManagerMutation(ctx, t, sut, wallet)
+	sut.clock.Advance(blockBuildAdvance)
+	sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[toIdx], common.Big1))
+	post := sut.RunConsensusLoop(ctx, t)
 	require.Equal(t, wantPinned, post.ExecutedBaseFee(),
 		"static-pricing ExecutedBaseFee must survive Tau settlement")
 }
@@ -136,48 +135,35 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 	)
 	initialCfg := staticPricingConfig(oldMinPrice)
 
-	now := postIglooStartTime(t)
-	sut := newL1SUT(
+	wallet := newWallet(t, 2)
+	ctx, sut := newSUT(
 		t,
-		withFork(upgrade.Igloo),
-		withNumAccounts(2),
-		withNow(now),
-		withIglooGenesis(),
-		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
-			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					new(genesis.Timestamp),
-					[]common.Address{addresses[adminIdx]},
-					nil,
-					nil,
-					&initialCfg,
-				),
-			}
-		}),
+		withMaxAllocFor(wallet.Addresses()...),
+		withGasPriceManager(wallet.Addresses()[adminIdx], &initialCfg),
 	)
 
 	// Block M mutates the config.
-	sut.advanceTime(t, blockBuildAdvance)
+	sut.clock.Advance(blockBuildAdvance)
 	newCfg := staticPricingConfig(newMinPrice)
 	mutationCalldata, err := gaspricemanager.PackSetGasPriceConfig(newCfg)
 	require.NoError(t, err)
-	mutationTx := sut.sendCallTx(t, adminIdx, gaspricemanager.ContractAddress, mutationCalldata, gasPriceManagerCallGas)
-	mutationBlock := sut.buildAcceptExecuteBlock(t)
-	sut.requireTxSucceeded(t, mutationTx)
+	mutationTx := sut.send(ctx, t, wallet, adminIdx, callTx(gaspricemanager.ContractAddress, mutationCalldata, gasPriceManagerCallGas))
+	mutationBlock := sut.RunConsensusLoop(ctx, t)
+	sut.requireReceiptStatus(ctx, t, mutationTx, types.ReceiptStatusSuccessful)
 	require.Equal(t, uint256.NewInt(oldMinPrice), mutationBlock.ExecutedBaseFee(),
 		"mutation block ExecutedBaseFee must use pre-mutation floor")
 
 	// M+1 is built after M settles, but its base fee comes from the clock
 	// after M, which M built before anything had settled.
-	next := settleGasPriceManagerMutation(t, sut)
+	next := settleGasPriceManagerMutation(ctx, t, sut, wallet)
 	require.Equal(t, uint256.NewInt(oldMinPrice), next.ExecutedBaseFee(),
 		"settle-next block ExecutedBaseFee must still use pre-mutation floor")
 
 	// M+2's base fee comes from the clock after M+1, which M+1 built against
 	// M's settled state.
-	sut.advanceTime(t, blockBuildAdvance)
-	sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
-	delivery := sut.buildAcceptExecuteBlock(t)
+	sut.clock.Advance(blockBuildAdvance)
+	sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+	delivery := sut.RunConsensusLoop(ctx, t)
 	require.Equal(t, uint256.NewInt(newMinPrice), delivery.ExecutedBaseFee(),
 		"delivery block ExecutedBaseFee must reflect post-settlement new floor")
 }
@@ -203,30 +189,19 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 
 	buildChain := func(t *testing.T, cfg commontype.GasPriceConfig) []*blocks.Block {
 		t.Helper()
-		now := postIglooStartTime(t)
-		sut := newL1SUT(
+		wallet := newWallet(t, 2)
+		ctx, sut := newSUT(
 			t,
-			withFork(upgrade.Igloo),
-			withNumAccounts(2),
-			withNow(now),
+			withMaxAllocFor(wallet.Addresses()...),
 			withGasTarget(desiredGasTarget),
-			withIglooGenesis(),
-			withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
-				legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-					gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-						new(genesis.Timestamp),
-						[]common.Address{addresses[adminIdx]},
-						nil, nil, &cfg,
-					),
-				}
-			}),
+			withGasPriceManager(wallet.Addresses()[adminIdx], &cfg),
 		)
 
 		built := make([]*blocks.Block, 0, numBlocks)
 		for range numBlocks {
-			sut.advanceTime(t, blockBuildAdvance)
-			sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
-			built = append(built, sut.buildAcceptExecuteBlock(t))
+			sut.clock.Advance(blockBuildAdvance)
+			sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+			built = append(built, sut.RunConsensusLoop(ctx, t))
 		}
 		return built
 	}
@@ -306,23 +281,12 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 		TimeToDouble: 60,
 	}
 
-	now := postIglooStartTime(t)
-	sut := newL1SUT(
+	wallet := newWallet(t, 2)
+	ctx, sut := newSUT(
 		t,
-		withFork(upgrade.Igloo),
-		withNumAccounts(2),
-		withNow(now),
+		withMaxAllocFor(wallet.Addresses()...),
 		withGasTarget(desiredTarget),
-		withIglooGenesis(),
-		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
-			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					new(genesis.Timestamp),
-					[]common.Address{addresses[adminIdx]},
-					nil, nil, &initialConfig,
-				),
-			}
-		}),
+		withGasPriceManager(wallet.Addresses()[adminIdx], &initialConfig),
 	)
 
 	blockTargetExponent := func(t *testing.T, b *blocks.Block) dynamic.TargetExponent {
@@ -335,15 +299,15 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 		t.Helper()
 		calldata, err := gaspricemanager.PackSetGasPriceConfig(config)
 		require.NoError(t, err, "gaspricemanager.PackSetGasPriceConfig(%+v)", config)
-		tx := sut.sendCallTx(t, adminIdx, gaspricemanager.ContractAddress, calldata, gasPriceManagerCallGas)
-		b := sut.buildAcceptExecuteBlock(t)
-		sut.requireTxSucceeded(t, tx)
+		tx := sut.send(ctx, t, wallet, adminIdx, callTx(gaspricemanager.ContractAddress, calldata, gasPriceManagerCallGas))
+		b := sut.RunConsensusLoop(ctx, t)
+		sut.requireReceiptStatus(ctx, t, tx, types.ReceiptStatusSuccessful)
 		return b
 	}
 
-	sut.advanceTime(t, blockBuildAdvance)
-	sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
-	baseline := sut.buildAcceptExecuteBlock(t)
+	sut.clock.Advance(blockBuildAdvance)
+	sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+	baseline := sut.RunConsensusLoop(ctx, t)
 	initialPinnedExponent := dynamic.DesiredTargetExponent(gas.Gas(initialPinnedTarget))
 	require.Equal(t, initialPinnedExponent, blockTargetExponent(t, baseline),
 		"initial pinned config must set TargetExponent")
@@ -353,12 +317,12 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 		MinGasPrice:        1,
 		TimeToDouble:       60,
 	}
-	sut.advanceTime(t, blockBuildAdvance)
+	sut.clock.Advance(blockBuildAdvance)
 	validatorMutation := mutate(t, validatorConfig)
 	require.Equal(t, initialPinnedExponent, blockTargetExponent(t, validatorMutation),
 		"validator authority must not apply before the mutation settles")
 
-	validatorActive := settleGasPriceManagerMutation(t, sut)
+	validatorActive := settleGasPriceManagerMutation(ctx, t, sut, wallet)
 	wantValidatorExponent := initialPinnedExponent - maxTargetExponentDiff
 	require.Equal(t, wantValidatorExponent, blockTargetExponent(t, validatorActive),
 		"validator authority must resume one bounded step from the pinned parent")
@@ -368,12 +332,12 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 		MinGasPrice:  1,
 		TimeToDouble: 60,
 	}
-	sut.advanceTime(t, blockBuildAdvance)
+	sut.clock.Advance(blockBuildAdvance)
 	pinnedMutation := mutate(t, finalConfig)
 	require.Equal(t, wantValidatorExponent-maxTargetExponentDiff, blockTargetExponent(t, pinnedMutation),
 		"pinned authority must not apply before the mutation settles")
 
-	pinnedActive := settleGasPriceManagerMutation(t, sut)
+	pinnedActive := settleGasPriceManagerMutation(ctx, t, sut, wallet)
 	finalPinnedExponent := dynamic.DesiredTargetExponent(gas.Gas(finalPinnedTarget))
 	require.Equal(t, finalPinnedExponent, blockTargetExponent(t, pinnedActive),
 		"pinned authority must replace TargetExponent after the mutation settles")
@@ -386,37 +350,27 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 		adminIdx = 0
 		fromIdx  = 1
 	)
-	const (
-		pinnedMinPrice uint64 = 25_000_000_000
-	)
+	// pinnedMinPrice exceeds the genesis base fee, from which the unpinned
+	// base fee decays.
+	const pinnedMinPrice uint64 = 100_000_000_000
 	var (
-		pinnedCfg       = staticPricingConfig(pinnedMinPrice)
-		pinnedBaseFee   = uint256.NewInt(pinnedMinPrice)
-		defaultBaseFeeU = uint256.NewInt(uint64(gastime.DefaultMinPrice))
+		pinnedCfg     = staticPricingConfig(pinnedMinPrice)
+		pinnedBaseFee = uint256.NewInt(pinnedMinPrice)
 	)
 
-	now := postIglooStartTime(t)
+	now := testStartTime
 	midChainActivation := now.Add(saeparams.Tau)
 
-	pinnedGenesisPrecompiles := func(genesis *core.Genesis, addresses []common.Address) extras.Precompiles {
-		return extras.Precompiles{
-			gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-				new(genesis.Timestamp),
-				[]common.Address{addresses[adminIdx]},
-				nil, nil, &pinnedCfg,
-			),
-		}
-	}
-	enableUpgrades := func(addresses []common.Address, activationTime time.Time) []extras.PrecompileUpgrade {
+	enableUpgrades := func(admin common.Address, activationTime time.Time) []extras.PrecompileUpgrade {
 		return []extras.PrecompileUpgrade{{
 			Config: gaspricemanager.NewConfig(
 				new(uint64(activationTime.Unix())), // #nosec G115 -- known positive test timestamp
-				[]common.Address{addresses[adminIdx]},
+				[]common.Address{admin},
 				nil, nil, &pinnedCfg,
 			),
 		}}
 	}
-	disableUpgrades := func(_ []common.Address, activationTime time.Time) []extras.PrecompileUpgrade {
+	disableUpgrades := func(_ common.Address, activationTime time.Time) []extras.PrecompileUpgrade {
 		return []extras.PrecompileUpgrade{{
 			Config: gaspricemanager.NewDisableConfig(new(uint64(activationTime.Unix()))), // #nosec G115 -- known positive test timestamp
 		}}
@@ -440,12 +394,12 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 	}
 
 	cases := []struct {
-		name               string
-		genesisPrecompiles func(*core.Genesis, []common.Address) extras.Precompiles
-		upgrades           func(addresses []common.Address, activationTime time.Time) []extras.PrecompileUpgrade
-		activationTime     time.Time
-		preTransition      baseFeeExpectation
-		postTransition     baseFeeExpectation
+		name            string
+		pinnedAtGenesis bool
+		upgrades        func(admin common.Address, activationTime time.Time) []extras.PrecompileUpgrade
+		activationTime  time.Time
+		preTransition   baseFeeExpectation
+		postTransition  baseFeeExpectation
 	}{
 		{
 			name:           "enable_first_async_block",
@@ -457,15 +411,15 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 			name:           "enable_mid_chain",
 			upgrades:       enableUpgrades,
 			activationTime: midChainActivation,
-			preTransition:  baseFeeExpectation{equal: defaultBaseFeeU},
+			preTransition:  baseFeeExpectation{below: pinnedBaseFee},
 			postTransition: baseFeeExpectation{equal: pinnedBaseFee},
 		},
 		{
-			name:               "disable_mid_chain",
-			genesisPrecompiles: pinnedGenesisPrecompiles,
-			upgrades:           disableUpgrades,
-			activationTime:     midChainActivation,
-			preTransition:      baseFeeExpectation{equal: pinnedBaseFee},
+			name:            "disable_mid_chain",
+			pinnedAtGenesis: true,
+			upgrades:        disableUpgrades,
+			activationTime:  midChainActivation,
+			preTransition:   baseFeeExpectation{equal: pinnedBaseFee},
 			// The base fee starts decaying from the pin. Its exact value is
 			// gastime's concern.
 			postTransition: baseFeeExpectation{below: pinnedBaseFee},
@@ -474,46 +428,39 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := []l1SUTOption{
-				withFork(upgrade.Igloo),
-				withNumAccounts(2),
-				withNow(now),
-				withUpgradeConfig(func(addresses []common.Address) []byte {
-					return marshalJSON(t, &extras.UpgradeConfig{
-						PrecompileUpgrades: tc.upgrades(addresses, tc.activationTime),
-					})
+			wallet := newWallet(t, 2)
+			admin := wallet.Addresses()[adminIdx]
+			opts := []sutOption{
+				withMaxAllocFor(wallet.Addresses()...),
+				withUpgrades(extras.UpgradeConfig{
+					PrecompileUpgrades: tc.upgrades(admin, tc.activationTime),
 				}),
 			}
-			if tc.genesisPrecompiles != nil {
-				opts = append(opts,
-					withIglooGenesis(),
-					withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
-						legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = tc.genesisPrecompiles(genesis, addresses)
-					}),
-				)
+			if tc.pinnedAtGenesis {
+				opts = append(opts, withGasPriceManager(admin, &pinnedCfg))
 			}
-			sut := newL1SUT(t, opts...)
+			ctx, sut := newSUT(t, opts...)
 
 			if tc.preTransition != (baseFeeExpectation{}) {
 				require.True(t, tc.activationTime.After(now),
 					"test setup: pre-transition assertion requires activationTime > now")
-				sut.advanceTime(t, blockBuildAdvance)
-				sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
-				preTransition := sut.buildAcceptExecuteBlock(t)
+				sut.clock.Advance(blockBuildAdvance)
+				sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+				preTransition := sut.RunConsensusLoop(ctx, t)
 				check(t, "pre-transition", tc.preTransition, preTransition)
 			}
 
 			// Any tx triggers the activation block.
-			sut.setTime(t, tc.activationTime)
-			activationTx := sut.sendDeployTx(t, adminIdx)
-			_ = sut.buildAcceptExecuteBlock(t)
-			sut.requireTxSucceeded(t, activationTx)
+			sut.clock.Set(tc.activationTime)
+			activationTx := sut.send(ctx, t, wallet, adminIdx, deployTx())
+			_ = sut.RunConsensusLoop(ctx, t)
+			sut.requireReceiptStatus(ctx, t, activationTx, types.ReceiptStatusSuccessful)
 
-			_ = settleGasPriceManagerMutation(t, sut)
+			_ = settleGasPriceManagerMutation(ctx, t, sut, wallet)
 
-			sut.advanceTime(t, blockBuildAdvance)
-			sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
-			delivery := sut.buildAcceptExecuteBlock(t)
+			sut.clock.Advance(blockBuildAdvance)
+			sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+			delivery := sut.RunConsensusLoop(ctx, t)
 			check(t, "delivery", tc.postTransition, delivery)
 		})
 	}
@@ -530,39 +477,31 @@ func TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE(t *testing.T) {
 	const pinnedMinPrice uint64 = 25_000_000_000
 	cfg := staticPricingConfig(pinnedMinPrice)
 
-	now := postIglooStartTime(t)
-	sut := newL1SUT(
-		t,
-		withFork(upgrade.Igloo),
-		withNumAccounts(2),
-		withNow(now),
-		withIglooGenesis(),
-		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
-			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					new(genesis.Timestamp),
-					[]common.Address{addresses[adminIdx]},
-					nil,
-					nil,
-					&cfg,
-				),
-			}
-		}),
-	)
+	wallet := newWallet(t, 2)
+	timeOpt, _ := withVMTime(testStartTime)
+	opts := []sutOption{
+		withMaxAllocFor(wallet.Addresses()...),
+		withGasPriceManager(wallet.Addresses()[adminIdx], &cfg),
+		withDB(memdb.New()),
+		withChainDataDir(t.TempDir()),
+		timeOpt,
+	}
+	ctx, sut := newSUT(t, opts...)
 
 	wantPinned := uint256.NewInt(pinnedMinPrice)
 
-	sut.advanceTime(t, blockBuildAdvance)
-	sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
-	preRestart := sut.buildAcceptExecuteBlock(t)
+	sut.clock.Advance(blockBuildAdvance)
+	sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+	preRestart := sut.RunConsensusLoop(ctx, t)
 	require.Equal(t, wantPinned, preRestart.ExecutedBaseFee(),
 		"pre-restart ExecutedBaseFee must reflect pinned MinGasPrice")
 
-	sut.restart(t)
+	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
+	ctx, sut = newSUT(t, opts...)
 
-	sut.advanceTime(t, blockBuildAdvance)
-	sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
-	postRestart := sut.buildAcceptExecuteBlock(t)
+	sut.clock.Advance(blockBuildAdvance)
+	sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+	postRestart := sut.RunConsensusLoop(ctx, t)
 	require.Equal(t, wantPinned, postRestart.ExecutedBaseFee(),
 		"post-restart ExecutedBaseFee must still reflect pinned MinGasPrice (header roundtrip)")
 }

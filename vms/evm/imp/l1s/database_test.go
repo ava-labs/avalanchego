@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/types"
 )
@@ -68,24 +67,23 @@ func TestConfig_UseStandaloneDatabase(t *testing.T) {
 // chain data, so the chain resumes from it after a restart while the node's
 // database stays empty.
 func TestStandaloneDatabase(t *testing.T) {
-	sut := newL1SUT(
-		t,
-		withFork(upgrade.Igloo),
-		withNow(postIglooStartTime(t)),
-		withStandaloneDatabase(t.TempDir()),
-	)
+	wallet := newWallet(t, 1)
+	nodeDB := memdb.New()
+	opts := []sutOption{
+		withMaxAllocFor(wallet.Addresses()...),
+		withDB(nodeDB),
+		withChainDataDir(t.TempDir()),
+	}
 
-	sut.advanceTime(t, blockBuildAdvance)
-	sut.sendTransferTx(t, 0, 0, common.Big1)
-	want := sut.buildAcceptExecuteBlock(t)
+	ctx, sut := newSUT(t, opts...)
+	sut.send(ctx, t, wallet, 0, transferTx(common.Address{1}, common.Big1))
+	want := sut.RunConsensusLoop(ctx, t)
+	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
 
-	sut.restart(t)
+	ctx, restarted := newSUT(t, opts...)
+	require.Equal(t, want.ID(), restarted.LastAcceptedID(ctx, t), "LastAcceptedID() after restart")
 
-	got, err := sut.vm.LastAccepted(sut.ctx)
-	require.NoError(t, err)
-	require.Equal(t, want.ID(), got, "LastAccepted() after restart")
-
-	count, err := database.Count(sut.baseDB)
+	count, err := database.Count(nodeDB)
 	require.NoError(t, err)
 	require.Zero(t, count, "database.Count(node database)")
 }

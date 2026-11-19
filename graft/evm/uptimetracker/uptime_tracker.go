@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var ErrValidationIDNotFound = errors.New("validationID not found")
@@ -40,7 +39,7 @@ func New(
 	validatorState validators.State,
 	subnetID ids.ID,
 	db database.Database,
-	clock *mockable.Clock,
+	clock uptime.Clock,
 ) (*UptimeTracker, error) {
 	s, err := newState(db)
 	if err != nil {

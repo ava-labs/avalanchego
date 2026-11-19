@@ -60,7 +60,7 @@ var (
 	testAllocFund = big.NewInt(1_000_000_000_000_000_000)
 )
 
-func mustMarshal(v any) []byte {
+func marshalJSON(v any) []byte {
 	b, err := json.Marshal(v)
 	if err != nil {
 		panic(err)
@@ -105,7 +105,7 @@ func testGenesis(opts ...genesisOption) *ethcore.Genesis {
 }
 
 func testGenesisJSON(opts ...genesisOption) string {
-	return string(mustMarshal(testGenesis(opts...)))
+	return string(marshalJSON(testGenesis(opts...)))
 }
 
 func withGenesis(fn func(*ethcore.Genesis)) genesisOption {
@@ -115,7 +115,7 @@ func withGenesis(fn func(*ethcore.Genesis)) genesisOption {
 // overridesJSON returns upgrade bytes that override the network upgrades
 // with u.
 func overridesJSON(u extras.NetworkUpgrades) string {
-	return string(mustMarshal(extras.UpgradeConfig{
+	return string(marshalJSON(extras.UpgradeConfig{
 		NetworkUpgradeOverrides: &u,
 	}))
 }
@@ -341,7 +341,7 @@ func TestParseGenesis(t *testing.T) {
 			name:    "gaspricemanager_upgrade_before_igloo",
 			ctx:     helicon,
 			genesis: testGenesisJSON(),
-			upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
+			upgradeBytes: string(marshalJSON(extras.UpgradeConfig{
 				PrecompileUpgrades: []extras.PrecompileUpgrade{{
 					Config: gaspricemanager.NewConfig(new(testGenesisTime+1), nil, nil, nil, nil),
 				}},

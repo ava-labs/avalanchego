@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
@@ -48,11 +47,8 @@ type VM struct {
 	*sae.VM          // created by [VM.Initialize]
 	*network.Network // created by [VM.Initialize]
 
-	// now is the clock provided to the [sae.VM] and is used for block building.
+	// now is the clock provided to the [sae.VM] and the uptime tracker.
 	now func() time.Time
-	// clock drives the validator uptime tracker. It is allocated by
-	// [VM.Initialize] if nil.
-	clock *mockable.Clock
 
 	uptime *uptimetracker.UptimeTracker
 	// startUptimeSync starts periodically syncing [VM.uptime] with the
@@ -169,10 +165,7 @@ func (vm *VM) Initialize(
 	}
 	vm.onClose = append(vm.onClose, vm.VM.Shutdown)
 
-	if vm.clock == nil {
-		vm.clock = &mockable.Clock{}
-	}
-	vm.uptime, err = uptimetracker.New(snowCtx.ValidatorState, snowCtx.SubnetID, prefixdb.New(validatorsDBPrefix, avaDB), vm.clock)
+	vm.uptime, err = uptimetracker.New(snowCtx.ValidatorState, snowCtx.SubnetID, prefixdb.New(validatorsDBPrefix, avaDB), unixClock(vm.now))
 	if err != nil {
 		return fmt.Errorf("creating uptime tracker: %w", err)
 	}
@@ -230,6 +223,11 @@ func (vm *VM) Initialize(
 	snowCtx.Log.Info("initialized L1 VM")
 	return nil
 }
+
+// unixClock is a time source for [uptimetracker.New].
+type unixClock func() time.Time
+
+func (c unixClock) UnixTime() time.Time { return c().Truncate(time.Second) }
 
 const (
 	// validatorNamespace is the JSON-RPC namespace of [l1api.Validator].

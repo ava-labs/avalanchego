@@ -5,12 +5,12 @@
 package l1s
 
 import (
+	"context"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
@@ -18,9 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
-	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 
-	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
 )
 
@@ -31,12 +30,12 @@ const nativeMinterCallGas = 100_000
 
 // sendMintTx packs a `mintNativeCoin(target, amount)` calldata for the
 // nativeminter precompile and broadcasts it from account `from`.
-func sendMintTx(t *testing.T, sut *l1SUT, from int, target common.Address, amount *big.Int) *types.Transaction {
+func sendMintTx(ctx context.Context, t *testing.T, sut *SUT, wallet *saetest.Wallet, from int, target common.Address, amount *big.Int) *types.Transaction {
 	t.Helper()
 
 	data, err := nativeminter.PackMintNativeCoin(target, amount)
 	require.NoError(t, err)
-	return sut.sendCallTx(t, from, nativeminter.ContractAddress, data, nativeMinterCallGas)
+	return sut.send(ctx, t, wallet, from, callTx(nativeminter.ContractAddress, data, nativeMinterCallGas))
 }
 
 // TestNativeMinterPrecompileUpgradesSAE exercises mid-chain
@@ -57,7 +56,7 @@ func sendMintTx(t *testing.T, sut *l1SUT, from int, target common.Address, amoun
 //  1. The precompile is correctly enabled / disabled at the scheduled
 //     timestamp (via `StartExecutingBlock` -> `core.ApplyUpgrades`).
 //  2. Admin / manager roles are observable via the generic
-//     [l1SUT.fetchAllowListRole] helper and follow the last-executed vs
+//     [SUT.fetchAllowListRole] helper and follow the last-executed vs
 //     last-settled lag exactly as for the allowlists.
 //  3. Mint txs from non-allow-listed senders are admitted at RPC and
 //     included in the block, but produce a `status=failed` receipt with no
@@ -71,7 +70,7 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 		nonAdminIdx = 1
 	)
 
-	now := postIglooStartTime(t)
+	now := testStartTime
 	disableTime := now.Add(saeparams.Tau)
 	reenableTime := disableTime.Add(2 * saeparams.Tau)
 
@@ -80,47 +79,42 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 	target := common.HexToAddress("0x00000000000000000000000000000000DeadBeef")
 	mintAmount := big.NewInt(1_000_000_000)
 
-	sut := newL1SUT(
-		t,
-		withFork(upgrade.Igloo),
-		withNumAccounts(2),
-		withNow(now),
-		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
-			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-				nativeminter.ConfigKey: nativeminter.NewConfig(
-					new(uint64(0)),
-					[]common.Address{addresses[adminIdx]},
-					nil,
-					nil,
-					nil, // no initial mint
-				),
-			}
-		}),
-		withUpgradeConfig(func(addresses []common.Address) []byte {
-			return marshalJSON(t, &extras.UpgradeConfig{
-				PrecompileUpgrades: []extras.PrecompileUpgrade{
-					{
-						Config: nativeminter.NewDisableConfig(new(uint64(disableTime.Unix()))), // #nosec G115 -- known positive test timestamp
-					},
-					{
-						// Re-enable promotes `nonAdminIdx` to manager so we
-						// can observe the new config land in state.
-						Config: nativeminter.NewConfig(
-							new(uint64(reenableTime.Unix())), // #nosec G115 -- known positive test timestamp
-							[]common.Address{addresses[adminIdx]},
-							nil,
-							[]common.Address{addresses[nonAdminIdx]},
-							nil,
-						),
-					},
-				},
-			})
-		}),
-	)
-
-	addresses := sut.ethWallet.Addresses()
+	wallet := newWallet(t, 2)
+	addresses := wallet.Addresses()
 	admin := addresses[adminIdx]
 	nonAdmin := addresses[nonAdminIdx]
+
+	ctx, sut := newSUT(
+		t,
+		withMaxAllocFor(addresses...),
+		withGenesisPrecompiles(extras.Precompiles{
+			nativeminter.ConfigKey: nativeminter.NewConfig(
+				new(uint64(0)),
+				[]common.Address{admin},
+				nil,
+				nil,
+				nil, // no initial mint
+			),
+		}),
+		withUpgrades(extras.UpgradeConfig{
+			PrecompileUpgrades: []extras.PrecompileUpgrade{
+				{
+					Config: nativeminter.NewDisableConfig(new(uint64(disableTime.Unix()))), // #nosec G115 -- known positive test timestamp
+				},
+				{
+					// Re-enable promotes `nonAdminIdx` to manager so we
+					// can observe the new config land in state.
+					Config: nativeminter.NewConfig(
+						new(uint64(reenableTime.Unix())), // #nosec G115 -- known positive test timestamp
+						[]common.Address{admin},
+						nil,
+						[]common.Address{nonAdmin},
+						nil,
+					),
+				},
+			},
+		}),
+	)
 
 	// Step 0: at genesis, nativeminter is enabled with `admin` as the only
 	// allow-listed minter. Latest and finalized agree (no upgrades yet).
@@ -128,33 +122,33 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 	require.True(t, sut.isPrecompileEnabledAtLatest(nativeminter.ContractAddress),
 		"nativeminter must be enabled at genesis")
 	// (2) Genesis config is applied to state in both latest & finalized.
-	require.Equal(t, allowlist.AdminRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, admin, rpc.LatestBlockNumber))
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, nonAdmin, rpc.LatestBlockNumber))
-	require.Equal(t, allowlist.AdminRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, admin, rpc.FinalizedBlockNumber))
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
+	require.Equal(t, allowlist.AdminRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, admin, rpc.LatestBlockNumber))
+	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, nonAdmin, rpc.LatestBlockNumber))
+	require.Equal(t, allowlist.AdminRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, admin, rpc.FinalizedBlockNumber))
+	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
 
 	// (3) Both mint txs are admitted at RPC. The admin's call succeeds and
 	// credits `target` by exactly `mintAmount`; the non-admin's call reverts
 	// because the precompile returns ErrCannotMint, producing a status=failed
 	// receipt with no balance change.
-	preBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
+	preBalance, err := sut.EthClient().BalanceAt(ctx, target, nil)
 	require.NoError(t, err)
 	require.Zero(t, preBalance.Sign(), "target balance must be 0 before any mint")
 
-	adminMint := sendMintTx(t, sut, adminIdx, target, mintAmount)
-	block := sut.buildAcceptExecuteBlock(t)
+	adminMint := sendMintTx(ctx, t, sut, wallet, adminIdx, target, mintAmount)
+	block := sut.RunConsensusLoop(ctx, t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, adminMint.Hash(), block.Transactions()[0].Hash())
-	sut.requireTxSucceeded(t, adminMint)
+	sut.requireReceiptStatus(ctx, t, adminMint, types.ReceiptStatusSuccessful)
 
-	sut.advanceTime(t, blockBuildAdvance)
-	nonAdminMint := sendMintTx(t, sut, nonAdminIdx, target, mintAmount)
-	block = sut.buildAcceptExecuteBlock(t)
+	sut.clock.Advance(blockBuildAdvance)
+	nonAdminMint := sendMintTx(ctx, t, sut, wallet, nonAdminIdx, target, mintAmount)
+	block = sut.RunConsensusLoop(ctx, t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, nonAdminMint.Hash(), block.Transactions()[0].Hash())
-	sut.requireTxFailed(t, nonAdminMint)
+	sut.requireReceiptStatus(ctx, t, nonAdminMint, types.ReceiptStatusFailed)
 
-	postBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
+	postBalance, err := sut.EthClient().BalanceAt(ctx, target, nil)
 	require.NoError(t, err)
 	require.Zerof(t, postBalance.Cmp(mintAmount),
 		"target balance must reflect exactly one successful mint (want=%s got=%s)", mintAmount, postBalance)
@@ -172,13 +166,13 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 	// (the calldata is just ignored). We assert the latter — that the
 	// post-disable mint had no effect on `target`'s balance — as the
 	// observable proof the precompile is no longer active.
-	sut.setTime(t, disableTime.Add(time.Second))
-	postDisableMint := sendMintTx(t, sut, adminIdx, target, mintAmount)
-	block = sut.buildAcceptExecuteBlock(t)
+	sut.clock.Set(disableTime.Add(time.Second))
+	postDisableMint := sendMintTx(ctx, t, sut, wallet, adminIdx, target, mintAmount)
+	block = sut.RunConsensusLoop(ctx, t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, postDisableMint.Hash(), block.Transactions()[0].Hash())
 
-	postDisableBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
+	postDisableBalance, err := sut.EthClient().BalanceAt(ctx, target, nil)
 	require.NoError(t, err)
 	require.Zerof(t, postDisableBalance.Cmp(mintAmount),
 		"target balance must be unchanged after the precompile was disabled (want=%s got=%s)", mintAmount, postDisableBalance)
@@ -189,35 +183,35 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 		"nativeminter must be disabled after activation")
 	// (2) Latest reflects the disable; finalized still observes the
 	// pre-disable admin role (settlement lags by Tau).
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, admin, rpc.LatestBlockNumber))
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, nonAdmin, rpc.LatestBlockNumber))
-	require.Equal(t, allowlist.AdminRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, admin, rpc.FinalizedBlockNumber),
+	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, admin, rpc.LatestBlockNumber))
+	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, nonAdmin, rpc.LatestBlockNumber))
+	require.Equal(t, allowlist.AdminRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, admin, rpc.FinalizedBlockNumber),
 		"finalized state must still show admin role until disable settles")
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
+	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
 
 	// Allow the disable activation to settle so finalized catches up.
-	sut.advanceTime(t, saeparams.Tau+time.Second)
-	settleTx := sut.sendTransferTx(t, adminIdx, nonAdminIdx, common.Big1)
-	block = sut.buildAcceptExecuteBlock(t)
+	sut.clock.Advance(saeparams.Tau + time.Second)
+	settleTx := sut.send(ctx, t, wallet, adminIdx, transferTx(nonAdmin, common.Big1))
+	block = sut.RunConsensusLoop(ctx, t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, settleTx.Hash(), block.Transactions()[0].Hash())
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, admin, rpc.FinalizedBlockNumber),
+	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, admin, rpc.FinalizedBlockNumber),
 		"finalized must reflect disable once it has settled")
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
+	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
 
 	// Step 2: advance to `reenableTime` and produce the re-enable activation
 	// block. The upgrade fires in `StartExecutingBlock`, so a mint from
 	// the now-promoted manager (`nonAdmin`) in this block sees the
 	// precompile already enabled with the new roles and succeeds.
-	sut.setTime(t, reenableTime)
-	managerMint := sendMintTx(t, sut, nonAdminIdx, target, mintAmount)
-	block = sut.buildAcceptExecuteBlock(t)
+	sut.clock.Set(reenableTime)
+	managerMint := sendMintTx(ctx, t, sut, wallet, nonAdminIdx, target, mintAmount)
+	block = sut.RunConsensusLoop(ctx, t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, managerMint.Hash(), block.Transactions()[0].Hash())
-	sut.requireTxSucceeded(t, managerMint)
+	sut.requireReceiptStatus(ctx, t, managerMint, types.ReceiptStatusSuccessful)
 
 	// Manager mint credited `target` by another `mintAmount`.
-	postReenableBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
+	postReenableBalance, err := sut.EthClient().BalanceAt(ctx, target, nil)
 	require.NoError(t, err)
 	want := new(big.Int).Mul(mintAmount, big.NewInt(2))
 	require.Zerof(t, postReenableBalance.Cmp(want),
@@ -229,9 +223,9 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 		"nativeminter must be re-enabled after activation")
 	// (2) Latest reflects the re-enable (admin + manager promotion);
 	// finalized is still pre-re-enable (no roles).
-	require.Equal(t, allowlist.AdminRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, admin, rpc.LatestBlockNumber))
-	require.Equal(t, allowlist.ManagerRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, nonAdmin, rpc.LatestBlockNumber))
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, admin, rpc.FinalizedBlockNumber),
+	require.Equal(t, allowlist.AdminRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, admin, rpc.LatestBlockNumber))
+	require.Equal(t, allowlist.ManagerRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, nonAdmin, rpc.LatestBlockNumber))
+	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, admin, rpc.FinalizedBlockNumber),
 		"finalized state must still reflect disabled allowlist until re-enable settles")
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
+	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, nativeminter.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
 }

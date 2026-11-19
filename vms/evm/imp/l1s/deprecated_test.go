@@ -92,12 +92,12 @@ func TestParseConfigDeprecated(t *testing.T) {
 		},
 		{
 			name: "database_config_file",
-			json: `{"database-config-file":` + string(marshalJSON(t, dbConfigFile)) + `}`,
+			json: `{"database-config-file":` + string(marshalJSON(dbConfigFile)) + `}`,
 			want: withDBConfig,
 		},
 		{
 			name:    "database_config_file_missing",
-			json:    `{"database-config-file":` + string(marshalJSON(t, filepath.Join(t.TempDir(), "missing.json"))) + `}`,
+			json:    `{"database-config-file":` + string(marshalJSON(filepath.Join(t.TempDir(), "missing.json"))) + `}`,
 			wantErr: fs.ErrNotExist,
 		},
 		{

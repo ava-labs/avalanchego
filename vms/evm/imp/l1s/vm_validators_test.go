@@ -5,6 +5,7 @@
 package l1s
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -16,13 +17,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api/l1sclient"
 
 	l1api "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api"
 	saerpc "github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 )
 
-// TestUptimeTracker exercises the SAE-side uptime tracker through
-// `vm.Connected/Disconnected` and a faked `mockable.Clock`.
+// TestUptimeTracker exercises the uptime tracker through
+// `vm.Connected/Disconnected` and the VM's clock.
 //
 //  0. After `SetState(NormalOp)` the validator is registered with 0 uptime.
 //  1. After being connected for 1 hour, uptime is 1 hour.
@@ -33,48 +35,47 @@ func TestUptimeTracker(t *testing.T) {
 	var (
 		testNodeID       = ids.GenerateTestNodeID()
 		testValidationID = ids.GenerateTestID()
-		baseTime         = time.Unix(0, 0)
+		baseTime         = upgrade.InitiallyActiveTime
 		startTime        = uint64(baseTime.Unix()) // #nosec G115 -- known positive test timestamp
-		now              = baseTime
 	)
 
-	sut := newL1SUT(
+	timeOpt, clock := withVMTime(baseTime)
+	ctx, sut := newSUT(
 		t,
-		withFork(upgrade.Latest),
-		withNow(now),
-		withCurrentValidatorSet(testValidationID, testNodeID, startTime),
+		timeOpt,
+		withCurrentValidator(testValidationID, testNodeID, startTime),
 	)
 
 	// (0) Validator known but not yet connected: 0 uptime, lastUpdated == baseTime.
-	upDuration, lastUpdated, err := sut.vm.uptime.GetUptime(testValidationID)
+	upDuration, lastUpdated, err := sut.uptime.GetUptime(testValidationID)
 	require.NoError(t, err)
 	require.Equalf(t, time.Duration(0), upDuration, "initial uptime must be 0")
 	require.Equalf(t, baseTime, lastUpdated, "initial lastUpdated must be baseTime")
 
 	// (1) Connect and let 1h pass.
-	require.NoError(t, sut.vm.Connected(sut.ctx, testNodeID, version.Current))
-	sut.advanceTime(t, 1*time.Hour)
+	require.NoError(t, sut.Connected(ctx, testNodeID, version.Current))
+	clock.Advance(1 * time.Hour)
 
-	upDuration, lastUpdated, err = sut.vm.uptime.GetUptime(testValidationID)
+	upDuration, lastUpdated, err = sut.uptime.GetUptime(testValidationID)
 	require.NoError(t, err)
 	require.Equalf(t, 1*time.Hour, upDuration, "uptime after 1h connected must be 1h")
 	require.Equalf(t, baseTime.Add(1*time.Hour), lastUpdated, "lastUpdated must reflect new clock time")
 
 	// (2) Disconnect and let another hour pass: uptime must NOT advance,
 	//     but lastUpdated must.
-	require.NoError(t, sut.vm.Disconnected(sut.ctx, testNodeID))
-	sut.advanceTime(t, 1*time.Hour)
+	require.NoError(t, sut.Disconnected(ctx, testNodeID))
+	clock.Advance(1 * time.Hour)
 
-	upDuration, lastUpdated, err = sut.vm.uptime.GetUptime(testValidationID)
+	upDuration, lastUpdated, err = sut.uptime.GetUptime(testValidationID)
 	require.NoError(t, err)
 	require.Equalf(t, 1*time.Hour, upDuration, "uptime must NOT advance while disconnected")
 	require.Equalf(t, baseTime.Add(2*time.Hour), lastUpdated, "lastUpdated must still advance")
 
 	// (3) Reconnect and let 30m pass: uptime must reach 1h30m.
-	require.NoError(t, sut.vm.Connected(sut.ctx, testNodeID, version.Current))
-	sut.advanceTime(t, 30*time.Minute)
+	require.NoError(t, sut.Connected(ctx, testNodeID, version.Current))
+	clock.Advance(30 * time.Minute)
 
-	upDuration, lastUpdated, err = sut.vm.uptime.GetUptime(testValidationID)
+	upDuration, lastUpdated, err = sut.uptime.GetUptime(testValidationID)
 	require.NoError(t, err)
 	require.Equalf(t, 1*time.Hour+30*time.Minute, upDuration,
 		"uptime must be 1h30m (1h initial + 30m reconnect)")
@@ -86,10 +87,20 @@ func TestUptimeTracker(t *testing.T) {
 // validation ID the tracker has never seen returns
 // `uptimetracker.ErrValidationIDNotFound`.
 func TestUptimeTrackerUnknownValidationID(t *testing.T) {
-	sut := newL1SUT(t, withFork(upgrade.Latest))
+	_, sut := newSUT(t)
 
-	_, _, err := sut.vm.uptime.GetUptime(ids.GenerateTestID())
+	_, _, err := sut.uptime.GetUptime(ids.GenerateTestID())
 	require.ErrorIs(t, err, uptimetracker.ErrValidationIDNotFound)
+}
+
+// l1sClient dials the L1-specific API of the SUT.
+func (s *SUT) l1sClient(ctx context.Context, tb testing.TB) *l1sclient.Client {
+	tb.Helper()
+
+	c, err := l1sclient.Dial(ctx, s.URL+"/rpc")
+	require.NoError(tb, err, "l1sclient.Dial()")
+	tb.Cleanup(c.Close)
+	return c
 }
 
 // TestUptimeAPI asserts that `validator_uptime` reports the tracked uptime and
@@ -98,25 +109,26 @@ func TestUptimeAPI(t *testing.T) {
 	var (
 		testNodeID       = ids.GenerateTestNodeID()
 		testValidationID = ids.GenerateTestID()
-		baseTime         = time.Unix(0, 0)
+		baseTime         = upgrade.InitiallyActiveTime
 		startTime        = uint64(baseTime.Unix()) // #nosec G115 -- known positive test timestamp
 	)
 
-	sut := newL1SUT(
+	timeOpt, clock := withVMTime(baseTime)
+	ctx, sut := newSUT(
 		t,
-		withFork(upgrade.Latest),
-		withNow(baseTime),
-		withCurrentValidatorSet(testValidationID, testNodeID, startTime),
+		timeOpt,
+		withCurrentValidator(testValidationID, testNodeID, startTime),
 	)
+	client := sut.l1sClient(ctx, t)
 
 	// Connected for 1h then disconnected for 1h, so the uptime and
 	// last-updated time differ.
-	require.NoError(t, sut.vm.Connected(sut.ctx, testNodeID, version.Current))
-	sut.advanceTime(t, 1*time.Hour)
-	require.NoError(t, sut.vm.Disconnected(sut.ctx, testNodeID))
-	sut.advanceTime(t, 1*time.Hour)
+	require.NoError(t, sut.Connected(ctx, testNodeID, version.Current))
+	clock.Advance(1 * time.Hour)
+	require.NoError(t, sut.Disconnected(ctx, testNodeID))
+	clock.Advance(1 * time.Hour)
 
-	got, err := sut.client.Uptime(sut.ctx, testValidationID)
+	got, err := client.Uptime(ctx, testValidationID)
 	require.NoError(t, err)
 	want := &l1api.Uptime{
 		Seconds:     hexutil.Uint64((1 * time.Hour).Seconds()),
@@ -124,18 +136,19 @@ func TestUptimeAPI(t *testing.T) {
 	}
 	require.Equal(t, want, got)
 
-	_, err = sut.client.Uptime(sut.ctx, ids.GenerateTestID())
+	_, err = client.Uptime(ctx, ids.GenerateTestID())
 	require.ErrorContains(t, err, uptimetracker.ErrValidationIDNotFound.Error()) //nolint:forbidigo // RPC error
 }
 
 // TestValidatorAPIDisabled asserts that the validator namespace MUST NOT be
 // served unless [apiValidator] is enabled.
 func TestValidatorAPIDisabled(t *testing.T) {
-	sut := newL1SUT(t, withAPIs(saerpc.DefaultAPIs()))
+	ctx, sut := newSUT(t, withAPIs(saerpc.DefaultAPIs()))
+	client := sut.l1sClient(ctx, t)
 
-	_, err := sut.client.Uptime(sut.ctx, ids.GenerateTestID())
+	_, err := client.Uptime(ctx, ids.GenerateTestID())
 	var rpcErr rpc.Error
 	require.ErrorAs(t, err, &rpcErr)
 	const methodNotFound = -32601 // JSON-RPC 2.0
-	require.Equal(t, methodNotFound, rpcErr.ErrorCode(), "%T.Uptime() error code", sut.client)
+	require.Equal(t, methodNotFound, rpcErr.ErrorCode(), "%T.Uptime() error code", client)
 }

@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
-	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -18,12 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
 )
-
-func withUpgrades(u extras.UpgradeConfig) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.upgrades = u
-	})
-}
 
 func TestGetChainConfig(t *testing.T) {
 	const (
