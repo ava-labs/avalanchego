@@ -6,7 +6,7 @@ package simplex
 import (
 	"sync"
 
-	metadata "github.com/ava-labs/simplex/msm"
+	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
 )
 
 // ValidatorCache wraps a PlatformChain and remembers the validator set of the

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/simplex/common"
-	"github.com/ava-labs/simplex/testutil"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

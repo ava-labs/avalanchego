@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ava-labs/simplex/common"
-	"github.com/ava-labs/simplex/wal"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/wal"
 	"github.com/stretchr/testify/require"
 )
 

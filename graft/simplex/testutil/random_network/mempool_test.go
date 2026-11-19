@@ -7,9 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ava-labs/simplex/common"
-	"github.com/ava-labs/simplex/simplex"
-	"github.com/ava-labs/simplex/testutil"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
+	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 	"github.com/stretchr/testify/require"
 )
 

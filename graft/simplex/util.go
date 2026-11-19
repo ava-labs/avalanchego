@@ -7,8 +7,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/simplex/common"
-	metadata "github.com/ava-labs/simplex/msm"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
 	"go.uber.org/zap"
 )
 
