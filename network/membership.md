@@ -10,8 +10,44 @@ means editing and restarting every validator.
 
 This proposes that a subnet can instead trust a **membership CA** and admit any
 peer whose staking certificate was issued under it. Admitting a node then takes
-one certificate and no change on the other nodes. Two new settings in the subnet
-config set it, each as a PEM file path or inline PEM text:
+one certificate and no change on the other nodes.
+
+A typical CA hierarchy:
+
+```text
+Member Root CA     offline · trusted by every node of the subnet
+└── Nodes CA       the online issuer
+    ├── rpc-01     key generated on the node, never leaves it
+    └── archival-01
+```
+
+How a member such as rpc-01 gets its certificate and node ID. No private key
+ever leaves the machine that created it:
+
+1. **Root CA.** Creates the root key and a self-signed certificate
+   (`root.crt`) offline. Every node of the subnet installs `root.crt` as its
+   membership CA.
+2. **Nodes CA → Root CA, once.** The Nodes CA creates its key and a certificate
+   signing request (CSR) and sends the CSR. The root signs it and sends back
+   `nodes-ca.crt`.
+3. **rpc-01 → Nodes CA.** rpc-01 creates its staking key (`staker.key`: ECDSA
+   P-256, RSA-2048 or RSA-4096, as for any staking certificate) and a CSR, and
+   sends the CSR.
+4. **Nodes CA → rpc-01.** The Nodes CA signs a leaf certificate of at most
+   2 KiB and sends back `staker.crt`, a PEM bundle of the leaf followed by
+   `nodes-ca.crt`.
+5. **rpc-01 starts** with `--staking-tls-cert-file=staker.crt` and
+   `--staking-tls-key-file=staker.key`.
+6. **rpc-01 → peer.** In the TLS handshake, rpc-01 sends the bundle and signs
+   the handshake with `staker.key`.
+7. **Peer.** Checks the handshake signature against the leaf, verifies the
+   chain to its membership CA, and derives the node ID from the leaf as today:
+   `RIPEMD-160(SHA-256(leaf DER))`. A copied certificate fails without its key
+   and a self-signed one fails the chain. rpc-01 reads its own node ID from
+   `info.getNodeID`.
+
+Two new settings in the subnet config set the roots and revocation lists, each
+as a PEM file path or inline PEM text:
 
 ```json
 {
@@ -24,15 +60,6 @@ config set it, each as a PEM file path or inline PEM text:
 - `membershipCAPath` / `membershipCA`: the roots. Listing several stages a root
   rotation.
 - `membershipCRLPath` / `membershipCRL`: optional revocation lists (X.509 CRLs).
-
-A typical CA hierarchy:
-
-```text
-Member Root CA       offline · trusted by this subnet's nodes only (membershipCA)
-└── Nodes CA         the online issuer
-    ├── rpc-01       key generated on the node, never leaves it
-    └── archival-01
-```
 
 A peer would be a member of a tracked subnet if it validates the subnet, is
 listed in `allowedNodes`, or its certificate chain verifies against the subnet's
