@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest"
 )
 
 func TestMonitorDoubleClose(t *testing.T) {
@@ -152,7 +153,6 @@ func (t *testLogger) intercept(hook func(entry zapcore.Entry) error) {
 }
 
 func makeLogger(t *testing.T) *testLogger {
-	logger, err := zap.NewDevelopment()
-	require.NoError(t, err)
+	logger := zaptest.NewLogger(t, zaptest.Level(zapcore.DebugLevel))
 	return &testLogger{Logger: logger}
 }

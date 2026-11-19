@@ -393,11 +393,14 @@ func TestReplicationStartsBeforeCurrentRound(t *testing.T) {
 	require.Equal(t, startSeq, normalNode3.Storage.NumBlocks())
 	require.Equal(t, uint64(0), laggingNode.Storage.NumBlocks())
 
-	net.StartInstances()
-	defer net.StopInstances()
+	// Start the lagging node alone so that no messages from the other nodes advance it past its restored round.
+	laggingNode.Start()
+	require.Equal(t, uint64(2), laggingNode.E.Metadata().Round)
 
-	laggingNodeMd := laggingNode.E.Metadata()
-	require.Equal(t, uint64(2), laggingNodeMd.Round)
+	normalNode3.Start()
+	normalNode2.Start()
+	normalNode1.Start()
+	defer net.StopInstances()
 
 	net.TriggerLeaderBlockBuilder(startSeq)
 	for i := uint64(0); i <= startSeq; i++ {
@@ -704,8 +707,6 @@ func TestReplicationStuckInProposingBlock(t *testing.T) {
 // have a stale notarization for a round(i.e. a node notarized a block but the rest of the network
 // propagated an empty notarization).
 func TestReplicationNodeDiverges(t *testing.T) {
-	t.Setenv("LOG_LEVEL", "debug")
-
 	nodes := []common.NodeID{{1}, {2}, {3}, {4}, {5}, {6}}
 	numBlocks := uint64(5)
 
@@ -1604,7 +1605,7 @@ func TestReplicationStartsRoundFromFinalization(t *testing.T) {
 
 	// Verify the node sent an empty vote after timeout
 	var foundEmptyVote bool
-	timeout := time.After(5 * time.Second)
+	timeout := time.After(testutil.DefaultTimeout)
 	iteration := 1
 messages:
 	for {
@@ -1726,7 +1727,7 @@ func TestReplicationStartsRoundFromFinalizationWithBlock(t *testing.T) {
 
 	// Verify the node sent an empty vote after timeout
 	var foundEmptyVote bool
-	timeout := time.After(5 * time.Second)
+	timeout := time.After(testutil.DefaultTimeout)
 	iteration := 1
 messages:
 	for {
@@ -1900,7 +1901,7 @@ func TestLeaderStartsRoundAfterReplicatedQuorumRound(t *testing.T) {
 						return false
 					}
 				}
-			}, 5*time.Second, 10*time.Millisecond, "node did not request the missing block for round 0")
+			}, testutil.DefaultTimeout, 10*time.Millisecond, "node did not request the missing block for round 0")
 
 			// Answer the request with the notarized/finalized round 0 through the replication path,
 			// delivering the block together with the notarization/finalization once more.
@@ -1913,7 +1914,7 @@ func TestLeaderStartsRoundAfterReplicatedQuorumRound(t *testing.T) {
 			// The node advances to round 1 off the replicated notarization/finalization.
 			require.Eventually(t, func() bool {
 				return e.Metadata().Round == 1
-			}, 5*time.Second, 10*time.Millisecond, "node did not advance to round 1")
+			}, testutil.DefaultTimeout, 10*time.Millisecond, "node did not advance to round 1")
 
 			// Being the leader of round 1, the node must propose a block.
 			require.Eventually(t, func() bool {
@@ -1928,8 +1929,55 @@ func TestLeaderStartsRoundAfterReplicatedQuorumRound(t *testing.T) {
 						return false
 					}
 				}
-			}, 5*time.Second, 50*time.Millisecond, "leader never proposed a block for round 1 after advancing via a replicated quorum round")
+			}, testutil.DefaultTimeout, 50*time.Millisecond, "leader never proposed a block for round 1 after advancing via a replicated quorum round")
 		})
+	}
+}
+
+// TestLeaderDoesNotRestartRoundAfterReplicatingOlderNotarization makes sure that replicating a
+// notarized block for an older round does not restart the current round.
+func TestLeaderDoesNotRestartRoundAfterReplicatingOlderNotarization(t *testing.T) {
+	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	quorum := common.Quorum(len(nodes))
+
+	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), testutil.NewTestBlockBuilder())
+	conf.ReplicationEnabled = true
+
+	e, err := simplex.NewEpoch(conf)
+	require.NoError(t, err)
+	t.Cleanup(e.Stop)
+	require.NoError(t, e.Start())
+
+	// The notarized block for round 0 that the node never received.
+	block0 := testutil.NewTestBlock(e.Metadata(), emptyBlacklist)
+	notarization0, err := testutil.NewNotarization(e.Logger, conf.SignatureAggregatorCreator(conf.Comm.Validators()), block0, nodes[:quorum])
+	require.NoError(t, err)
+
+	// Node 1 times out on round 0 and moves to round 1. It is the leader, so it proposes a block.
+	require.NoError(t, e.HandleMessage(&common.Message{
+		EmptyNotarization: testutil.NewEmptyNotarization(nodes[:quorum], 0),
+	}, nodes[0]))
+
+	// node 1, creates a block proposal
+	wal.AssertBlockProposal(1)
+
+	// The network actually notarized round 0, so we receive it via a replication response.
+	require.NoError(t, e.HandleMessage(&common.Message{
+		ReplicationResponse: &common.ReplicationResponse{
+			Data: []common.QuorumRound{{Block: block0, Notarization: &notarization0}},
+		},
+	}, nodes[0]))
+
+	// Wait for the replicated notarization to be processed.
+	require.Eventually(t, func() bool {
+		return wal.ContainsNotarization(0)
+	}, testutil.DefaultTimeout, 10*time.Millisecond, "node never persisted the replicated notarization for round 0")
+	require.Equal(t, uint64(1), e.Metadata().Round)
+
+	// The node must not have halted. A halted node returns its error for any message it handles.
+	for range 50 {
+		require.NoError(t, e.HandleMessage(&common.Message{}, nodes[0]))
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 

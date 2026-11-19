@@ -12,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
-
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/hashing"
