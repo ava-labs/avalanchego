@@ -8,13 +8,14 @@ submodules at tagged versions via the Go module proxy, using
 
 ## Problem
 
-The repository contains 4 Go modules with circular dependencies:
+The repository contains 5 Go modules with circular dependencies:
 
 | Module | Path |
 |--------|------|
 | Main | `github.com/ava-labs/avalanchego` |
 | Coreth | `github.com/ava-labs/avalanchego/graft/coreth` |
 | EVM | `github.com/ava-labs/avalanchego/graft/evm` |
+| Simplex | `github.com/ava-labs/avalanchego/graft/simplex` |
 | Subnet-EVM | `github.com/ava-labs/avalanchego/graft/subnet-evm` |
 
 Replace directives handle inter-module resolution for local
