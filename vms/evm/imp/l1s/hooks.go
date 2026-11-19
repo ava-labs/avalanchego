@@ -176,18 +176,8 @@ func (*hooks) VerifyBlockSyntax(b *types.Block) error {
 		return fmt.Errorf("%w: %d of 4 fields set", errPartialSettledMarker, settledFields)
 	}
 
-	gasConfigFields := 0
-	for _, set := range []bool{
-		he.TargetToExcessScaling != nil,
-		he.MinPrice != nil,
-		he.StaticPricing != nil,
-	} {
-		if set {
-			gasConfigFields++
-		}
-	}
-	if gasConfigFields != 0 && gasConfigFields != 3 {
-		return fmt.Errorf("%w: %d of 3 fields set", errPartialGasConfig, gasConfigFields)
+	if (he.TargetToExcessScaling == nil) != (he.MinPrice == nil) {
+		return errPartialGasConfig
 	}
 	return nil
 }

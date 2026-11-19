@@ -536,7 +536,7 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 
 		// Added the gas-config group.
 		// TODO(alarso16): Add the remaining SAE required fields.
-		upgrade.Igloo: "0xb1ae7f0face6087d194212b8b5c0877caba51b298416e3ea793171e461133fba",
+		upgrade.Igloo: "0x8afed61aa179a138084218c162f3b50b5664f0e1d4bfb4c2655ca581889eeabc",
 	}
 	_ = hashes[upgrade.Latest] // Enforce completeness at compile time.
 

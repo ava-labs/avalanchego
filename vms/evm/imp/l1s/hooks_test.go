@@ -253,17 +253,9 @@ func TestVerifyBlockSyntaxGasConfigGroup(t *testing.T) {
 	}{
 		{name: "absent", extra: &customtypes.HeaderExtra{}},
 		{
-			name: "one_of_three",
+			name: "partial",
 			extra: &customtypes.HeaderExtra{
 				TargetToExcessScaling: one,
-			},
-			wantErr: errPartialGasConfig,
-		},
-		{
-			name: "two_of_three",
-			extra: &customtypes.HeaderExtra{
-				TargetToExcessScaling: one,
-				MinPrice:              one,
 			},
 			wantErr: errPartialGasConfig,
 		},
@@ -272,7 +264,6 @@ func TestVerifyBlockSyntaxGasConfigGroup(t *testing.T) {
 			extra: &customtypes.HeaderExtra{
 				TargetToExcessScaling: one,
 				MinPrice:              one,
-				StaticPricing:         new(true),
 			},
 		},
 	}

@@ -51,9 +51,8 @@ type HeaderExtra struct {
 	SettledExcess       *uint64
 
 	TargetExcess          *gas.Gas
-	TargetToExcessScaling *uint64
+	TargetToExcessScaling *uint64 // 0 for static pricing
 	MinPrice              *uint64
-	StaticPricing         *bool
 
 	predicateResults atomic.Pointer[predicate.BlockResults]
 }
@@ -180,10 +179,6 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		v := *h.MinPrice
 		cp.MinPrice = &v
 	}
-	if h.StaticPricing != nil {
-		v := *h.StaticPricing
-		cp.StaticPricing = &v
-	}
 	SetHeaderExtra(dst, cp)
 }
 
@@ -217,9 +212,6 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	}
 	if h.MinPrice != nil {
 		m["minPrice"] = hexutil.Uint64(*h.MinPrice)
-	}
-	if h.StaticPricing != nil {
-		m["staticPricing"] = *h.StaticPricing
 	}
 }
 
@@ -278,7 +270,6 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.TargetExcess = (*uint64)(extras.TargetExcess)
 	h.TargetToExcessScaling = extras.TargetToExcessScaling
 	h.MinPrice = extras.MinPrice
-	h.StaticPricing = extras.StaticPricing
 }
 
 func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
@@ -292,7 +283,6 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.TargetExcess = (*gas.Gas)(h.TargetExcess)
 	extras.TargetToExcessScaling = h.TargetToExcessScaling
 	extras.MinPrice = h.MinPrice
-	extras.StaticPricing = h.StaticPricing
 }
 
 // NOTE: both generators currently do not support type aliases.
@@ -351,12 +341,11 @@ type HeaderSerializable struct {
 	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
 	SettledExcess       *uint64 `json:"settledExcess"       rlp:"optional"`
 
-	// TargetExcess, TargetToExcessScaling, MinPrice and StaticPricing were
-	// added by Igloo (SAE) and are ignored in legacy headers.
+	// TargetExcess, TargetToExcessScaling and MinPrice were added by Igloo
+	// (SAE) and are ignored in legacy headers.
 	TargetExcess          *uint64 `json:"targetExcess"          rlp:"optional"`
 	TargetToExcessScaling *uint64 `json:"targetToExcessScaling" rlp:"optional"`
 	MinPrice              *uint64 `json:"minPrice"              rlp:"optional"`
-	StaticPricing         *bool   `json:"staticPricing"         rlp:"optional"`
 }
 
 // field type overrides for gencodec

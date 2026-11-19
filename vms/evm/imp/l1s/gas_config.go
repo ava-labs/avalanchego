@@ -34,62 +34,50 @@ func stampStoredGasConfig(he *customtypes.HeaderExtra, stored commontype.GasPric
 	stampGasConfig(he, gasConfigFromStored(stored))
 }
 
-// stampGasConfig writes the group into `he`. All three fields are always set
-// together; [readGasConfig] treats anything less as absent.
+// stampGasConfig writes c into he, encoding static pricing as a zero
+// TargetToExcessScaling.
 func stampGasConfig(he *customtypes.HeaderExtra, c gastime.GasPriceConfig) {
-	he.TargetToExcessScaling = (*uint64)(&c.TargetToExcessScaling)
+	scaling := uint64(c.TargetToExcessScaling)
+	if c.StaticPricing {
+		scaling = 0
+	}
+	he.TargetToExcessScaling = &scaling
 	he.MinPrice = (*uint64)(&c.MinPrice)
-	he.StaticPricing = &c.StaticPricing
 }
 
-// readGasConfig recovers the group stamped by [stampGasConfig], reporting
-// `false` when the header does not carry a complete group, which only happens
-// before the first SAE block. A maliciously
-// crafted header CAN carry present-but-zero fields (RLP decodes empty
-// optional items as pointers to zero); such headers are rejected by the
-// rebuild-hash-equality check in block verification, never by this reader.
+// readGasConfig returns the config stamped by [stampGasConfig], or false if he
+// has none, which only happens before the first SAE block. Static pricing
+// ignores the scaling, but gastime requires a non-zero one, so it reads as
+// the default.
 func readGasConfig(he *customtypes.HeaderExtra) (gastime.GasPriceConfig, bool) {
-	if he.TargetToExcessScaling == nil ||
-		he.MinPrice == nil ||
-		he.StaticPricing == nil {
+	if he.TargetToExcessScaling == nil || he.MinPrice == nil {
 		return gastime.GasPriceConfig{}, false
 	}
-	return gastime.GasPriceConfig{
+	c := gastime.GasPriceConfig{
 		TargetToExcessScaling: gas.Gas(*he.TargetToExcessScaling),
 		MinPrice:              gas.Price(*he.MinPrice),
-		StaticPricing:         *he.StaticPricing,
-	}, true
+	}
+	if c.TargetToExcessScaling == 0 {
+		c.TargetToExcessScaling = gastime.DefaultTargetToExcessScaling
+		c.StaticPricing = true
+	}
+	return c, true
 }
 
-// scalingFromTimeToDouble converts ACP-224's `TimeToDouble` (seconds) into the
-// K/T ratio used by ACP-176 / gastime: K = T * TimeToDouble / ln(2), so
-// TargetToExcessScaling = round(TimeToDouble / ln(2)). The default 60s
-// round-trips to [gastime.DefaultTargetToExcessScaling].
+// scalingFromTimeToDouble converts ACP-224's TimeToDouble, in seconds, into
+// the ACP-176 TargetToExcessScaling. It scales ACP-176's approximation of 87
+// for a 60s doubling time linearly.
 //
-// For `StaticPricing` configs `TimeToDouble` is 0 and unused (gastime zeroes
-// excess in that branch instead of scaling), but the gastime invariant
-// requires `TargetToExcessScaling != 0`, so we return the default.
+// TimeToDouble is 0 for static pricing, which ignores the scaling, but gastime
+// requires a non-zero scaling, so 0 maps to the default.
 func scalingFromTimeToDouble(ttd uint64) gas.Gas {
 	if ttd == 0 {
 		return gastime.DefaultTargetToExcessScaling
 	}
-
-	// This continued-fraction convergent computes round(ttd / ln(2)) exactly
-	// throughout the uint64 domain without platform-dependent floating point.
-	const (
-		inverseLn2Numerator   uint64 = 4_403_748_962_482_230_453
-		inverseLn2Denominator uint64 = 3_052_446_177_238_342_414
-	)
-	quotient, remainder, err := intmath.MulDiv(
-		ttd,
-		inverseLn2Numerator,
-		inverseLn2Denominator,
-	)
+	const defaultTimeToDouble = 60 // seconds
+	scaling, _, err := intmath.MulDiv(ttd, gastime.DefaultTargetToExcessScaling, defaultTimeToDouble)
 	if err != nil {
 		return math.MaxUint64
 	}
-	if remainder > inverseLn2Denominator/2 {
-		quotient = intmath.BoundedAdd(quotient, 1, uint64(math.MaxUint64))
-	}
-	return gas.Gas(quotient)
+	return gas.Gas(scaling)
 }

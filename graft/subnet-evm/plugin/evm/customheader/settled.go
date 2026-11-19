@@ -29,8 +29,7 @@ func VerifyNoSAEFields(header *types.Header) error {
 		extra.SettledExcess != nil ||
 		extra.TargetExcess != nil ||
 		extra.TargetToExcessScaling != nil ||
-		extra.MinPrice != nil ||
-		extra.StaticPricing != nil {
+		extra.MinPrice != nil {
 		return fmt.Errorf("%w: %s", errSAEFieldSet, header.Hash())
 	}
 	return nil
