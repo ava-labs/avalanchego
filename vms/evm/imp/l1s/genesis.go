@@ -148,19 +148,6 @@ func verifyGasPriceManagerAfterIgloo(cfg *extras.ChainConfig, genesisTimestamp u
 	return nil
 }
 
-// genesisGasConfig returns the gas config in effect at genesisTime, which is
-// what [gaspricemanager.Configure] seeds into genesis state if the precompile
-// is enabled.
-func genesisGasConfig(cfg *extras.ChainConfig, genesisTime uint64) commontype.GasPriceConfig {
-	if cfg.IsPrecompileEnabled(gaspricemanager.ContractAddress, genesisTime) {
-		precompileConfig := cfg.GetActivePrecompileConfig(gaspricemanager.ContractAddress, genesisTime)
-		if c, ok := precompileConfig.(*gaspricemanager.Config); ok && c.InitialGasPriceConfig != nil {
-			return *c.InitialGasPriceConfig
-		}
-	}
-	return commontype.DefaultGasPriceConfig()
-}
-
 // makeUpgrades returns an [extras.NetworkUpgrades] based on the following rules:
 // - By default, use the network upgrades from the genesis.
 // - If any forks are omitted in the genesis, use the primary network's timestamps.

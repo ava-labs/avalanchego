@@ -18,12 +18,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/snow"
@@ -390,15 +388,6 @@ func (b *builder) BuildBlock(
 		receipts,
 		trie.NewStackTrie(nil),
 	), nil
-}
-
-// readGasConfig returns the gas config in effect under rules, read from
-// state if gaspricemanager is enabled.
-func readGasConfig(rules *extras.Rules, state libevm.StateReader) commontype.GasPriceConfig {
-	if !rules.IsPrecompileEnabled(gaspricemanager.ContractAddress) {
-		return commontype.DefaultGasPriceConfig()
-	}
-	return gaspricemanager.GetStoredGasPriceConfig(state, gaspricemanager.ContractAddress)
 }
 
 // resolveCoinbase returns the fee recipient of the block being built.
