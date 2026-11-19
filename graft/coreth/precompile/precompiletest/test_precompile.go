@@ -11,14 +11,18 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/libevm"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
+	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 )
 
 // PrecompileTest is a test case for a precompile
@@ -38,35 +42,29 @@ type PrecompileTest struct {
 	ReadOnly bool
 	// WarpMessages that the precompile should have access to.
 	WarpMessages []predicate.Predicate
-	// SetupBlockContext sets the expected calls on MockBlockContext for the test execution.
-	SetupBlockContext func(*contract.MockBlockContext)
+	// WarpMessageFailures is a list of indices of Warp messages that failed
+	// predicate verification.
+	WarpMessageFailures []int
 	// AfterHook is called after the precompile is called.
 	AfterHook func(t testing.TB, state contract.StateDB)
 	// ExpectedRes is the expected raw byte result returned by the precompile
 	ExpectedRes []byte
 	// ExpectedErr is the expected error returned by the precompile
 	ExpectedErr error
-	// Rules is the rules to use for the precompile's block context
+	// Rules is the rules to use for the precompile
 	Rules cparams.Rules
 }
 
-type PrecompileRunparams struct {
-	AccessibleState contract.AccessibleState
-	Caller          common.Address
-	ContractAddress common.Address
-	Input           []byte
-	SuppliedGas     uint64
-	ReadOnly        bool
-}
+func (test PrecompileTest) Run(t *testing.T, precompile contract.StatefulPrecompiledContract) {
+	input := test.input(t)
 
-func (test PrecompileTest) Run(t *testing.T, address common.Address, precompile contract.StatefulPrecompiledContract) {
 	state := newTestStateDB(t, test.WarpMessages)
-	runParams := test.setup(t, address, state)
+	env := test.setup(t, state)
 
-	if runParams.Input != nil {
-		ret, remainingGas, err := precompile.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.SuppliedGas, runParams.ReadOnly)
+	if input != nil {
+		ret, err := precompile.Run(env, input)
 		require.ErrorIs(t, err, test.ExpectedErr)
-		require.Equal(t, uint64(0), remainingGas)
+		require.Zero(t, env.Gas(), "remaining gas")
 		require.Equal(t, test.ExpectedRes, ret)
 	}
 
@@ -75,20 +73,18 @@ func (test PrecompileTest) Run(t *testing.T, address common.Address, precompile 
 	}
 }
 
-func (test PrecompileTest) Bench(b *testing.B, address common.Address, precompile contract.StatefulPrecompiledContract) {
-	state := newTestStateDB(b, test.WarpMessages)
-	runParams := test.setup(b, address, state)
-
-	if runParams.Input == nil {
+func (test PrecompileTest) Bench(b *testing.B, precompile contract.StatefulPrecompiledContract) {
+	input := test.input(b)
+	if input == nil {
 		b.Skip("Skipping precompile benchmark due to nil input (used for configuration tests)")
 	}
 
-	stateDB := runParams.AccessibleState.GetStateDB()
-	snapshot := stateDB.Snapshot()
+	state := newTestStateDB(b, test.WarpMessages)
+	env := test.setup(b, state)
 
-	ret, remainingGas, err := precompile.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.SuppliedGas, runParams.ReadOnly)
+	ret, err := precompile.Run(env, input)
 	require.ErrorIs(b, err, test.ExpectedErr)
-	require.Equal(b, uint64(0), remainingGas)
+	require.Zero(b, env.Gas(), "remaining gas")
 	require.Equal(b, test.ExpectedRes, ret)
 
 	if test.AfterHook != nil {
@@ -99,13 +95,15 @@ func (test PrecompileTest) Bench(b *testing.B, address common.Address, precompil
 	start := time.Now()
 	b.ResetTimer()
 
+	snapshot := state.Snapshot()
 	for i := 0; i < b.N; i++ {
 		// Revert to the previous snapshot and take a new snapshot, so we can reset the state after execution
-		stateDB.RevertToSnapshot(snapshot)
-		snapshot = stateDB.Snapshot()
+		state.RevertToSnapshot(snapshot)
+		snapshot = state.Snapshot()
+		env.gas = test.SuppliedGas
 
 		// Ignore return values for benchmark
-		_, _, _ = precompile.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.SuppliedGas, runParams.ReadOnly)
+		_, _ = precompile.Run(env, input)
 	}
 	b.StopTimer()
 
@@ -113,18 +111,19 @@ func (test PrecompileTest) Bench(b *testing.B, address common.Address, precompil
 	if elapsed < 1 {
 		elapsed = 1
 	}
-	gasUsed := runParams.SuppliedGas * uint64(b.N)
-	b.ReportMetric(float64(runParams.SuppliedGas), "gas/op")
+	gasUsed := test.SuppliedGas * uint64(b.N)
+	b.ReportMetric(float64(test.SuppliedGas), "gas/op")
 	// Keep it as uint64, multiply 100 to get two digit float later
 	mgasps := (100 * 1000 * gasUsed) / elapsed
 	b.ReportMetric(float64(mgasps)/100, "mgas/s")
 
 	// Execute the test one final time to ensure that if our RevertToSnapshot logic breaks such that each run is actually failing or resulting in unexpected behavior
 	// the benchmark should catch the error here.
-	stateDB.RevertToSnapshot(snapshot)
-	ret, remainingGas, err = precompile.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.SuppliedGas, runParams.ReadOnly)
+	state.RevertToSnapshot(snapshot)
+	env.gas = test.SuppliedGas
+	ret, err = precompile.Run(env, input)
 	require.ErrorIs(b, err, test.ExpectedErr)
-	require.Equal(b, uint64(0), remainingGas)
+	require.Zero(b, env.Gas(), "remaining gas")
 	require.Equal(b, test.ExpectedRes, ret)
 
 	if test.AfterHook != nil {
@@ -132,59 +131,85 @@ func (test PrecompileTest) Bench(b *testing.B, address common.Address, precompil
 	}
 }
 
-func (test PrecompileTest) setup(t testing.TB, address common.Address, state *testStateDB) PrecompileRunparams {
+func (test PrecompileTest) input(tb testing.TB) []byte {
+	tb.Helper()
+	if test.InputFn != nil {
+		return test.InputFn(tb)
+	}
+	return test.Input
+}
+
+func (test PrecompileTest) setup(t testing.TB, state *testStateDB) *testEnv {
 	t.Helper()
 
-	ctrl := gomock.NewController(t)
-
-	blockContext := contract.NewMockBlockContext(ctrl)
-	blockContext.EXPECT().Timestamp().Return(uint64(time.Now().Unix())).AnyTimes()
-	if test.SetupBlockContext != nil {
-		test.SetupBlockContext(blockContext)
-	} else {
-		blockContext.EXPECT().Number().Return(big.NewInt(0)).AnyTimes()
-	}
-	snowContext := snowtest.Context(t, snowtest.CChainID)
-
-	accessibleState := contract.NewMockAccessibleState(ctrl)
-	accessibleState.EXPECT().GetStateDB().Return(state).AnyTimes()
-	accessibleState.EXPECT().GetBlockContext().Return(blockContext).AnyTimes()
-	accessibleState.EXPECT().GetSnowContext().Return(snowContext).AnyTimes()
-	accessibleState.EXPECT().GetRules().Return(test.Rules).AnyTimes()
-
-	input := test.Input
-	if test.InputFn != nil {
-		input = test.InputFn(t)
-	}
-
-	return PrecompileRunparams{
-		AccessibleState: accessibleState,
-		Caller:          test.Caller,
-		ContractAddress: address,
-		Input:           input,
-		SuppliedGas:     test.SuppliedGas,
-		ReadOnly:        test.ReadOnly,
+	return &testEnv{
+		gas:          test.SuppliedGas,
+		readOnly:     test.ReadOnly,
+		state:        state,
+		caller:       test.Caller,
+		snowContext:  snowtest.Context(t, snowtest.CChainID),
+		rules:        test.Rules,
+		warpFailures: set.NewBits(test.WarpMessageFailures...),
 	}
 }
 
-func RunPrecompileTests(t *testing.T, address common.Address, precompile contract.StatefulPrecompiledContract, tests []PrecompileTest) {
+func RunPrecompileTests(t *testing.T, precompile contract.StatefulPrecompiledContract, tests []PrecompileTest) {
 	t.Helper()
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			test.Run(t, address, precompile)
+			test.Run(t, precompile)
 		})
 	}
 }
 
-func RunPrecompileBenchmarks(b *testing.B, address common.Address, precompile contract.StatefulPrecompiledContract, tests []PrecompileTest) {
+func RunPrecompileBenchmarks(b *testing.B, precompile contract.StatefulPrecompiledContract, tests []PrecompileTest) {
 	b.Helper()
 
 	for _, test := range tests {
 		b.Run(test.Name, func(b *testing.B) {
-			test.Bench(b, address, precompile)
+			test.Bench(b, precompile)
 		})
 	}
+}
+
+// testEnv is a [contract.Environment] with a fixed configuration that tracks
+// gas usage. All unimplemented methods panic. The gas methods mirror libevm's
+// implementation.
+type testEnv struct {
+	contract.Environment
+
+	gas          uint64
+	readOnly     bool
+	state        *testStateDB
+	caller       common.Address
+	snowContext  *snow.Context
+	rules        cparams.Rules
+	warpFailures set.Bits
+}
+
+func (e *testEnv) Gas() uint64 {
+	return e.gas
+}
+
+func (e *testEnv) UseGas(gas uint64) bool {
+	if e.gas < gas {
+		return false
+	}
+	e.gas -= gas
+	return true
+}
+
+func (e *testEnv) ReadOnly() bool                     { return e.readOnly }
+func (e *testEnv) StateDB() vm.StateDB                { return e.state }
+func (e *testEnv) ReadOnlyState() libevm.StateReader  { return e.state }
+func (*testEnv) BlockNumber() *big.Int                { return new(big.Int) }
+func (e *testEnv) Caller() common.Address             { return e.caller }
+func (e *testEnv) SnowContext() *snow.Context         { return e.snowContext }
+func (e *testEnv) ExtraRules() precompileconfig.Rules { return e.rules }
+
+func (e *testEnv) WarpMessageResults(common.Hash) set.Bits {
+	return e.warpFailures
 }
 
 // testStateDB allows for mocking the Warp messages without calling Prepare on

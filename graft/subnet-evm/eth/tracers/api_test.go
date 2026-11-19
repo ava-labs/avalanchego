@@ -39,13 +39,13 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -101,7 +101,7 @@ func newTestBackend(t *testing.T, n int, gspec *core.Genesis, scheme string, gen
 		StateHistory:              100, // Sufficient history for testing
 		ChainDataDir:              t.TempDir(),
 	}
-	if scheme == customrawdb.FirewoodScheme {
+	if scheme == firewood.Scheme {
 		cacheConfig.SnapshotLimit = 0 // Firewood does not support snapshots
 	}
 

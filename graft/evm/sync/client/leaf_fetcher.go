@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
+	"github.com/ava-labs/avalanchego/vms/evm/statesync/hashdb"
 )
 
 // LeafFetcher reads leaf ranges over the message protocol. One [Client] serves both

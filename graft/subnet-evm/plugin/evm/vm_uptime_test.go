@@ -10,13 +10,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/uptimetracker"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avagovalidators "github.com/ava-labs/avalanchego/snow/validators"
@@ -49,7 +49,7 @@ func TestUptimeTracker(t *testing.T) {
 	}
 
 	require := require.New(t)
-	ctx, dbManager, genesisBytes := setupGenesis(t, upgradetest.Latest)
+	ctx, dbManager, genesisBytes := setupGenesis(t, upgrade.Latest)
 	ctx.ValidatorState = makeValidatorState()
 	appSender := &enginetest.Sender{T: t}
 

@@ -17,59 +17,6 @@ blockchain running the AVM.
 
 ## Methods
 
-### `avm.getAllBalances`
-
-<Callout type="warn">
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-</Callout>
-
-Get the balances of all assets controlled by a given address.
-
-**Signature:**
-
-```sh
-avm.getAllBalances({address:string}) -> {
-    balances: []{
-        asset: string,
-        balance: int
-    }
-}
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     : 1,
-    "method" :"avm.getAllBalances",
-    "params" :{
-        "address":"X-avax1c79e0dd0susp7dc8udq34jgk2yvve7hapvdyht"
-    }
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/X
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "balances": [
-      {
-        "asset": "AVAX",
-        "balance": "102"
-      },
-      {
-        "asset": "2sdnziCz37Jov3QSNMXcFRGFJ1tgauaj6L7qfk7yUcRPfQMC79",
-        "balance": "10000"
-      }
-    ]
-  },
-  "id": 1
-}
-```
-
 ### `avm.getAssetDescription`
 
 Get information about an asset.
@@ -130,58 +77,6 @@ curl -X POST --data '{
     },
     "id": 1
 }`
-```
-
-### `avm.getBalance`
-
-<Callout type="warn">
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-</Callout>
-
-Get the balance of an asset controlled by a given address.
-
-**Signature:**
-
-```sh
-avm.getBalance({
-    address: string,
-    assetID: string
-}) -> {balance: int}
-```
-
-- `address` owner of the asset
-- `assetID` id of the asset for which the balance is requested
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-  "jsonrpc":"2.0",
-  "id"     : 1,
-  "method" :"avm.getBalance",
-  "params" :{
-      "address":"X-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5",
-      "assetID": "2pYGetDWyKdHxpFxh2LHeoLNCH6H5vxxCxHQtFnnFaYxLsqtHC"
-  }
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/X
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "balance": "299999999999900",
-    "utxoIDs": [
-      {
-        "txID": "WPQdyLNqHfiEKp4zcCpayRHYDVYuh1hqs9c1RqgZXS4VPgdvo",
-        "outputIndex": 1
-      }
-    ]
-  }
-}
 ```
 
 ### `avm.getBlock`
@@ -497,52 +392,6 @@ curl -X POST --data '{
   "result": {
     "txFee": "1000000",
     "createAssetTxFee": "10000000"
-  }
-}
-```
-
-### `avm.getTxStatus`
-
-<Callout type="warn">
-Deprecated as of **v1.10.0**.
-</Callout>
-
-Get the status of a transaction sent to the network.
-
-**Signature:**
-
-```sh
-avm.getTxStatus({txID: string}) -> {status: string}
-```
-
-`status` is one of:
-
-- `Accepted`: The transaction is (or will be) accepted by every node
-- `Processing`: The transaction is being voted on by this node
-- `Rejected`: The transaction will never be accepted by any node in the network
-- `Unknown`: The transaction hasn’t been seen by this node
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"avm.getTxStatus",
-    "params" :{
-        "txID":"2QouvFWUbjuySRxeX5xMbNCuAaKWfbk5FeEa2JmoF85RKLk2dD"
-    }
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/X
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "status": "Accepted"
   }
 }
 ```

@@ -144,7 +144,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 			b.mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 			continue
 		}
-		err = b.manager.VerifyUniqueInputs(preferredID, inputs)
+		err = b.manager.VerifyUniqueInputs(preferredID, executor.Inputs)
 		if err != nil {
 			txID := tx.ID()
 			b.mempool.MarkDropped(txID, err)

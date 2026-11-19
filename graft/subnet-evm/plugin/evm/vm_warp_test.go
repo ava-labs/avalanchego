@@ -20,6 +20,7 @@ import (
 
 	_ "embed"
 
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers"
@@ -39,13 +40,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
@@ -87,7 +86,7 @@ func testSendWarpMessage(t *testing.T, scheme string) {
 	require := require.New(t)
 	genesis := &core.Genesis{}
 
-	require.NoError(genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Durango]))))
+	require.NoError(genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Durango]))))
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 		warpcontract.ConfigKey: warpcontract.NewDefaultConfig(utils.TimeToNewUint64(upgrade.InitiallyActiveTime)),
 	}
@@ -322,7 +321,7 @@ func testValidateInvalidWarpBlockHash(t *testing.T, scheme string) {
 func testWarpVMTransaction(t *testing.T, scheme string, unsignedMessage *avalancheWarp.UnsignedMessage, validSignature bool, txPayload []byte) {
 	require := require.New(t)
 	genesis := &core.Genesis{}
-	require.NoError(genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Durango]))))
+	require.NoError(genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Durango]))))
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 		warpcontract.ConfigKey: warpcontract.NewDefaultConfig(utils.TimeToNewUint64(upgrade.InitiallyActiveTime)),
 	}
@@ -503,7 +502,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 
 func testReceiveWarpMessageWithScheme(t *testing.T, scheme string) {
 	require := require.New(t)
-	fork := upgradetest.Durango
+	fork := upgrade.Durango
 	tvm := newVM(t, testVMConfig{
 		fork:       &fork,
 		configJSON: getConfig(scheme, ""),
@@ -835,7 +834,7 @@ func TestSignatureRequestsToVM(t *testing.T) {
 }
 
 func testSignatureRequestsToVM(t *testing.T, scheme string) {
-	fork := upgradetest.Durango
+	fork := upgrade.Durango
 	tvm := newVM(t, testVMConfig{
 		fork:       &fork,
 		configJSON: getConfig(scheme, ""),
@@ -950,7 +949,7 @@ func testSignatureRequestsToVM(t *testing.T, scheme string) {
 }
 
 func TestClearWarpDB(t *testing.T) {
-	ctx, db, genesisBytes := setupGenesis(t, upgradetest.Latest)
+	ctx, db, genesisBytes := setupGenesis(t, upgrade.Latest)
 	vm := &VM{}
 	require.NoError(t, vm.Initialize(t.Context(), ctx, db, genesisBytes, []byte{}, []byte{}, []*commonEng.Fx{}, &enginetest.Sender{}))
 
@@ -974,7 +973,7 @@ func TestClearWarpDB(t *testing.T) {
 	// Restart VM with the same database default should not prune the warp db
 	vm = &VM{}
 	// we need new context since the previous one has registered metrics.
-	ctx, _, _ = setupGenesis(t, upgradetest.Latest)
+	ctx, _, _ = setupGenesis(t, upgrade.Latest)
 	require.NoError(t, vm.Initialize(t.Context(), ctx, db, genesisBytes, []byte{}, []byte{}, []*commonEng.Fx{}, &enginetest.Sender{}))
 
 	// check messages are still present
@@ -989,7 +988,7 @@ func TestClearWarpDB(t *testing.T) {
 	// restart the VM with pruning enabled
 	vm = &VM{}
 	config := `{"prune-warp-db-enabled": true}`
-	ctx, _, _ = setupGenesis(t, upgradetest.Latest)
+	ctx, _, _ = setupGenesis(t, upgrade.Latest)
 	require.NoError(t, vm.Initialize(t.Context(), ctx, db, genesisBytes, []byte{}, []byte(config), []*commonEng.Fx{}, &enginetest.Sender{}))
 
 	it := vm.warpDB.NewIterator()

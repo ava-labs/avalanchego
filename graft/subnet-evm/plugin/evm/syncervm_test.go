@@ -25,7 +25,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
@@ -37,13 +39,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
-	"github.com/ava-labs/avalanchego/vms/evm/database"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/database"
 
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -162,7 +162,7 @@ func testStateSyncToggleEnabledToDisabled(t *testing.T, scheme string) {
 			t.Context(),
 			vmSetup.syncerVM.ctx,
 			vmSetup.syncerDB,
-			[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest])),
+			[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Latest])),
 			nil,
 			[]byte(stateSyncDisabledConfigJSON),
 			[]*commonEng.Fx{},
@@ -194,7 +194,7 @@ func testStateSyncToggleEnabledToDisabled(t *testing.T, scheme string) {
 		}
 		// Verify the snapshot disk layer matches the last block root
 		lastRoot := syncDisabledVM.blockChain.CurrentBlock().Root
-		if test.stateScheme != customrawdb.FirewoodScheme {
+		if test.stateScheme != firewood.Scheme {
 			require.NoError(t, syncDisabledVM.blockChain.Snapshots().Verify(lastRoot))
 		}
 		syncDisabledVM.blockChain.DrainAcceptorQueue()
@@ -246,7 +246,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		test.syncableInterval, test.syncableInterval, test.syncableInterval,
 	)
 	serverVM := newVM(t, testVMConfig{
-		genesisJSON: toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]),
+		genesisJSON: toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Latest]),
 		configJSON:  getConfig(test.stateScheme, serverConfigJSON),
 	})
 
@@ -273,7 +273,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		root                        common.Hash
 		fundedAccounts, allAccounts map[*utilstest.Key]*types.StateAccount
 	)
-	if test.stateScheme == customrawdb.FirewoodScheme {
+	if test.stateScheme == firewood.Scheme {
 		tdb, ok := serverVM.vm.Blockchain().TrieDB().Backend().(*firewood.TrieDB)
 		require.Truef(ok, "expected TrieDB backend to be *firewood.TrieDB, got %T", serverVM.vm.Blockchain().TrieDB().Backend())
 		tdb.SetHashAndHeight(common.Hash{}, 0) // must be set for FillAccountsWithStorageAndCode to work
@@ -304,7 +304,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		test.stateSyncMinBlocks, 4, test.syncableInterval,
 	)
 	syncerVM := newVM(t, testVMConfig{
-		genesisJSON: toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]),
+		genesisJSON: toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Latest]),
 		configJSON:  getConfig(test.stateScheme, stateSyncEnabledJSON),
 		isSyncing:   true,
 	})

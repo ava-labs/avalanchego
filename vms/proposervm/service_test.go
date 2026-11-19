@@ -16,14 +16,14 @@ import (
 	"github.com/ava-labs/avalanchego/api/connectclient"
 	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
 	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 )
 
 func TestConnectRPCService_GetProposedHeight(t *testing.T) {
 	require := require.New(t)
 
 	const pChainHeight = 123
-	_, _, vm, _ := initTestProposerVM(t, upgradetest.Latest, pChainHeight)
+	_, _, vm, _ := initTestProposerVM(t, upgrade.Latest, pChainHeight)
 	defer func() {
 		require.NoError(vm.Shutdown(t.Context()))
 	}()
@@ -61,7 +61,7 @@ func TestJSONRPCService_GetProposedHeight(t *testing.T) {
 	require := require.New(t)
 
 	const pChainHeight = 123
-	_, _, vm, _ := initTestProposerVM(t, upgradetest.Latest, pChainHeight)
+	_, _, vm, _ := initTestProposerVM(t, upgrade.Latest, pChainHeight)
 	defer func() {
 		require.NoError(vm.Shutdown(t.Context()))
 	}()
