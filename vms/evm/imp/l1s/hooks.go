@@ -276,8 +276,9 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			ParentBeaconRoot: &common.Hash{},
 		},
 		&customtypes.HeaderExtra{
-			BlockGasCost:     big.NewInt(0), // Unused under SAE.
-			TimeMilliseconds: new(nowMS),
+			// BlockGasCost has been set to 0 since the Granite upgrade.
+			BlockGasCost:     big.NewInt(0),
+			TimeMilliseconds: &nowMS,
 			MinDelayExcess:   &minDelayExcess,
 			TargetExponent:   &te,
 		},
@@ -305,8 +306,6 @@ func (b *builder) BuildBlock(
 	settledRulesExtra := legacyparams.GetRulesExtra(settledRules)
 	header.Coinbase = b.resolveCoinbase(settledRulesExtra, worstCaseState)
 
-	// Written even while gaspricemanager is disabled, because header fields
-	// can't be removed once populated.
 	headerExtra := customtypes.GetHeaderExtra(header)
 	setGasConfig(headerExtra, readGasConfig(settledRulesExtra, worstCaseState))
 
