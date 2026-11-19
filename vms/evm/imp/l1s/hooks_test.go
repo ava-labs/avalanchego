@@ -272,7 +272,7 @@ func TestVerifyBlockSyntaxGasConfigGroup(t *testing.T) {
 			extra: &customtypes.HeaderExtra{
 				TargetToExcessScaling: one,
 				MinPrice:              one,
-				StaticPricing:         one,
+				StaticPricing:         new(true),
 			},
 		},
 	}

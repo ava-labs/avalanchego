@@ -46,7 +46,7 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 		TargetExcess          *hexutil.Uint64  `json:"targetExcess"          rlp:"optional"`
 		TargetToExcessScaling *hexutil.Uint64  `json:"targetToExcessScaling" rlp:"optional"`
 		MinPrice              *hexutil.Uint64  `json:"minPrice"              rlp:"optional"`
-		StaticPricing         *hexutil.Uint64  `json:"staticPricing"         rlp:"optional"`
+		StaticPricing         *bool            `json:"staticPricing"         rlp:"optional"`
 		Hash                  common.Hash      `json:"hash"`
 	}
 	var enc HeaderSerializable
@@ -79,7 +79,7 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 	enc.TargetExcess = (*hexutil.Uint64)(h.TargetExcess)
 	enc.TargetToExcessScaling = (*hexutil.Uint64)(h.TargetToExcessScaling)
 	enc.MinPrice = (*hexutil.Uint64)(h.MinPrice)
-	enc.StaticPricing = (*hexutil.Uint64)(h.StaticPricing)
+	enc.StaticPricing = h.StaticPricing
 	enc.Hash = h.Hash()
 	return json.Marshal(&enc)
 }
@@ -116,7 +116,7 @@ func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 		TargetExcess          *hexutil.Uint64   `json:"targetExcess"          rlp:"optional"`
 		TargetToExcessScaling *hexutil.Uint64   `json:"targetToExcessScaling" rlp:"optional"`
 		MinPrice              *hexutil.Uint64   `json:"minPrice"              rlp:"optional"`
-		StaticPricing         *hexutil.Uint64   `json:"staticPricing"         rlp:"optional"`
+		StaticPricing         *bool             `json:"staticPricing"         rlp:"optional"`
 	}
 	var dec HeaderSerializable
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -223,7 +223,7 @@ func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 		h.MinPrice = (*uint64)(dec.MinPrice)
 	}
 	if dec.StaticPricing != nil {
-		h.StaticPricing = (*uint64)(dec.StaticPricing)
+		h.StaticPricing = dec.StaticPricing
 	}
 	return nil
 }

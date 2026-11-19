@@ -67,7 +67,7 @@ func TestVerifyNoSAEFields(t *testing.T) {
 		},
 		{
 			name:    "static_pricing_should_fail",
-			extra:   &customtypes.HeaderExtra{StaticPricing: utils.PointerTo[uint64](1)},
+			extra:   &customtypes.HeaderExtra{StaticPricing: utils.PointerTo(true)},
 			wantErr: errSAEFieldSet,
 		},
 		{

@@ -39,7 +39,7 @@ func stampStoredGasConfig(he *customtypes.HeaderExtra, stored commontype.GasPric
 func stampGasConfig(he *customtypes.HeaderExtra, c gastime.GasPriceConfig) {
 	he.TargetToExcessScaling = (*uint64)(&c.TargetToExcessScaling)
 	he.MinPrice = (*uint64)(&c.MinPrice)
-	he.StaticPricing = boolToUint64Ptr(c.StaticPricing)
+	he.StaticPricing = &c.StaticPricing
 }
 
 // readGasConfig recovers the group stamped by [stampGasConfig], reporting
@@ -57,16 +57,8 @@ func readGasConfig(he *customtypes.HeaderExtra) (gastime.GasPriceConfig, bool) {
 	return gastime.GasPriceConfig{
 		TargetToExcessScaling: gas.Gas(*he.TargetToExcessScaling),
 		MinPrice:              gas.Price(*he.MinPrice),
-		StaticPricing:         *he.StaticPricing != 0,
+		StaticPricing:         *he.StaticPricing,
 	}, true
-}
-
-func boolToUint64Ptr(b bool) *uint64 {
-	var v uint64
-	if b {
-		v = 1
-	}
-	return &v
 }
 
 // scalingFromTimeToDouble converts ACP-224's `TimeToDouble` (seconds) into the

@@ -73,7 +73,7 @@ func TestHeaderExtraPostRPCMarshal(t *testing.T) {
 		"targetExcess":          hexutil.Uint64(30),
 		"targetToExcessScaling": hexutil.Uint64(31),
 		"minPrice":              hexutil.Uint64(32),
-		"staticPricing":         hexutil.Uint64(33),
+		"staticPricing":         true,
 	}
 	require.Equal(t, want, got, "HeaderExtra.PostRPCMarshal()")
 }
@@ -152,7 +152,7 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		TargetExcess:          utils.PointerTo(gas.Gas(30)),
 		TargetToExcessScaling: utils.PointerTo[uint64](31),
 		MinPrice:              utils.PointerTo[uint64](32),
-		StaticPricing:         utils.PointerTo[uint64](33),
+		StaticPricing:         utils.PointerTo(true),
 	}
 	return WithHeaderExtra(header, extra), extra
 }

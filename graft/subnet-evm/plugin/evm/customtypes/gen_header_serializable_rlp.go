@@ -160,7 +160,7 @@ func (obj *HeaderSerializable) EncodeRLP(_w io.Writer) error {
 		if obj.StaticPricing == nil {
 			w.Write([]byte{0x80})
 		} else {
-			w.WriteUint64((*obj.StaticPricing))
+			w.WriteBool((*obj.StaticPricing))
 		}
 	}
 	w.ListEnd(_tmp0)

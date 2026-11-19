@@ -53,7 +53,7 @@ type HeaderExtra struct {
 	TargetExcess          *gas.Gas
 	TargetToExcessScaling *uint64
 	MinPrice              *uint64
-	StaticPricing         *uint64 // 0 or 1
+	StaticPricing         *bool
 
 	predicateResults atomic.Pointer[predicate.BlockResults]
 }
@@ -219,7 +219,7 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 		m["minPrice"] = hexutil.Uint64(*h.MinPrice)
 	}
 	if h.StaticPricing != nil {
-		m["staticPricing"] = hexutil.Uint64(*h.StaticPricing)
+		m["staticPricing"] = *h.StaticPricing
 	}
 }
 
@@ -356,7 +356,7 @@ type HeaderSerializable struct {
 	TargetExcess          *uint64 `json:"targetExcess"          rlp:"optional"`
 	TargetToExcessScaling *uint64 `json:"targetToExcessScaling" rlp:"optional"`
 	MinPrice              *uint64 `json:"minPrice"              rlp:"optional"`
-	StaticPricing         *uint64 `json:"staticPricing"         rlp:"optional"`
+	StaticPricing         *bool   `json:"staticPricing"         rlp:"optional"`
 }
 
 // field type overrides for gencodec
@@ -382,7 +382,6 @@ type headerMarshaling struct {
 
 	TargetToExcessScaling *hexutil.Uint64
 	MinPrice              *hexutil.Uint64
-	StaticPricing         *hexutil.Uint64
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
