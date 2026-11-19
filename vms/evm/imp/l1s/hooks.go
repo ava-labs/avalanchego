@@ -168,11 +168,16 @@ func (*hooks) CanExecuteTransaction(rules ethparams.Rules, from common.Address, 
 // StartExecutingBlock applies the precompile and state upgrades scheduled
 // since parent, so each is applied exactly once.
 func (h *hooks) StartExecutingBlock(_ ethparams.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error {
-	blockContext := legacycore.NewBlockContext(block.Number(), block.Time())
-	if err := legacycore.ApplyUpgrades(h.chainConfig, &parent.Time, blockContext, statedb); err != nil {
-		return fmt.Errorf("applying upgrades for block %s (%d): %w", block.Hash(), block.NumberU64(), err)
-	}
-	return nil
+	blockContext := legacycore.NewBlockContext(
+		block.Number(),
+		block.Time(),
+	)
+	return legacycore.ApplyUpgrades(
+		h.chainConfig,
+		&parent.Time,
+		blockContext,
+		statedb,
+	)
 }
 
 func (*hooks) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
