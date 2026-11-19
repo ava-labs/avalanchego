@@ -105,6 +105,11 @@ type Peer struct {
 	// Only modified on the connection's reader routine.
 	finishedHandshake utils.Atomic[bool]
 
+	// handshakeArrivalTime is the time at which the peer's Handshake message
+	// started arriving, before any time spent waiting on the inbound message
+	// throttler. It is no longer updated once the Handshake has been received.
+	handshakeArrivalTime time.Time
+
 	// onFinishHandshake is closed when the peer finishes the p2p handshake.
 	onFinishHandshake chan struct{}
 
@@ -379,6 +384,13 @@ func (p *Peer) readMessages() {
 				zap.Error(err),
 			)
 			return
+		}
+
+		// Record when the Handshake arrived. The throttler below may block for
+		// an arbitrary amount of time, which must not be attributed to the
+		// peer when validating the time-sensitive fields of the Handshake.
+		if !p.gotHandshake.Get() {
+			p.handshakeArrivalTime = p.Clock.Time()
 		}
 
 		// Wait until the throttler says we can proceed to read the message.
@@ -834,7 +846,10 @@ func (p *Peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
-	localTime := p.Clock.Time()
+	// Compare against the time the handshake arrived rather than the current
+	// time, so that time spent waiting on the inbound message throttler isn't
+	// counted as clock skew.
+	localTime := p.handshakeArrivalTime
 	localUnixTime := uint64(localTime.Unix())
 	clockDifference := math.Abs(float64(msg.MyTime) - float64(localUnixTime))
 
