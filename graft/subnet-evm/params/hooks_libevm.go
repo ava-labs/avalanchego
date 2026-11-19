@@ -117,17 +117,17 @@ func (r RulesExtra) precompileOverrideBuiltin(addr common.Address) (libevm.Preco
 
 func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.PrecompiledContract {
 	run := func(env vm.PrecompileEnvironment, input []byte, suppliedGas uint64) ([]byte, uint64, error) {
+		rules := GetRulesExtra(env.Rules()).AvalancheRules
 		header := env.BlockHeader()
 		accessibleState := accessibleState{
 			env: env,
 			blockContext: &precompileBlockContext{
 				number:           env.BlockNumber(),
 				time:             env.BlockTime(),
-				predicateResults: customtypes.PredicateResults(header, customheader.PredicateBytesFromExtra(header.Extra)),
+				predicateResults: customtypes.PredicateResults(header, customheader.PredicateBytesFromExtra(rules, header.Extra)),
 			},
 		}
 
-		rules := GetRulesExtra(env.Rules()).AvalancheRules
 		switch call := env.IncomingCallType(); {
 		case call != vm.DelegateCall && call != vm.CallCode: // Others always allowed
 		case rules.IsGranite:

@@ -53,6 +53,7 @@ var (
 	errParentBeaconRootNonEmpty            = errors.New("invalid non-empty parentBeaconRoot")
 	errBlobGasUsedNilInCancun              = errors.New("blob gas used must not be nil in Cancun")
 	errBlobsNotEnabled                     = errors.New("blobs not enabled on avalanche networks")
+	errIglooUnsupported                    = errors.New("igloo blocks are unsupported")
 )
 
 // wrappedBlock implements the snowman.wrappedBlock interface
@@ -344,6 +345,10 @@ func (b *wrappedBlock) syntacticVerify() error {
 	ethHeader := b.ethBlock.Header()
 	rules := b.vm.chainConfig.Rules(ethHeader.Number, params.IsMergeTODO, ethHeader.Time)
 	rulesExtra := params.GetRulesExtra(rules)
+	// The SAE VM executes Igloo blocks, which use a different header format.
+	if rulesExtra.IsIgloo {
+		return errIglooUnsupported
+	}
 	// Perform block and header sanity checks
 	if !ethHeader.Number.IsUint64() {
 		return fmt.Errorf("invalid block number: %v", ethHeader.Number)
@@ -469,7 +474,7 @@ func (b *wrappedBlock) verifyPredicates(predicateContext *precompileconfig.Predi
 		return fmt.Errorf("failed to marshal predicate results: %w", err)
 	}
 	extraData := b.ethBlock.Extra()
-	headerPredicateResultsBytes := customheader.PredicateBytesFromExtra(extraData)
+	headerPredicateResultsBytes := customheader.PredicateBytesFromExtra(rulesExtra.AvalancheRules, extraData)
 	if !bytes.Equal(headerPredicateResultsBytes, predicateResultsBytes) {
 		return fmt.Errorf("%w (remote: %x local: %x)", errInvalidHeaderPredicateResults, headerPredicateResultsBytes, predicateResultsBytes)
 	}

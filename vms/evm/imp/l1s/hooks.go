@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
@@ -323,7 +322,7 @@ func (b *builder) BuildBlock(
 	if err != nil {
 		return nil, fmt.Errorf("serializing warp validity: %w", err)
 	}
-	header.Extra = customheader.SetPredicateBytesInExtra(header.Extra, warpValidityBytes)
+	header.Extra = warpValidityBytes
 
 	headerExtra.SettledHeight = &settled.Height
 	headerExtra.SettledGasUnix = &settled.GasUnix

@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -267,10 +266,7 @@ func assertPredicateResult(
 ) {
 	t.Helper()
 
-	headerPredicateResultsBytes := customheader.PredicateBytesFromExtra(
-		built.EthBlock().Extra(),
-	)
-	blockResults, err := predicate.ParseBlockResults(headerPredicateResultsBytes)
+	blockResults, err := predicate.ParseBlockResults(built.EthBlock().Extra())
 	require.NoError(t, err)
 
 	txBits := blockResults.Get(validateTx.Hash(), warpcontract.ContractAddress)
