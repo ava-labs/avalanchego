@@ -282,7 +282,7 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 				FortunaTimestamp:   nil,
 				GraniteTimestamp:   utils.TimeToNewUint64(upgrade.Fuji.GraniteTime),
 			},
-			avagoUpgrades: upgradetest.GetConfig(upgradetest.Granite),
+			avagoUpgrades: upgradetest.GetConfig(upgrade.Granite),
 			wantError:     nil,
 		},
 	}
@@ -335,7 +335,7 @@ func TestSetDefaultsTreatsZeroAsUnset(t *testing.T) {
 		HeliconTimestamp:   utils.PointerTo[uint64](0),
 		IglooTimestamp:     utils.PointerTo[uint64](0),
 	}
-	agoUpgrades := upgradetest.GetConfig(upgradetest.Latest)
+	agoUpgrades := upgradetest.GetConfig(upgrade.Latest)
 	upgrades.SetDefaults(agoUpgrades)
 
 	defaults := GetNetworkUpgrades(agoUpgrades)

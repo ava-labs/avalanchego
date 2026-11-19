@@ -54,6 +54,7 @@ graft_go_test(
         "//graft/subnet-evm/precompile/contracts/nativeminter",
         "//graft/subnet-evm/precompile/contracts/rewardmanager",
         "//graft/subnet-evm/precompile/contracts/txallowlist",
+        "//upgrade",
         "//upgrade/upgradetest",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",

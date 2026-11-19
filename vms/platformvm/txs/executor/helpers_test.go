@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -87,7 +88,7 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
+func newEnvironment(t *testing.T, f upgrade.Upgrade) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
@@ -211,7 +212,7 @@ func addSubnet(t *testing.T, env *environment) {
 	)
 	require.NoError(err)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, env.state)
@@ -228,14 +229,14 @@ func addSubnet(t *testing.T, env *environment) {
 	require.NoError(env.state.Commit())
 }
 
-func defaultConfig(f upgradetest.Fork) *config.Internal {
+func defaultConfig(f upgrade.Upgrade) *config.Internal {
 	upgrades := upgradetest.GetConfigWithUpgradeTime(
 		f,
 		genesistest.DefaultValidatorStartTime.Add(-2*time.Second),
 	)
 	upgradetest.SetTimesTo(
 		&upgrades,
-		min(f, upgradetest.ApricotPhase5),
+		min(f, upgrade.ApricotPhase5),
 		genesistest.DefaultValidatorEndTime,
 	)
 
@@ -260,9 +261,9 @@ func defaultConfig(f upgradetest.Fork) *config.Internal {
 	}
 }
 
-func defaultClock(f upgradetest.Fork) *mockable.Clock {
+func defaultClock(f upgrade.Upgrade) *mockable.Clock {
 	now := genesistest.DefaultValidatorStartTime
-	if f >= upgradetest.Banff {
+	if f >= upgrade.Banff {
 		// 1 second after active fork
 		now = genesistest.DefaultValidatorEndTime.Add(-2 * time.Second)
 	}

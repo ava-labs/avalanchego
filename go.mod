@@ -26,7 +26,7 @@ require (
 	github.com/ava-labs/avalanchego/graft/coreth v1.15.4
 	github.com/ava-labs/avalanchego/graft/evm v1.15.4
 	github.com/ava-labs/avalanchego/graft/subnet-evm v1.15.4
-	github.com/ava-labs/firewood-go/ffi v0.9.0
+	github.com/ava-labs/firewood-go/ffi v0.9.1
 	github.com/ava-labs/libevm v1.13.15-0.20261111112450-a335c2ecf4df
 	github.com/ava-labs/simplex v0.0.0-20261112233527-2f7a52cc827d
 	github.com/btcsuite/btcd/btcutil v1.1.3
@@ -157,7 +157,7 @@ require (
 	github.com/klauspost/compress v1.20.2
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
-	github.com/kylelemons/godebug v1.1.0 // indirect
+	github.com/kylelemons/godebug v1.1.0
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

@@ -237,8 +237,8 @@ func (g *genesis) block() (*types.Block, error) {
 		h.GasLimit = ethparams.GenesisGasLimit
 	}
 
-	c := cparams.GetExtra(g.Config)
-	if c.IsApricotPhase3(g.Timestamp) { // Also called London
+	r := cparams.GetExtra(g.Config).Rules(g.Timestamp)
+	if r.Is(upgrade.ApricotPhase3) { // Also called London
 		h.BaseFee = g.BaseFee
 		if h.BaseFee == nil {
 			h.BaseFee = big.NewInt(ap3BaseFee)
@@ -246,7 +246,7 @@ func (g *genesis) block() (*types.Block, error) {
 	}
 
 	headerExtra := customtypes.GetHeaderExtra(h)
-	if c.IsEtna(g.Timestamp) { // Also called Cancun
+	if r.Is(upgrade.Etna) { // Also called Cancun
 		h.BlobGasUsed = new(uint64)
 		h.ExcessBlobGas = new(uint64)
 		h.ParentBeaconRoot = new(common.Hash)
@@ -255,12 +255,12 @@ func (g *genesis) block() (*types.Block, error) {
 		headerExtra.BlockGasCost = new(big.Int)
 	}
 
-	if c.IsGranite(g.Timestamp) {
+	if r.Is(upgrade.Granite) {
 		headerExtra.TimeMilliseconds = new(g.Timestamp * 1000)
 		headerExtra.MinDelayExcess = new(acp226.InitialDelayExcess)
 	}
 
-	if c.IsHelicon(g.Timestamp) {
+	if r.Is(upgrade.Helicon) {
 		headerExtra.TargetExponent = new(dynamic.InitialTargetExponent)
 		headerExtra.MinPriceExponent = new(dynamic.InitialPriceExponent)
 
@@ -346,7 +346,7 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 	// the genesis timestamp is already after the Warp activation, then the
 	// state needs to reflect that or the precompile would never be marked as
 	// active.
-	if c := cparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
+	if c := cparams.GetExtra(g.Config); c.IsActive(upgrade.Durango, g.Timestamp) {
 		activatePrecompile(statedb, warp.ContractAddress)
 	}
 

@@ -9,17 +9,11 @@ package hookadaptor
 import (
 	"context"
 	"iter"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/libevm"
-	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
@@ -28,24 +22,16 @@ import (
 // Points is a subset of [hook.PointsG] that doesn't expose any end-of-block
 // operations.
 type Points interface {
+	hook.PointsWithoutBlockOps
+
 	BlockBuilder
 	BlockRebuilderFrom(block *types.Block) (BlockBuilder, error)
-
-	ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error)
-	GasConfigAfter(*types.Header) (target gas.Gas, c gastime.GasPriceConfig)
-	BlockTime(h *types.Header) time.Time
-	SettledBy(*types.Header) hook.Settled
-	VerifyBlockSyntax(*types.Block) error
-	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
-	StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
-	FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
-	AfterExecutingBlock(*types.Block, types.Receipts) error
 }
 
 // BlockBuilder is a subset of [hook.BlockBuilder] that doesn't expose any
 // end-of-block operations.
 type BlockBuilder interface {
-	BuildHeader(parent *types.Header) (*types.Header, error)
+	hook.HeaderBuilder
 	BuildBlock(
 		header *types.Header,
 		blockCtx *block.Context,

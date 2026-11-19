@@ -38,6 +38,7 @@ go_test(
         "//chains/atomic/atomicmock",
         "//ids",
         "//snow",
+        "//upgrade",
         "//upgrade/upgradetest",
         "//utils",
         "//utils/logging",

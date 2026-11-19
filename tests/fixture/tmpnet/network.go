@@ -358,16 +358,16 @@ func (n *Network) DefaultGenesis() (*genesis.UnparsedConfig, error) {
 //   - activateLatestAfter == 0: activate latest from genesis
 //   - activateLatestAfter > 0: schedule latest that duration after starting
 func UpgradeConfig(activateLatestAfter time.Duration) upgrade.Config {
-	const previous = upgradetest.Latest - 1
+	const previous = upgrade.Latest - 1
 	var upgrades upgrade.Config
 	switch {
 	case activateLatestAfter < 0:
 		upgrades = upgradetest.GetConfig(previous)
 	case activateLatestAfter == 0:
-		upgrades = upgradetest.GetConfig(upgradetest.Latest)
+		upgrades = upgradetest.GetConfig(upgrade.Latest)
 	default:
 		upgrades = upgradetest.GetConfigWithUpgradeTime(
-			upgradetest.Latest,
+			upgrade.Latest,
 			time.Now().Add(activateLatestAfter),
 		)
 		upgradetest.SetTimesTo(&upgrades, previous, upgrade.InitiallyActiveTime)

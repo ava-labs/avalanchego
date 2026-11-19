@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -25,7 +25,7 @@ import (
 // Ensure Execute fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Banff)
+	env := newEnvironment(t, upgrade.Banff)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -46,7 +46,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	// Remove a signature
 	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
@@ -62,7 +62,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 // Ensure Execute fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Banff)
+	env := newEnvironment(t, upgrade.Banff)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -89,7 +89,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require.NoError(err)
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
@@ -106,7 +106,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Banff)
+	env := newEnvironment(t, upgrade.Banff)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -126,10 +126,10 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	tx.Unsigned.(*platform.CreateChainTx).SubnetID = ids.GenerateTestID()
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	builderDiff, err := state.NewDiffOn(stateDiff, state.StakerAdditionAfterDeletionForbidden)
+	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, builderDiff)
@@ -145,7 +145,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Banff)
+	env := newEnvironment(t, upgrade.Banff)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -163,10 +163,10 @@ func TestCreateChainTxValid(t *testing.T) {
 	)
 	require.NoError(err)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	builderDiff, err := state.NewDiffOn(stateDiff, state.StakerAdditionAfterDeletionForbidden)
+	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, builderDiff)
@@ -204,7 +204,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, upgradetest.Banff)
+			env := newEnvironment(t, upgrade.Banff)
 			env.config.UpgradeConfig.ApricotPhase3Time = ap3Time
 
 			addrs := set.NewSet[ids.ShortID](len(genesistest.DefaultFundedKeys))
@@ -230,7 +230,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			)
 			require.NoError(err)
 
-			stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
 			stateDiff.SetTimestamp(test.time)
@@ -249,7 +249,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 func TestEtnaCreateChainTxInvalidWithManagedSubnet(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Etna)
+	env := newEnvironment(t, upgrade.Etna)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -267,10 +267,10 @@ func TestEtnaCreateChainTxInvalidWithManagedSubnet(t *testing.T) {
 	)
 	require.NoError(err)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	builderDiff, err := state.NewDiffOn(stateDiff, state.StakerAdditionAfterDeletionForbidden)
+	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
 
 	stateDiff.SetSubnetToL1Conversion(
