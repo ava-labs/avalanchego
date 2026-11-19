@@ -103,10 +103,6 @@ func updateChainConfig(cfg *params.ChainConfig, genesisTimestamp uint64, upgrade
 		SnowCtx: ctx,
 	}
 
-	// Retire the legacy `feeManager` precompile at Igloo: reject
-	// post-Igloo upgrades, normalize a stale genesis activation, and inject
-	// the synthetic disable that wipes pre-existing storage at the Igloo
-	// block.
 	if iglooTS, ok := extra.NetworkUpgrades.ScheduledIglooTimestamp(); ok {
 		if err := retirement.ReconcileForIgloo(extra, genesisTimestamp, iglooTS); err != nil {
 			return err
