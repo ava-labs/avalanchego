@@ -139,6 +139,8 @@ func exportedFieldsPointToDifferentMemory[T interface {
 				assertDifferentPointers(t, f, fieldCp)
 			case *uint64:
 				assertDifferentPointers(t, f, fieldCp)
+			case *bool:
+				assertDifferentPointers(t, f, fieldCp)
 			case []uint8:
 				assertDifferentPointers(t, unsafe.SliceData(f), unsafe.SliceData(fieldCp.([]uint8)))
 			default:
