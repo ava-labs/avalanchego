@@ -148,6 +148,7 @@ func blockTime(h *types.Header) time.Time {
 }
 
 func (*hooks) VerifyBlockSyntax(*types.Block) error {
+	// L1 VM has no extra block body fields.
 	return nil
 }
 
