@@ -4,10 +4,10 @@
 package simplex
 
 import (
-	"github.com/ava-labs/simplex/avalanchego"
-	"github.com/ava-labs/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
 
-	metadata "github.com/ava-labs/simplex/msm"
+	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
 )
 
 // epochTransitionListener reacts to blocks committed to storage. When a

@@ -6,19 +6,45 @@ package testutil
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"go.uber.org/zap"
-	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/zapcore"
 )
 
-const (
-	LOG_LEVEL      = "log_level"
-	INFO_LOG_LEVEL = "info"
-)
+// testWriter forwards log lines to t.Log so that go test only prints them if the test fails.
+type testWriter struct {
+	t      *testing.T
+	lock   sync.Mutex
+	closed bool
+}
+
+func newTestWriter(t *testing.T) *testWriter {
+	tw := &testWriter{t: t}
+	// Goroutines may still log after the test returns, and t.Log panics once the test is done.
+	// So just mark the writer as closed when the test ends, and ignore any further writes.
+	t.Cleanup(func() {
+		tw.lock.Lock()
+		defer tw.lock.Unlock()
+		tw.closed = true
+	})
+	return tw
+}
+
+func (tw *testWriter) Write(p []byte) (int, error) {
+	tw.lock.Lock()
+	defer tw.lock.Unlock()
+	if !tw.closed && len(p) > 0 {
+		tw.t.Log(strings.TrimSuffix(string(p), "\n"))
+	}
+	return len(p), nil
+}
+
+func (*testWriter) Sync() error {
+	return nil
+}
 
 type TestLogger struct {
 	*zap.Logger
@@ -129,33 +155,21 @@ func MakeLoggerWithFile(t *testing.T, fileWriter zapcore.WriteSyncer, writeStdou
 
 	atomicLevel := zap.NewAtomicLevelAt(zapcore.DebugLevel)
 
+	newEncoder := func() zapcore.Encoder {
+		return zapcore.NewConsoleEncoder(config)
+	}
+
 	var cores []zapcore.Core
 
 	// Stdout core only if explicitly enabled
 	if writeStdout {
-		stdoutEncoder := zapcore.NewConsoleEncoder(config)
-		if strings.ToLower(os.Getenv("LOG_LEVEL")) == "info" {
-			stdoutEncoder = &DebugSwallowingEncoder{
-				consoleEncoder: stdoutEncoder,
-				ObjectEncoder:  stdoutEncoder,
-				pool:           buffer.NewPool(),
-			}
-		}
-		stdoutCore := zapcore.NewCore(stdoutEncoder, zapcore.AddSync(os.Stdout), atomicLevel)
+		stdoutCore := zapcore.NewCore(newEncoder(), newTestWriter(t), atomicLevel)
 		cores = append(cores, stdoutCore)
 	}
 
 	// File core only if provided
 	if fileWriter != nil {
-		fileEncoder := zapcore.NewConsoleEncoder(config)
-		if strings.ToLower(os.Getenv(LOG_LEVEL)) == INFO_LOG_LEVEL {
-			fileEncoder = &DebugSwallowingEncoder{
-				consoleEncoder: fileEncoder,
-				ObjectEncoder:  fileEncoder,
-				pool:           buffer.NewPool(),
-			}
-		}
-		fileCore := zapcore.NewCore(fileEncoder, fileWriter, atomicLevel)
+		fileCore := zapcore.NewCore(newEncoder(), fileWriter, atomicLevel)
 		cores = append(cores, fileCore)
 	}
 
@@ -186,27 +200,6 @@ func MakeLoggerWithFile(t *testing.T, fileWriter zapcore.WriteSyncer, writeStdou
 	return &TestLogger{t: t, Logger: logger, traceVerboseLogger: traceVerboseLogger,
 		atomicLevel: atomicLevel,
 	}
-}
-
-type DebugSwallowingEncoder struct {
-	zapcore.ObjectEncoder
-	consoleEncoder zapcore.Encoder
-	pool           buffer.Pool
-}
-
-func (dse *DebugSwallowingEncoder) Clone() zapcore.Encoder {
-	return &DebugSwallowingEncoder{
-		pool:           dse.pool,
-		ObjectEncoder:  dse.ObjectEncoder,
-		consoleEncoder: dse.consoleEncoder.Clone(),
-	}
-}
-
-func (dse *DebugSwallowingEncoder) EncodeEntry(entry zapcore.Entry, fields []zapcore.Field) (*buffer.Buffer, error) {
-	if entry.Level == zapcore.DebugLevel {
-		return dse.pool.Get(), nil
-	}
-	return dse.consoleEncoder.EncodeEntry(entry, fields)
 }
 
 func (tl *TestLogger) SetLevel(level zapcore.Level) {

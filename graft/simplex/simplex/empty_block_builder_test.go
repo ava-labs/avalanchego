@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/simplex/common"
-	"github.com/ava-labs/simplex/simplex"
-	"github.com/ava-labs/simplex/testutil"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
+	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 
 	"github.com/stretchr/testify/require"
 )
@@ -168,7 +168,7 @@ func TestEmptyBlockBuilderWaitForPendingBlockCancelledByShouldBuildEmpty(t *test
 
 	select {
 	case <-done:
-	case <-time.After(5 * time.Second):
+	case <-time.After(testutil.DefaultTimeout):
 		require.Fail(t, "WaitForPendingBlock did not return after ShouldBuildEmptyBlock fired")
 	}
 }

@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/simplex/common"
-	"github.com/ava-labs/simplex/simplex"
-	"github.com/ava-labs/simplex/testutil"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
+	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -890,7 +890,7 @@ func TestNonValidator_EpochReplication(t *testing.T) {
 			defer nv.Stop()
 
 			advanceUntil(nv, epochs, msgQueue, tt.lastSeq)
-			require.Eventually(t, nv.HasReplicatedEpochs, 5*time.Second, 10*time.Millisecond)
+			require.Eventually(t, nv.HasReplicatedEpochs, testutil.DefaultTimeout, 10*time.Millisecond)
 		})
 	}
 }
@@ -1366,7 +1366,7 @@ func TestNonValidator_EpochReplicationRetriesSealingBlock(t *testing.T) {
 	require.Eventually(t, func() bool {
 		msg, ok := msgQueue.popResponse()
 		return ok && slices.Equal(msg.msg.ReplicationRequest.Seqs, []uint64{10})
-	}, 5*time.Second, 10*time.Millisecond, "the sealing block was never re-requested")
+	}, testutil.DefaultTimeout, 10*time.Millisecond, "the sealing block was never re-requested")
 }
 
 // TestNonValidator_EpochReplicationRequestsSealingBlock asserts that a replication response carrying a
@@ -1621,7 +1621,7 @@ func TestNonValidatorAcceptsProposalFromUnsortedValidatorSet(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return tc.NumBlocks() == b.BlockHeader().Seq+1
-	}, 5*time.Second, 10*time.Millisecond,
+	}, testutil.DefaultTimeout, 10*time.Millisecond,
 		"non-validator never committed the block, having dropped the proposal because it ordered the validator set differently than the validators")
 }
 

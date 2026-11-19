@@ -25,10 +25,10 @@ require (
 	github.com/arr4n/shed v0.0.0-20260908170710-35e123a98127
 	github.com/ava-labs/avalanchego/graft/coreth v1.15.4
 	github.com/ava-labs/avalanchego/graft/evm v1.15.4
+	github.com/ava-labs/avalanchego/graft/simplex v1.15.4
 	github.com/ava-labs/avalanchego/graft/subnet-evm v1.15.4
 	github.com/ava-labs/firewood-go/ffi v0.9.1
 	github.com/ava-labs/libevm v1.13.15-0.20261111112450-a335c2ecf4df
-	github.com/ava-labs/simplex v0.0.0-20261112233527-2f7a52cc827d
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
@@ -225,3 +225,5 @@ replace github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
 // Modern packages use split modules (genproto/googleapis/rpc, etc.).
 // Force use of newer split genproto to resolve ambiguity.
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1
+
+replace github.com/ava-labs/avalanchego/graft/simplex => ./graft/simplex

@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/simplex/avalanchego"
-	"github.com/ava-labs/simplex/common"
-	"github.com/ava-labs/simplex/simplex"
-	"github.com/ava-labs/simplex/testutil"
+	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
+	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -2493,7 +2493,7 @@ func TestMSMWaitForPendingBlock(t *testing.T) {
 			cancel()
 			select {
 			case <-done:
-			case <-time.After(time.Second * 5):
+			case <-time.After(testutil.DefaultTimeout):
 				require.FailNow(t, "WaitForPendingBlock ignored cancellation")
 			}
 		})

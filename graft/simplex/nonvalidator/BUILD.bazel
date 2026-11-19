@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "nonvalidator",
+    srcs = [
+        "epochs.go",
+        "future_epoch_listener.go",
+        "non_validator.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/simplex/nonvalidator",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/simplex/common",
+        "//graft/simplex/simplex",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+graft_go_test(
+    name = "nonvalidator_test",
+    srcs = [
+        "chain_helpers_test.go",
+        "comm_test.go",
+        "epochs_test.go",
+        "future_epoch_listener_test.go",
+        "leak_test.go",
+        "non_validator_test.go",
+    ],
+    embed = [":nonvalidator"],
+    deps = [
+        "//graft/simplex/common",
+        "//graft/simplex/simplex",
+        "//graft/simplex/testutil",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
+    ],
+)

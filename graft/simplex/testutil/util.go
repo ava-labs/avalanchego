@@ -10,10 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/simplex/common"
-	"github.com/ava-labs/simplex/simplex"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/stretchr/testify/require"
 )
+
+// DefaultTimeout is how long tests wait for an expected event before failing.
+// It is generous so that tests do not flake on slow or loaded machines, such as CI runners with the race detector.
+const DefaultTimeout = 30 * time.Second
 
 // DefaultTestNodeEpochConfig returns a default epoch config for a given node.
 func DefaultTestNodeEpochConfig(t *testing.T, nodeID common.NodeID, comm common.Communication, bb common.BlockBuilder) (simplex.EpochConfig, *TestWAL, *InMemStorage) {

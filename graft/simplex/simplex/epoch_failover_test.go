@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/ava-labs/simplex/common"
-	. "github.com/ava-labs/simplex/simplex"
-	"github.com/ava-labs/simplex/testutil"
+	. "github.com/ava-labs/avalanchego/graft/simplex/common"
+	. "github.com/ava-labs/avalanchego/graft/simplex/simplex"
+	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 )
@@ -1349,7 +1349,7 @@ func TestNodeIsNotSuspectedAfterSigningALaterNotarization(t *testing.T) {
 				return false
 			}
 		}
-	}, 5*time.Second, 10*time.Millisecond, "we never proposed a block for round 4")
+	}, testutil.DefaultTimeout, 10*time.Millisecond, "we never proposed a block for round 4")
 
 	// Only the leaders of rounds 2 and 3 are accused, and not nodes[suspectIndex] for timing out in round 1.
 	parentBlacklist := roundTwoBlock.Blacklist()

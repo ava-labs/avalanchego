@@ -9,7 +9,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/ava-labs/simplex/avalanchego"
+	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 )
 
 type Message struct {

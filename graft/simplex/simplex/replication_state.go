@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"go.uber.org/zap"
 )
 
@@ -355,6 +355,11 @@ func (r *ReplicationState) GetFinalizedBlockForSequence(seq uint64) (common.Bloc
 }
 
 func (r *ReplicationState) GetLowestRound() *common.QuorumRound {
+	if !r.enabled.Load() {
+		// DeleteRound() early aborts if !r.enabled.Load(), so processReplicationState() will run into an infinite recursion
+		// unless we also early abort here.
+		return nil
+	}
 	var lowestRound *common.QuorumRound
 
 	for round, qr := range r.rounds {

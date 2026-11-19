@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/simplex/avalanchego"
-	"github.com/ava-labs/simplex/common"
-	metadata "github.com/ava-labs/simplex/msm"
-	"github.com/ava-labs/simplex/simplex"
-	"github.com/ava-labs/simplex/testutil"
+	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
+	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
+	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -227,9 +227,19 @@ func TestHonestLeaderBuildsOnFutureDatedParent(t *testing.T) {
 
 	pChain := newTestPChain(validators)
 	network := newNetwork(t, pChain)
+	// Round 1's leader proposes as soon as it starts, and its proposal isn't re-sent to nodes added after it.
+	// Without the Byzantine validator, round 1 needs every honest vote, so add its leader last.
+	round1Leader := simplex.LeaderForRound(network.epochValidatorSet.NodeIDs(), 1)
 	var nodes []*node
 	for _, v := range honest {
-		nodes = append(nodes, network.addNode(v.NodeID[:]))
+		if !round1Leader.Equals(v.NodeID[:]) {
+			nodes = append(nodes, network.addNode(v.NodeID[:]))
+		}
+	}
+	for _, v := range honest {
+		if round1Leader.Equals(v.NodeID[:]) {
+			nodes = append(nodes, network.addNode(v.NodeID[:]))
+		}
 	}
 	network.sync()
 
@@ -294,7 +304,7 @@ func TestHonestLeaderBuildsOnFutureDatedParent(t *testing.T) {
 	for _, n := range nodes {
 		require.Eventually(t, func() bool {
 			return n.storage.NumBlocks() > network.seq
-		}, 3*time.Second, 10*time.Millisecond,
+		}, testutil.DefaultTimeout, 10*time.Millisecond,
 			"node %s did not commit an honest block on top of a future-dated parent", n.id)
 	}
 
@@ -586,36 +596,13 @@ func TestInstanceEmptiesWALOfLeavingValidator(t *testing.T) {
 
 	network.waitUntilSealingBlock(newValidatorSet.Nodes())
 
-	// isTelock reports whether the given WAL record is a block record of a Telock.
-	isTelock := func(record []byte) bool {
-		_, blockBytes, err := common.ParseBlockRecord(record)
-		if err != nil {
-			return false
-		}
-		var rawBlock metadata.RawBlock
-		if err := rawBlock.UnmarshalCanoto(blockBytes); err != nil {
-			return false
-		}
-		block := metadata.StateMachineBlock{Metadata: rawBlock.Metadata}
-		return block.Type() == metadata.BlockTypeTelock
-	}
-
-	// The garbage collection may not have run yet when the sealing block's commit is reported.
-	// The epoch may propose a Telock for the round after the sealing block before it is stopped,
-	// and its record is written after the garbage collection, so only Telocks may remain.
 	require.Eventually(t, func() bool {
-		for _, record := range leavingNode.walRecords() {
-			if !isTelock(record) {
-				return false
-			}
-		}
-		return true
-	}, 5*time.Second, 10*time.Millisecond)
+		return len(leavingNode.walRecords()) == 0
+	}, testutil.DefaultTimeout, 10*time.Millisecond)
 
 	// A non-validator must not add to the WAL.
-	remaining := leavingNode.walRecords()
 	network.acceptNewBlock()
-	require.Equal(t, remaining, leavingNode.walRecords())
+	require.Empty(t, leavingNode.walRecords())
 }
 
 func TestInstanceDoubleStartFails(t *testing.T) {
@@ -820,9 +807,8 @@ func TestValidatorSetsMetadataFromSnowman(t *testing.T) {
 		lastNonSimplexBlock: lastBlock,
 	}
 
-	network.addNodeWithConfig(validatorID.NodeID[:], config).sync()
-
-	block, _ := network.acceptNewBlock()
+	node := network.addNodeWithConfig(validatorID.NodeID[:], config).sync()
+	block := node.storage.WaitForBlockCommit(numNonSimplexBlocks)
 	require.Equal(t, numNonSimplexBlocks, block.BlockHeader().Epoch)
 	require.Equal(t, uint64(1), block.BlockHeader().Round)
 	require.Equal(t, numNonSimplexBlocks, block.BlockHeader().Seq)
@@ -1165,13 +1151,14 @@ func TestInstanceBlacklistConfigurationRollsOverAcrossEpochs(t *testing.T) {
 
 	// Inspect the chain: every block moves the max blacklisted rounds of its parent, possibly from the previous epoch,
 	// by a single orbit (as many rounds as there are validators) towards the configuration of the node that built it,
-	// unless it is already within a single orbit of it. The first ever blacklist starts from GenesisMaxBlacklistedRounds.
+	// unless it is already within a single orbit of it, in which case it adopts that configuration.
+	// The first ever blacklist starts from GenesisMaxBlacklistedRounds.
 	// The epoch number is the sequence of the sealing block that started it.
-	validatorsOfEpoch := func(epoch uint64) common.NodeIDs {
+	validatorsOfEpoch := func(epoch uint64) metadata.NodeBLSMappings {
 		if epoch == secondEpoch {
-			return threeValidators.NodeIDs()
+			return threeValidators
 		}
-		return twoValidators.NodeIDs()
+		return twoValidators
 	}
 	rounds := uint16(common.GenesisMaxBlacklistedRounds)
 	var epochSizes []uint16
@@ -1184,16 +1171,8 @@ func TestInstanceBlacklistConfigurationRollsOverAcrossEpochs(t *testing.T) {
 			epochSizes = append(epochSizes, nodeCount)
 		}
 
-		leader := simplex.LeaderForRound(validators, block.BlockHeader().Round)
-		target := maxBlacklistedRoundsByNode[string(leader)]
-		switch {
-		case rounds < nodeCount:
-			rounds = nodeCount
-		case target >= rounds+nodeCount:
-			rounds += nodeCount
-		case target+nodeCount <= rounds:
-			rounds = max(rounds-nodeCount, nodeCount)
-		}
+		leader := simplex.LeaderForRound(validators.NodeIDs(), block.BlockHeader().Round)
+		rounds = nextMaxBlacklistedRounds(rounds, maxBlacklistedRoundsByNode[string(leader)], validators.Nodes())
 		require.Equal(t, rounds, blacklist.MaxBlacklistedRounds(), "block %d built by %s", seq, leader)
 	}
 
@@ -1229,7 +1208,6 @@ func TestInstanceMaxBlacklistedRoundsRollingRestart(t *testing.T) {
 
 	// targets holds the max blacklisted rounds each block's builder was configured with when it built the block.
 	// The first simplex block is built while the nodes sync, with the initial configuration.
-	nodeCount := uint16(len(genesisSet))
 	targets := map[uint64]uint16{1: initialRounds}
 	acceptNewBlocks := func(count int) {
 		for range count {
@@ -1259,15 +1237,7 @@ func TestInstanceMaxBlacklistedRoundsRollingRestart(t *testing.T) {
 		block := nodes[0].storage.WaitForBlockCommit(seq)
 		blacklist := block.Blacklist()
 		actual := blacklist.MaxBlacklistedRounds()
-
-		switch target := targets[seq]; {
-		case prevMaxRounds < target:
-			require.Equal(t, prevMaxRounds+nodeCount, actual, "block %d", seq)
-		case prevMaxRounds > target:
-			require.Equal(t, prevMaxRounds-nodeCount, actual, "block %d", seq)
-		default:
-			require.Equal(t, prevMaxRounds, actual, "block %d", seq)
-		}
+		require.Equal(t, nextMaxBlacklistedRounds(prevMaxRounds, targets[seq], genesisSet.Nodes()), actual, "block %d", seq)
 		prevMaxRounds = actual
 		highest = max(highest, actual)
 	}
@@ -1275,6 +1245,12 @@ func TestInstanceMaxBlacklistedRoundsRollingRestart(t *testing.T) {
 	// The chain reached the increased configuration, and ended up with the decreased one.
 	require.Equal(t, uint16(increasedRounds), highest)
 	require.Equal(t, uint16(decreasedRounds), prevMaxRounds)
+}
+
+func nextMaxBlacklistedRounds(prev, target uint16, validators common.Nodes) uint16 {
+	parent := common.NewBlacklist(prev)
+	next := parent.Next(validators, 0, target, nil, nil)
+	return next.MaxBlacklistedRounds()
 }
 
 // TestInstanceMaxBlacklistedRoundsDifferAtGenesis runs a network whose validators are configured with different
