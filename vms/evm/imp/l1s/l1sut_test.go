@@ -98,6 +98,9 @@ type (
 		// time. Use [withNow] to set.
 		clockTime        *time.Time
 		configureGenesis func(*core.Genesis, []common.Address)
+		// iglooGenesis, if true, starts the genesis at Igloo. Use
+		// [withIglooGenesis] to set.
+		iglooGenesis     bool
 		configureUpgrade func([]common.Address) []byte
 		// feeRecipient, if non-nil, is passed through
 		// `Config.FeeRecipient` to the VM. When nil, the VM burns fees.
@@ -141,6 +144,9 @@ func newL1SUT(t *testing.T, opts ...l1SUTOption) *l1SUT {
 
 	keychain := saetest.NewUNSAFEKeyChain(t, cfg.numAccounts)
 	genesis := newTestGenesis(cfg.fork, keychain)
+	if cfg.iglooGenesis {
+		genesis.Timestamp = uint64(upgrades.IglooTime.Unix()) //#nosec G115 -- known positive test timestamp
+	}
 	if cfg.configureGenesis != nil {
 		cfg.configureGenesis(genesis, keychain.Addresses())
 	}
@@ -351,6 +357,14 @@ func withNumAccounts(numAccounts uint) l1SUTOption {
 func withGenesisConfig(fn func(*core.Genesis, []common.Address)) l1SUTOption {
 	return options.Func[l1SUTConfig](func(c *l1SUTConfig) {
 		c.configureGenesis = fn
+	})
+}
+
+// withIglooGenesis starts the genesis at Igloo, which configs that only
+// Igloo allows, like gaspricemanager genesis precompiles, require.
+func withIglooGenesis() l1SUTOption {
+	return options.Func[l1SUTConfig](func(c *l1SUTConfig) {
+		c.iglooGenesis = true
 	})
 }
 

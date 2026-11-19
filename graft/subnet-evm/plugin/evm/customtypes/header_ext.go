@@ -50,17 +50,10 @@ type HeaderExtra struct {
 	SettledGasNumerator *uint64
 	SettledExcess       *uint64
 
-	// TargetExcess is populated by the SAE block builder after Igloo and is
-	// ignored on legacy chains. It encodes the gas target, whether chosen by
-	// validators or pinned by the gas price manager precompile.
-	TargetExcess *gas.Gas
-
-	// The GasConfig* fields hold the ACP-224 price configuration from the gas
-	// price manager precompile, when it is enabled. They are either all set or
-	// all nil. If nil, the ACP-176 defaults apply. StaticPricing is 0 or 1.
-	GasConfigTargetToExcessScaling *uint64
-	GasConfigMinGasPrice           *uint64
-	GasConfigStaticPricing         *uint64
+	TargetExcess          *gas.Gas
+	TargetToExcessScaling *uint64
+	MinPrice              *uint64
+	StaticPricing         *uint64 // 0 or 1
 
 	predicateResults atomic.Pointer[predicate.BlockResults]
 }
@@ -179,17 +172,17 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		v := *h.TargetExcess
 		cp.TargetExcess = &v
 	}
-	if h.GasConfigTargetToExcessScaling != nil {
-		v := *h.GasConfigTargetToExcessScaling
-		cp.GasConfigTargetToExcessScaling = &v
+	if h.TargetToExcessScaling != nil {
+		v := *h.TargetToExcessScaling
+		cp.TargetToExcessScaling = &v
 	}
-	if h.GasConfigMinGasPrice != nil {
-		v := *h.GasConfigMinGasPrice
-		cp.GasConfigMinGasPrice = &v
+	if h.MinPrice != nil {
+		v := *h.MinPrice
+		cp.MinPrice = &v
 	}
-	if h.GasConfigStaticPricing != nil {
-		v := *h.GasConfigStaticPricing
-		cp.GasConfigStaticPricing = &v
+	if h.StaticPricing != nil {
+		v := *h.StaticPricing
+		cp.StaticPricing = &v
 	}
 	SetHeaderExtra(dst, cp)
 }
@@ -219,14 +212,14 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	if h.TargetExcess != nil {
 		m["targetExcess"] = hexutil.Uint64(*h.TargetExcess)
 	}
-	if h.GasConfigTargetToExcessScaling != nil {
-		m["gasConfigTargetToExcessScaling"] = hexutil.Uint64(*h.GasConfigTargetToExcessScaling)
+	if h.TargetToExcessScaling != nil {
+		m["targetToExcessScaling"] = hexutil.Uint64(*h.TargetToExcessScaling)
 	}
-	if h.GasConfigMinGasPrice != nil {
-		m["gasConfigMinGasPrice"] = hexutil.Uint64(*h.GasConfigMinGasPrice)
+	if h.MinPrice != nil {
+		m["minPrice"] = hexutil.Uint64(*h.MinPrice)
 	}
-	if h.GasConfigStaticPricing != nil {
-		m["gasConfigStaticPricing"] = hexutil.Uint64(*h.GasConfigStaticPricing)
+	if h.StaticPricing != nil {
+		m["staticPricing"] = hexutil.Uint64(*h.StaticPricing)
 	}
 }
 
@@ -283,9 +276,9 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.SettledGasNumerator = extras.SettledGasNumerator
 	h.SettledExcess = extras.SettledExcess
 	h.TargetExcess = (*uint64)(extras.TargetExcess)
-	h.GasConfigTargetToExcessScaling = extras.GasConfigTargetToExcessScaling
-	h.GasConfigMinGasPrice = extras.GasConfigMinGasPrice
-	h.GasConfigStaticPricing = extras.GasConfigStaticPricing
+	h.TargetToExcessScaling = extras.TargetToExcessScaling
+	h.MinPrice = extras.MinPrice
+	h.StaticPricing = extras.StaticPricing
 }
 
 func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
@@ -297,9 +290,9 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.SettledGasNumerator = h.SettledGasNumerator
 	extras.SettledExcess = h.SettledExcess
 	extras.TargetExcess = (*gas.Gas)(h.TargetExcess)
-	extras.GasConfigTargetToExcessScaling = h.GasConfigTargetToExcessScaling
-	extras.GasConfigMinGasPrice = h.GasConfigMinGasPrice
-	extras.GasConfigStaticPricing = h.GasConfigStaticPricing
+	extras.TargetToExcessScaling = h.TargetToExcessScaling
+	extras.MinPrice = h.MinPrice
+	extras.StaticPricing = h.StaticPricing
 }
 
 // NOTE: both generators currently do not support type aliases.
@@ -358,14 +351,12 @@ type HeaderSerializable struct {
 	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
 	SettledExcess       *uint64 `json:"settledExcess"       rlp:"optional"`
 
-	// TargetExcess was added by Igloo (SAE) and is ignored in legacy headers.
-	TargetExcess *uint64 `json:"targetExcess" rlp:"optional"`
-
-	// The GasConfig* group carries the effective ACP-224 price configuration
-	// (see [HeaderExtra]) and is ignored in legacy headers.
-	GasConfigTargetToExcessScaling *uint64 `json:"gasConfigTargetToExcessScaling" rlp:"optional"`
-	GasConfigMinGasPrice           *uint64 `json:"gasConfigMinGasPrice"           rlp:"optional"`
-	GasConfigStaticPricing         *uint64 `json:"gasConfigStaticPricing"         rlp:"optional"`
+	// TargetExcess, TargetToExcessScaling, MinPrice and StaticPricing were
+	// added by Igloo (SAE) and are ignored in legacy headers.
+	TargetExcess          *uint64 `json:"targetExcess"          rlp:"optional"`
+	TargetToExcessScaling *uint64 `json:"targetToExcessScaling" rlp:"optional"`
+	MinPrice              *uint64 `json:"minPrice"              rlp:"optional"`
+	StaticPricing         *uint64 `json:"staticPricing"         rlp:"optional"`
 }
 
 // field type overrides for gencodec
@@ -389,9 +380,9 @@ type headerMarshaling struct {
 	SettledExcess       *hexutil.Uint64
 	TargetExcess        *hexutil.Uint64
 
-	GasConfigTargetToExcessScaling *hexutil.Uint64
-	GasConfigMinGasPrice           *hexutil.Uint64
-	GasConfigStaticPricing         *hexutil.Uint64
+	TargetToExcessScaling *hexutil.Uint64
+	MinPrice              *hexutil.Uint64
+	StaticPricing         *hexutil.Uint64
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its

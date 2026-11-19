@@ -102,6 +102,7 @@ func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 		withFork(upgrade.Igloo),
 		withNumAccounts(2),
 		withNow(now),
+		withIglooGenesis(),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
@@ -172,6 +173,7 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 		withFork(upgrade.Igloo),
 		withNumAccounts(2),
 		withNow(now),
+		withIglooGenesis(),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
@@ -263,6 +265,7 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 			withNumAccounts(2),
 			withNow(now),
 			withGasTarget(desiredGasTarget),
+			withIglooGenesis(),
 			withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 				legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 					gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
@@ -371,6 +374,7 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 		withNumAccounts(2),
 		withNow(now),
 		withGasTarget(desiredTarget),
+		withIglooGenesis(),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
@@ -453,7 +457,7 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 //   - `disable_mid_chain`: chain starts with `pinnedCfg` at genesis;
 //     `PrecompileUpgrades` disables it `Tau` after genesis. Locks in the
 //     `SelfDestruct + Finalise` storage-wipe path: post-settlement
-//     builds observe zero-valued settled storage, stop stamping the
+//     builds observe zero-valued settled storage, stamp the default
 //     GasConfig* group, and the chain begins decaying back toward ACP-176
 //     defaults.
 func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
@@ -560,23 +564,25 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			sut := newL1SUT(
-				t,
+			opts := []l1SUTOption{
 				withFork(upgrade.Igloo),
 				withNumAccounts(2),
 				withNow(now),
-				withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
-					if tc.genesisPrecompiles == nil {
-						return
-					}
-					legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = tc.genesisPrecompiles(addresses)
-				}),
 				withUpgradeConfig(func(addresses []common.Address) []byte {
 					return marshalJSON(t, &extras.UpgradeConfig{
 						PrecompileUpgrades: tc.upgrades(addresses, tc.activationTime),
 					})
 				}),
-			)
+			}
+			if tc.genesisPrecompiles != nil {
+				opts = append(opts,
+					withIglooGenesis(),
+					withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
+						legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = tc.genesisPrecompiles(addresses)
+					}),
+				)
+			}
+			sut := newL1SUT(t, opts...)
 
 			// Pre-transition block: built only when the case sets a
 			// pre-transition expectation. Cases whose activation fires at
@@ -637,6 +643,7 @@ func TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE(t *testing.T) {
 		withFork(upgrade.Igloo),
 		withNumAccounts(2),
 		withNow(now),
+		withIglooGenesis(),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(

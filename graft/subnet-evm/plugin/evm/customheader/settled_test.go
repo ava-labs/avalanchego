@@ -57,17 +57,17 @@ func TestVerifyNoSAEFields(t *testing.T) {
 		},
 		{
 			name:    "gas_config_target_to_excess_scaling_should_fail",
-			extra:   &customtypes.HeaderExtra{GasConfigTargetToExcessScaling: utils.PointerTo[uint64](1)},
+			extra:   &customtypes.HeaderExtra{TargetToExcessScaling: utils.PointerTo[uint64](1)},
 			wantErr: errSAEFieldSet,
 		},
 		{
 			name:    "gas_config_min_gas_price_should_fail",
-			extra:   &customtypes.HeaderExtra{GasConfigMinGasPrice: utils.PointerTo[uint64](1)},
+			extra:   &customtypes.HeaderExtra{MinPrice: utils.PointerTo[uint64](1)},
 			wantErr: errSAEFieldSet,
 		},
 		{
 			name:    "gas_config_static_pricing_should_fail",
-			extra:   &customtypes.HeaderExtra{GasConfigStaticPricing: utils.PointerTo[uint64](1)},
+			extra:   &customtypes.HeaderExtra{StaticPricing: utils.PointerTo[uint64](1)},
 			wantErr: errSAEFieldSet,
 		},
 		{

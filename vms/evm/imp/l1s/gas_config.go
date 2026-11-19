@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math/intmath"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 )
 
 // gasConfigFromStored projects gaspricemanager storage into the derived
@@ -24,30 +25,39 @@ func gasConfigFromStored(stored commontype.GasPriceConfig) gastime.GasPriceConfi
 	}
 }
 
+// stampStoredGasConfig writes the target and gas-config group of stored
+// gaspricemanager storage into he.
+func stampStoredGasConfig(he *customtypes.HeaderExtra, stored commontype.GasPriceConfig) {
+	if !stored.ValidatorTargetGas {
+		he.TargetExcess = new(gas.Gas(dynamic.DesiredTargetExponent(gas.Gas(stored.TargetGas))))
+	}
+	stampGasConfig(he, gasConfigFromStored(stored))
+}
+
 // stampGasConfig writes the group into `he`. All three fields are always set
 // together; [readGasConfig] treats anything less as absent.
 func stampGasConfig(he *customtypes.HeaderExtra, c gastime.GasPriceConfig) {
-	he.GasConfigTargetToExcessScaling = (*uint64)(&c.TargetToExcessScaling)
-	he.GasConfigMinGasPrice = (*uint64)(&c.MinPrice)
-	he.GasConfigStaticPricing = boolToUint64Ptr(c.StaticPricing)
+	he.TargetToExcessScaling = (*uint64)(&c.TargetToExcessScaling)
+	he.MinPrice = (*uint64)(&c.MinPrice)
+	he.StaticPricing = boolToUint64Ptr(c.StaticPricing)
 }
 
 // readGasConfig recovers the group stamped by [stampGasConfig], reporting
-// `false` when the header does not carry a complete group (gaspricemanager
-// not enabled at the settled timestamp, or a pre-SAE header). A maliciously
+// `false` when the header does not carry a complete group, which only happens
+// before the first SAE block. A maliciously
 // crafted header CAN carry present-but-zero fields (RLP decodes empty
 // optional items as pointers to zero); such headers are rejected by the
 // rebuild-hash-equality check in block verification, never by this reader.
 func readGasConfig(he *customtypes.HeaderExtra) (gastime.GasPriceConfig, bool) {
-	if he.GasConfigTargetToExcessScaling == nil ||
-		he.GasConfigMinGasPrice == nil ||
-		he.GasConfigStaticPricing == nil {
+	if he.TargetToExcessScaling == nil ||
+		he.MinPrice == nil ||
+		he.StaticPricing == nil {
 		return gastime.GasPriceConfig{}, false
 	}
 	return gastime.GasPriceConfig{
-		TargetToExcessScaling: gas.Gas(*he.GasConfigTargetToExcessScaling),
-		MinPrice:              gas.Price(*he.GasConfigMinGasPrice),
-		StaticPricing:         *he.GasConfigStaticPricing != 0,
+		TargetToExcessScaling: gas.Gas(*he.TargetToExcessScaling),
+		MinPrice:              gas.Price(*he.MinPrice),
+		StaticPricing:         *he.StaticPricing != 0,
 	}, true
 }
 

@@ -17,37 +17,37 @@ var _ = (*headerMarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 	type HeaderSerializable struct {
-		ParentHash                     common.Hash      `json:"parentHash"       gencodec:"required"`
-		UncleHash                      common.Hash      `json:"sha3Uncles"       gencodec:"required"`
-		Coinbase                       common.Address   `json:"miner"            gencodec:"required"`
-		Root                           common.Hash      `json:"stateRoot"        gencodec:"required"`
-		TxHash                         common.Hash      `json:"transactionsRoot" gencodec:"required"`
-		ReceiptHash                    common.Hash      `json:"receiptsRoot"     gencodec:"required"`
-		Bloom                          types.Bloom      `json:"logsBloom"        gencodec:"required"`
-		Difficulty                     *hexutil.Big     `json:"difficulty"       gencodec:"required"`
-		Number                         *hexutil.Big     `json:"number"           gencodec:"required"`
-		GasLimit                       hexutil.Uint64   `json:"gasLimit"         gencodec:"required"`
-		GasUsed                        hexutil.Uint64   `json:"gasUsed"          gencodec:"required"`
-		Time                           hexutil.Uint64   `json:"timestamp"        gencodec:"required"`
-		Extra                          hexutil.Bytes    `json:"extraData"        gencodec:"required"`
-		MixDigest                      common.Hash      `json:"mixHash"`
-		Nonce                          types.BlockNonce `json:"nonce"`
-		BaseFee                        *hexutil.Big     `json:"baseFeePerGas" rlp:"optional"`
-		BlockGasCost                   *hexutil.Big     `json:"blockGasCost" rlp:"optional"`
-		BlobGasUsed                    *hexutil.Uint64  `json:"blobGasUsed" rlp:"optional"`
-		ExcessBlobGas                  *hexutil.Uint64  `json:"excessBlobGas" rlp:"optional"`
-		ParentBeaconRoot               *common.Hash     `json:"parentBeaconBlockRoot" rlp:"optional"`
-		TimeMilliseconds               *hexutil.Uint64  `json:"timestampMilliseconds" rlp:"optional"`
-		MinDelayExcess                 *hexutil.Uint64  `json:"minDelayExcess" rlp:"optional"`
-		SettledHeight                  *hexutil.Uint64  `json:"settledHeight"       rlp:"optional"`
-		SettledGasUnix                 *hexutil.Uint64  `json:"settledGasUnix"      rlp:"optional"`
-		SettledGasNumerator            *hexutil.Uint64  `json:"settledGasNumerator" rlp:"optional"`
-		SettledExcess                  *hexutil.Uint64  `json:"settledExcess"       rlp:"optional"`
-		TargetExcess                   *hexutil.Uint64  `json:"targetExcess" rlp:"optional"`
-		GasConfigTargetToExcessScaling *hexutil.Uint64  `json:"gasConfigTargetToExcessScaling" rlp:"optional"`
-		GasConfigMinGasPrice           *hexutil.Uint64  `json:"gasConfigMinGasPrice"           rlp:"optional"`
-		GasConfigStaticPricing         *hexutil.Uint64  `json:"gasConfigStaticPricing"         rlp:"optional"`
-		Hash                           common.Hash      `json:"hash"`
+		ParentHash            common.Hash      `json:"parentHash"       gencodec:"required"`
+		UncleHash             common.Hash      `json:"sha3Uncles"       gencodec:"required"`
+		Coinbase              common.Address   `json:"miner"            gencodec:"required"`
+		Root                  common.Hash      `json:"stateRoot"        gencodec:"required"`
+		TxHash                common.Hash      `json:"transactionsRoot" gencodec:"required"`
+		ReceiptHash           common.Hash      `json:"receiptsRoot"     gencodec:"required"`
+		Bloom                 types.Bloom      `json:"logsBloom"        gencodec:"required"`
+		Difficulty            *hexutil.Big     `json:"difficulty"       gencodec:"required"`
+		Number                *hexutil.Big     `json:"number"           gencodec:"required"`
+		GasLimit              hexutil.Uint64   `json:"gasLimit"         gencodec:"required"`
+		GasUsed               hexutil.Uint64   `json:"gasUsed"          gencodec:"required"`
+		Time                  hexutil.Uint64   `json:"timestamp"        gencodec:"required"`
+		Extra                 hexutil.Bytes    `json:"extraData"        gencodec:"required"`
+		MixDigest             common.Hash      `json:"mixHash"`
+		Nonce                 types.BlockNonce `json:"nonce"`
+		BaseFee               *hexutil.Big     `json:"baseFeePerGas" rlp:"optional"`
+		BlockGasCost          *hexutil.Big     `json:"blockGasCost" rlp:"optional"`
+		BlobGasUsed           *hexutil.Uint64  `json:"blobGasUsed" rlp:"optional"`
+		ExcessBlobGas         *hexutil.Uint64  `json:"excessBlobGas" rlp:"optional"`
+		ParentBeaconRoot      *common.Hash     `json:"parentBeaconBlockRoot" rlp:"optional"`
+		TimeMilliseconds      *hexutil.Uint64  `json:"timestampMilliseconds" rlp:"optional"`
+		MinDelayExcess        *hexutil.Uint64  `json:"minDelayExcess" rlp:"optional"`
+		SettledHeight         *hexutil.Uint64  `json:"settledHeight"       rlp:"optional"`
+		SettledGasUnix        *hexutil.Uint64  `json:"settledGasUnix"      rlp:"optional"`
+		SettledGasNumerator   *hexutil.Uint64  `json:"settledGasNumerator" rlp:"optional"`
+		SettledExcess         *hexutil.Uint64  `json:"settledExcess"       rlp:"optional"`
+		TargetExcess          *hexutil.Uint64  `json:"targetExcess"          rlp:"optional"`
+		TargetToExcessScaling *hexutil.Uint64  `json:"targetToExcessScaling" rlp:"optional"`
+		MinPrice              *hexutil.Uint64  `json:"minPrice"              rlp:"optional"`
+		StaticPricing         *hexutil.Uint64  `json:"staticPricing"         rlp:"optional"`
+		Hash                  common.Hash      `json:"hash"`
 	}
 	var enc HeaderSerializable
 	enc.ParentHash = h.ParentHash
@@ -77,9 +77,9 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 	enc.SettledGasNumerator = (*hexutil.Uint64)(h.SettledGasNumerator)
 	enc.SettledExcess = (*hexutil.Uint64)(h.SettledExcess)
 	enc.TargetExcess = (*hexutil.Uint64)(h.TargetExcess)
-	enc.GasConfigTargetToExcessScaling = (*hexutil.Uint64)(h.GasConfigTargetToExcessScaling)
-	enc.GasConfigMinGasPrice = (*hexutil.Uint64)(h.GasConfigMinGasPrice)
-	enc.GasConfigStaticPricing = (*hexutil.Uint64)(h.GasConfigStaticPricing)
+	enc.TargetToExcessScaling = (*hexutil.Uint64)(h.TargetToExcessScaling)
+	enc.MinPrice = (*hexutil.Uint64)(h.MinPrice)
+	enc.StaticPricing = (*hexutil.Uint64)(h.StaticPricing)
 	enc.Hash = h.Hash()
 	return json.Marshal(&enc)
 }
@@ -87,36 +87,36 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarshals from JSON.
 func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 	type HeaderSerializable struct {
-		ParentHash                     *common.Hash      `json:"parentHash"       gencodec:"required"`
-		UncleHash                      *common.Hash      `json:"sha3Uncles"       gencodec:"required"`
-		Coinbase                       *common.Address   `json:"miner"            gencodec:"required"`
-		Root                           *common.Hash      `json:"stateRoot"        gencodec:"required"`
-		TxHash                         *common.Hash      `json:"transactionsRoot" gencodec:"required"`
-		ReceiptHash                    *common.Hash      `json:"receiptsRoot"     gencodec:"required"`
-		Bloom                          *types.Bloom      `json:"logsBloom"        gencodec:"required"`
-		Difficulty                     *hexutil.Big      `json:"difficulty"       gencodec:"required"`
-		Number                         *hexutil.Big      `json:"number"           gencodec:"required"`
-		GasLimit                       *hexutil.Uint64   `json:"gasLimit"         gencodec:"required"`
-		GasUsed                        *hexutil.Uint64   `json:"gasUsed"          gencodec:"required"`
-		Time                           *hexutil.Uint64   `json:"timestamp"        gencodec:"required"`
-		Extra                          *hexutil.Bytes    `json:"extraData"        gencodec:"required"`
-		MixDigest                      *common.Hash      `json:"mixHash"`
-		Nonce                          *types.BlockNonce `json:"nonce"`
-		BaseFee                        *hexutil.Big      `json:"baseFeePerGas" rlp:"optional"`
-		BlockGasCost                   *hexutil.Big      `json:"blockGasCost" rlp:"optional"`
-		BlobGasUsed                    *hexutil.Uint64   `json:"blobGasUsed" rlp:"optional"`
-		ExcessBlobGas                  *hexutil.Uint64   `json:"excessBlobGas" rlp:"optional"`
-		ParentBeaconRoot               *common.Hash      `json:"parentBeaconBlockRoot" rlp:"optional"`
-		TimeMilliseconds               *hexutil.Uint64   `json:"timestampMilliseconds" rlp:"optional"`
-		MinDelayExcess                 *hexutil.Uint64   `json:"minDelayExcess" rlp:"optional"`
-		SettledHeight                  *hexutil.Uint64   `json:"settledHeight"       rlp:"optional"`
-		SettledGasUnix                 *hexutil.Uint64   `json:"settledGasUnix"      rlp:"optional"`
-		SettledGasNumerator            *hexutil.Uint64   `json:"settledGasNumerator" rlp:"optional"`
-		SettledExcess                  *hexutil.Uint64   `json:"settledExcess"       rlp:"optional"`
-		TargetExcess                   *hexutil.Uint64   `json:"targetExcess" rlp:"optional"`
-		GasConfigTargetToExcessScaling *hexutil.Uint64   `json:"gasConfigTargetToExcessScaling" rlp:"optional"`
-		GasConfigMinGasPrice           *hexutil.Uint64   `json:"gasConfigMinGasPrice"           rlp:"optional"`
-		GasConfigStaticPricing         *hexutil.Uint64   `json:"gasConfigStaticPricing"         rlp:"optional"`
+		ParentHash            *common.Hash      `json:"parentHash"       gencodec:"required"`
+		UncleHash             *common.Hash      `json:"sha3Uncles"       gencodec:"required"`
+		Coinbase              *common.Address   `json:"miner"            gencodec:"required"`
+		Root                  *common.Hash      `json:"stateRoot"        gencodec:"required"`
+		TxHash                *common.Hash      `json:"transactionsRoot" gencodec:"required"`
+		ReceiptHash           *common.Hash      `json:"receiptsRoot"     gencodec:"required"`
+		Bloom                 *types.Bloom      `json:"logsBloom"        gencodec:"required"`
+		Difficulty            *hexutil.Big      `json:"difficulty"       gencodec:"required"`
+		Number                *hexutil.Big      `json:"number"           gencodec:"required"`
+		GasLimit              *hexutil.Uint64   `json:"gasLimit"         gencodec:"required"`
+		GasUsed               *hexutil.Uint64   `json:"gasUsed"          gencodec:"required"`
+		Time                  *hexutil.Uint64   `json:"timestamp"        gencodec:"required"`
+		Extra                 *hexutil.Bytes    `json:"extraData"        gencodec:"required"`
+		MixDigest             *common.Hash      `json:"mixHash"`
+		Nonce                 *types.BlockNonce `json:"nonce"`
+		BaseFee               *hexutil.Big      `json:"baseFeePerGas" rlp:"optional"`
+		BlockGasCost          *hexutil.Big      `json:"blockGasCost" rlp:"optional"`
+		BlobGasUsed           *hexutil.Uint64   `json:"blobGasUsed" rlp:"optional"`
+		ExcessBlobGas         *hexutil.Uint64   `json:"excessBlobGas" rlp:"optional"`
+		ParentBeaconRoot      *common.Hash      `json:"parentBeaconBlockRoot" rlp:"optional"`
+		TimeMilliseconds      *hexutil.Uint64   `json:"timestampMilliseconds" rlp:"optional"`
+		MinDelayExcess        *hexutil.Uint64   `json:"minDelayExcess" rlp:"optional"`
+		SettledHeight         *hexutil.Uint64   `json:"settledHeight"       rlp:"optional"`
+		SettledGasUnix        *hexutil.Uint64   `json:"settledGasUnix"      rlp:"optional"`
+		SettledGasNumerator   *hexutil.Uint64   `json:"settledGasNumerator" rlp:"optional"`
+		SettledExcess         *hexutil.Uint64   `json:"settledExcess"       rlp:"optional"`
+		TargetExcess          *hexutil.Uint64   `json:"targetExcess"          rlp:"optional"`
+		TargetToExcessScaling *hexutil.Uint64   `json:"targetToExcessScaling" rlp:"optional"`
+		MinPrice              *hexutil.Uint64   `json:"minPrice"              rlp:"optional"`
+		StaticPricing         *hexutil.Uint64   `json:"staticPricing"         rlp:"optional"`
 	}
 	var dec HeaderSerializable
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -216,14 +216,14 @@ func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 	if dec.TargetExcess != nil {
 		h.TargetExcess = (*uint64)(dec.TargetExcess)
 	}
-	if dec.GasConfigTargetToExcessScaling != nil {
-		h.GasConfigTargetToExcessScaling = (*uint64)(dec.GasConfigTargetToExcessScaling)
+	if dec.TargetToExcessScaling != nil {
+		h.TargetToExcessScaling = (*uint64)(dec.TargetToExcessScaling)
 	}
-	if dec.GasConfigMinGasPrice != nil {
-		h.GasConfigMinGasPrice = (*uint64)(dec.GasConfigMinGasPrice)
+	if dec.MinPrice != nil {
+		h.MinPrice = (*uint64)(dec.MinPrice)
 	}
-	if dec.GasConfigStaticPricing != nil {
-		h.GasConfigStaticPricing = (*uint64)(dec.GasConfigStaticPricing)
+	if dec.StaticPricing != nil {
+		h.StaticPricing = (*uint64)(dec.StaticPricing)
 	}
 	return nil
 }

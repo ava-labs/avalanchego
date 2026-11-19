@@ -14,20 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeconfig"
 
 	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
 )
 
 func TestBuildHeaderIglooOverride(t *testing.T) {
@@ -76,51 +73,6 @@ func TestBuildHeaderIglooOverride(t *testing.T) {
 			}
 			require.NoError(t, err, "builder.BuildHeader() at %s", test.now)
 			require.Equal(t, uint64(test.now.Unix()), header.Time, "builder.BuildHeader() at %s", test.now) //#nosec G115 -- known positive test timestamp
-		})
-	}
-}
-
-func TestGasConfigAfterGenesisCanonicalTarget(t *testing.T) {
-	tests := []struct {
-		name         string
-		storedTarget gas.Gas
-		want         gas.Gas
-	}{
-		{
-			name:         "exactly_representable",
-			storedTarget: 3_000_000,
-			want:         3_000_000,
-		},
-		{
-			name:         "rounded_up",
-			storedTarget: 1_000_000_000,
-			want:         1_000_000_006,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgrade.Igloo])
-			config := &commontype.GasPriceConfig{
-				TargetGas:    uint64(test.storedTarget),
-				MinGasPrice:  1,
-				TimeToDouble: 60,
-			}
-			legacyparams.GetExtra(&chainCfg).GenesisPrecompiles = extras.Precompiles{
-				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					new(uint64(0)),
-					nil,
-					nil,
-					nil,
-					config,
-				),
-			}
-			genesis := &types.Header{
-				Number: new(big.Int),
-				Time:   saeparams.TauSeconds,
-			}
-
-			got, _ := newHooks(nil, &chainCfg, nil, saeconfig.Desired{}, nil, common.Address{}, nil).GasConfigAfter(genesis)
-			require.Equal(t, test.want, got, "hooks.GasConfigAfter() for stored target %d", test.storedTarget)
 		})
 	}
 }
@@ -260,6 +212,38 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 		"rebuilt hash MUST diverge from forged block's hash; this is what triggers sae.ErrHashMismatch in VerifyBlock")
 }
 
+// TestBuildBlockStampsDefaultGasConfig asserts that a block built while
+// gaspricemanager is disabled MUST carry the default gas-config group, because
+// header fields can't be removed once populated.
+func TestBuildBlockStampsDefaultGasConfig(t *testing.T) {
+	const (
+		parentTimeMS = uint64(2_000_000_000_000)
+		nowMS        = parentTimeMS + 5_000 // > InitialDelayExcess (~2s)
+	)
+	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgrade.Igloo])
+	parent := &types.Header{Number: big.NewInt(1), Time: parentTimeMS / 1000}
+	customtypes.SetHeaderExtra(parent, &customtypes.HeaderExtra{
+		TimeMilliseconds: new(parentTimeMS),
+		MinDelayExcess:   new(acp226.InitialDelayExcess),
+	})
+	b := newHooks(
+		nil, &chainCfg,
+		func() time.Time { return time.UnixMilli(int64(nowMS)) },
+		saeconfig.Desired{}, nil, common.Address{}, nil,
+	).builder
+
+	header, err := b.BuildHeader(parent)
+	require.NoError(t, err, "BuildHeader()")
+	tx := types.NewTx(&types.DynamicFeeTx{Gas: 21_000, Value: big.NewInt(0)})
+	settledRules := chainCfg.Rules(big.NewInt(0), true /*isMerge*/, parent.Time)
+	block, err := b.BuildBlock(header, nil, []*types.Transaction{tx}, nil, hook.Settled{}, settledRules, nil)
+	require.NoError(t, err, "BuildBlock()")
+
+	got, ok := readGasConfig(customtypes.GetHeaderExtra(block.Header()))
+	require.True(t, ok, "BuildBlock() MUST stamp the gas-config group")
+	require.Equal(t, gastime.DefaultGasPriceConfig(), got, "BuildBlock() gas-config group")
+}
+
 func TestVerifyBlockSyntaxGasConfigGroup(t *testing.T) {
 	one := new(uint64(1))
 	tests := []struct {
@@ -271,24 +255,24 @@ func TestVerifyBlockSyntaxGasConfigGroup(t *testing.T) {
 		{
 			name: "one_of_three",
 			extra: &customtypes.HeaderExtra{
-				GasConfigTargetToExcessScaling: one,
+				TargetToExcessScaling: one,
 			},
 			wantErr: errPartialGasConfig,
 		},
 		{
 			name: "two_of_three",
 			extra: &customtypes.HeaderExtra{
-				GasConfigTargetToExcessScaling: one,
-				GasConfigMinGasPrice:           one,
+				TargetToExcessScaling: one,
+				MinPrice:              one,
 			},
 			wantErr: errPartialGasConfig,
 		},
 		{
 			name: "complete",
 			extra: &customtypes.HeaderExtra{
-				GasConfigTargetToExcessScaling: one,
-				GasConfigMinGasPrice:           one,
-				GasConfigStaticPricing:         one,
+				TargetToExcessScaling: one,
+				MinPrice:              one,
+				StaticPricing:         one,
 			},
 		},
 	}

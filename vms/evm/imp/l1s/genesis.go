@@ -27,8 +27,10 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 
 	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -44,6 +46,7 @@ var (
 	errNonZeroGenesisParentHash   = errors.New("non-zero genesis parentHash")
 	errNonNilGenesisExcessBlobGas = errors.New("non-nil genesis excessBlobGas")
 	errNonNilGenesisBlobGasUsed   = errors.New("non-nil genesis blobGasUsed")
+	errGasPriceManagerBeforeIgloo = errors.New("gaspricemanager activated before Igloo")
 )
 
 type genesis core.Genesis
@@ -108,6 +111,9 @@ func updateChainConfig(cfg *params.ChainConfig, genesisTimestamp uint64, upgrade
 			return err
 		}
 	}
+	if err := verifyGasPriceManagerAfterIgloo(extra, genesisTimestamp); err != nil {
+		return err
+	}
 
 	if err := extra.Verify(); err != nil {
 		return err
@@ -117,6 +123,44 @@ func updateChainConfig(cfg *params.ChainConfig, genesisTimestamp uint64, upgrade
 		return err
 	}
 	return cfg.CheckConfigForkOrder()
+}
+
+// verifyGasPriceManagerAfterIgloo returns an error if cfg activates the
+// gaspricemanager precompile before Igloo. Only Igloo headers carry its gas
+// config.
+func verifyGasPriceManagerAfterIgloo(cfg *extras.ChainConfig, genesisTimestamp uint64) error {
+	if c, ok := cfg.GenesisPrecompiles[gaspricemanager.ConfigKey]; ok && !c.IsDisabled() {
+		if ts := c.Timestamp(); ts != nil {
+			activation := max(*ts, genesisTimestamp)
+			if !cfg.IsIgloo(activation) {
+				return fmt.Errorf("%w: genesis precompile activates at %d", errGasPriceManagerBeforeIgloo, activation)
+			}
+		}
+	}
+	for i, u := range cfg.PrecompileUpgrades {
+		if u.Key() != gaspricemanager.ConfigKey || u.IsDisabled() {
+			continue
+		}
+		if ts := u.Timestamp(); ts != nil && !cfg.IsIgloo(*ts) {
+			return fmt.Errorf("%w: precompileUpgrades[%d] activates at %d", errGasPriceManagerBeforeIgloo, i, *ts)
+		}
+	}
+	return nil
+}
+
+// genesisGasConfig returns the gas config that [gaspricemanager.Configure]
+// seeds into genesis state, or false if gaspricemanager isn't enabled at
+// genesisTime.
+func genesisGasConfig(cfg *extras.ChainConfig, genesisTime uint64) (commontype.GasPriceConfig, bool) {
+	if !cfg.IsPrecompileEnabled(gaspricemanager.ContractAddress, genesisTime) {
+		return commontype.GasPriceConfig{}, false
+	}
+	stored := commontype.DefaultGasPriceConfig()
+	precompileConfig := cfg.GetActivePrecompileConfig(gaspricemanager.ContractAddress, genesisTime)
+	if c, ok := precompileConfig.(*gaspricemanager.Config); ok && c.InitialGasPriceConfig != nil {
+		stored = *c.InitialGasPriceConfig
+	}
+	return stored, true
 }
 
 // makeUpgrades returns an [extras.NetworkUpgrades] based on the following rules:
@@ -258,6 +302,14 @@ func (g *genesis) block() (*types.Block, error) {
 			minDelayExcess = acp226.DesiredDelayExcess(c.InitialMinDelayMS)
 		}
 		headerExtra.MinDelayExcess = new(minDelayExcess)
+	}
+
+	if c.IsIgloo(g.Timestamp) {
+		if stored, ok := genesisGasConfig(c, g.Timestamp); ok {
+			stampStoredGasConfig(headerExtra, stored)
+		} else {
+			stampGasConfig(headerExtra, gastime.DefaultGasPriceConfig())
+		}
 	}
 
 	// TODO(alarso16): Add SAE required fields if active at genesis.

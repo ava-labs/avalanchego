@@ -63,17 +63,17 @@ func TestHeaderExtraPostRPCMarshal(t *testing.T) {
 	extra.PostRPCMarshal(header, got)
 
 	want := map[string]any{
-		"blockGasCost":                   (*hexutil.Big)(big.NewInt(23)),
-		"timestampMilliseconds":          hexutil.Uint64(24),
-		"minDelayExcess":                 hexutil.Uint64(25),
-		"settledHeight":                  hexutil.Uint64(26),
-		"settledGasUnix":                 hexutil.Uint64(27),
-		"settledGasNumerator":            hexutil.Uint64(28),
-		"settledExcess":                  hexutil.Uint64(29),
-		"targetExcess":                   hexutil.Uint64(30),
-		"gasConfigTargetToExcessScaling": hexutil.Uint64(31),
-		"gasConfigMinGasPrice":           hexutil.Uint64(32),
-		"gasConfigStaticPricing":         hexutil.Uint64(33),
+		"blockGasCost":          (*hexutil.Big)(big.NewInt(23)),
+		"timestampMilliseconds": hexutil.Uint64(24),
+		"minDelayExcess":        hexutil.Uint64(25),
+		"settledHeight":         hexutil.Uint64(26),
+		"settledGasUnix":        hexutil.Uint64(27),
+		"settledGasNumerator":   hexutil.Uint64(28),
+		"settledExcess":         hexutil.Uint64(29),
+		"targetExcess":          hexutil.Uint64(30),
+		"targetToExcessScaling": hexutil.Uint64(31),
+		"minPrice":              hexutil.Uint64(32),
+		"staticPricing":         hexutil.Uint64(33),
 	}
 	require.Equal(t, want, got, "HeaderExtra.PostRPCMarshal()")
 }
@@ -149,10 +149,10 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		SettledGasNumerator: utils.PointerTo[uint64](28),
 		SettledExcess:       utils.PointerTo[uint64](29),
 
-		TargetExcess:                   utils.PointerTo(gas.Gas(30)),
-		GasConfigTargetToExcessScaling: utils.PointerTo[uint64](31),
-		GasConfigMinGasPrice:           utils.PointerTo[uint64](32),
-		GasConfigStaticPricing:         utils.PointerTo[uint64](33),
+		TargetExcess:          utils.PointerTo(gas.Gas(30)),
+		TargetToExcessScaling: utils.PointerTo[uint64](31),
+		MinPrice:              utils.PointerTo[uint64](32),
+		StaticPricing:         utils.PointerTo[uint64](33),
 	}
 	return WithHeaderExtra(header, extra), extra
 }
