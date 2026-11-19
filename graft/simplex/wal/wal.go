@@ -4,6 +4,7 @@
 package wal
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -66,11 +67,15 @@ func (w *WriteAheadLog) Delete() error {
 	return os.Remove(w.file.Name())
 }
 
-func (w *WriteAheadLog) ReadAll() ([][]byte, error) {
+func (w *WriteAheadLog) ReadAll() (_ [][]byte, err error) {
 	if err := w.maybeOpenFile(); err != nil {
 		return nil, err
 	}
-	_, err := w.file.Seek(0, io.SeekStart)
+	defer func() {
+		err = errors.Join(err, w.Close())
+	}()
+
+	_, err = w.file.Seek(0, io.SeekStart)
 	if err != nil {
 		return nil, fmt.Errorf("error seeking to start %w", err)
 	}
@@ -84,9 +89,12 @@ func (w *WriteAheadLog) ReadAll() ([][]byte, error) {
 	var payloads [][]byte
 	for bytesToRead > 0 {
 		payload, bytesRead, err := readRecord(w.file, bytesToRead)
-		// record was corrupted in wal
-		if err != nil {
+		if errors.Is(err, ErrCorruptedWAL) {
 			return payloads, w.truncateAt(fileInfo.Size() - bytesToRead)
+		}
+		if err != nil {
+			// Transient read errors should not truncate the wal.
+			return nil, fmt.Errorf("error reading record: %w", err)
 		}
 
 		bytesToRead -= bytesRead

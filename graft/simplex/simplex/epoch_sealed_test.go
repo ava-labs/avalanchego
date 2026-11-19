@@ -92,13 +92,13 @@ func TestEpochStopsAtSealingBlock(t *testing.T) {
 			sealing: false,
 			verify: func(t *testing.T, env *sealingBlockTestEnv) {
 				// Without a sealing block, every block should eventually be verified.
-				require.Eventually(t, env.allVerified, 5*time.Second, 10*time.Millisecond,
+				require.Eventually(t, env.allVerified, testutil.DefaultTimeout, 10*time.Millisecond,
 					"all blocks should be verified when there is no sealing block")
 				require.False(t, env.sealed.Load(), "epoch should not seal when there is no sealing block")
 
 				// Having advanced through every preceding round, the epoch reaches the round
 				// it is the leader of and, because the epoch is not sealed, proposes a block for that round.
-				require.Eventually(t, env.proposedLeaderRound, 5*time.Second, 10*time.Millisecond,
+				require.Eventually(t, env.proposedLeaderRound, testutil.DefaultTimeout, 10*time.Millisecond,
 					"the epoch node should propose a block for the round it leads when the epoch is not sealed")
 			},
 		},
@@ -178,7 +178,7 @@ func TestEpochBuildsInRoundAfterSealingBlock(t *testing.T) {
 			sealing: false,
 			verify: func(t *testing.T, env *sealingBlockTestEnv) {
 				// Not sealed, so the epoch node builds and proposes a block for the round it leads.
-				require.Eventually(t, func() bool { return leaderProposedBlock(env.comm, roundAfterSealing) }, 5*time.Second, 10*time.Millisecond,
+				require.Eventually(t, func() bool { return leaderProposedBlock(env.comm, roundAfterSealing) }, testutil.DefaultTimeout, 10*time.Millisecond,
 					"the epoch node should propose a block for the round it leads right after the block")
 				require.False(t, env.sealed.Load(), "epoch should not seal when there is no sealing block")
 			},
@@ -190,7 +190,7 @@ func TestEpochBuildsInRoundAfterSealingBlock(t *testing.T) {
 				// The epoch reaches the round it leads and attempts to build, but aborts because
 				// it is sealed - it does not build a block after the sealing block. Waiting on the
 				// abort also synchronizes past the seal, which happens right before it.
-				require.Eventually(t, env.buildAborted.Load, 5*time.Second, 10*time.Millisecond,
+				require.Eventually(t, env.buildAborted.Load, testutil.DefaultTimeout, 10*time.Millisecond,
 					"a sealed epoch should abort block building in the round it leads")
 				require.True(t, env.sealed.Load(), "epoch should have been sealed after committing the sealing block")
 
