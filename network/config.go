@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/compression"
@@ -187,4 +188,8 @@ type Config struct {
 	// If true, connects to all validators regardless of primary network validator
 	// status or of configured tracked subnets.
 	ConnectToAllValidators bool `json:"connectToAllValidators"`
+
+	// SubnetConfigs holds the config of every subnet this node tracks, plus the
+	// primary network.
+	SubnetConfigs map[ids.ID]subnets.Config `json:"-"`
 }

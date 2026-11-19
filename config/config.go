@@ -1476,6 +1476,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	nodeConfig.ProposerMinBlockDelay = v.GetDuration(ProposerVMMinBlockDelayKey)
 	nodeConfig.SubnetConfigs = subnetConfigs
+	nodeConfig.NetworkConfig.SubnetConfigs = subnetConfigs
 
 	// Benchlist
 	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.SnowParameters)

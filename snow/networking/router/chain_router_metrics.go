@@ -14,6 +14,7 @@ type routerMetrics struct {
 	outstandingRequests   prometheus.Gauge
 	longestRunningRequest prometheus.Gauge
 	droppedRequests       prometheus.Counter
+	droppedUnallowed      prometheus.Counter
 }
 
 func newRouterMetrics(registerer prometheus.Registerer) (*routerMetrics, error) {
@@ -37,10 +38,18 @@ func newRouterMetrics(registerer prometheus.Registerer) (*routerMetrics, error) 
 		},
 	)
 
+	rMetrics.droppedUnallowed = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "dropped_unallowed",
+			Help: "Number of messages dropped because the sender is not allowed on the chain's subnet",
+		},
+	)
+
 	err := errors.Join(
 		registerer.Register(rMetrics.outstandingRequests),
 		registerer.Register(rMetrics.longestRunningRequest),
 		registerer.Register(rMetrics.droppedRequests),
+		registerer.Register(rMetrics.droppedUnallowed),
 	)
 	return rMetrics, err
 }
