@@ -279,7 +279,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 				file.Close()
 				require.NoError(t, os.Chmod(filePath, 0o444))
 			},
-			wantErrMsg: "failed to get data file for writing block",
+			wantErr: os.ErrPermission,
 		},
 		{
 			name:   "writeIndexEntryAt - index file write failure",
