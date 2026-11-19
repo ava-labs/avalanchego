@@ -141,15 +141,6 @@ func Parse[T any](log logging.Logger, b []byte, c *T) (map[string]json.RawMessag
 	return keys, nil
 }
 
-// Verify returns an error if c is invalid.
-func (c Config) Verify() error {
-	saeCfg := c.SAEConfig(nil)
-	if err := saeCfg.RPCConfig.Verify(); err != nil {
-		return err
-	}
-	return saeCfg.DBConfig.Verify()
-}
-
 // jsonKeys returns the key under which [encoding/json] decodes each field of
 // struct T, including fields promoted from embedded structs.
 func jsonKeys[T any]() set.Set[string] {
@@ -167,6 +158,15 @@ func jsonKeys[T any]() set.Set[string] {
 		keys.Add(name)
 	}
 	return keys
+}
+
+// Verify returns an error if c is invalid.
+func (c Config) Verify() error {
+	saeCfg := c.SAEConfig(nil)
+	if err := saeCfg.RPCConfig.Verify(); err != nil {
+		return err
+	}
+	return saeCfg.DBConfig.Verify()
 }
 
 // SAEConfig translates the operator-supplied [Config] into the [sae.Config]

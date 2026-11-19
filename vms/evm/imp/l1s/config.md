@@ -25,8 +25,6 @@ Default values are overridden only if specified in the given config file. It is 
 
 Configuration is provided as a JSON object. All fields are optional unless otherwise specified.
 
-Unrecognized options — a typo, or an option of Subnet-EVM that no longer exists — are ignored, and the node logs a warning naming them. The one exception is [`eth-apis`](#deprecated-eth-apis), which is deprecated but still honoured.
-
 ## Shared Options
 
 L1s accept the options shared with the C-Chain, described in the [shared configuration](../vmconfig/config.md):

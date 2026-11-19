@@ -25,22 +25,28 @@ func errIsType[T error]() testerr.Want {
 	return testerr.As(func(T) string { return "" })
 }
 
+// testConfig embeds [Config] alongside a field of its own, as a VM's config
+// does.
+type testConfig struct {
+	Config
+	Extra string `json:"extra"`
+}
+
 func TestParse(t *testing.T) {
 	// with applies mod to Default() so each override case asserts that its
 	// JSON field overrides the default while the rest are preserved.
-	with := func(mod func(*Config)) Config {
-		c := Default()
+	with := func(mod func(*testConfig)) testConfig {
+		c := testConfig{Config: Default()}
 		mod(&c)
 		return c
 	}
-	// parse parses b as the C-Chain and L1 VMs do.
-	parse := func(log logging.Logger, b []byte) (Config, error) {
-		c := Default()
+	parse := func(log logging.Logger, b []byte) (testConfig, error) {
+		c := testConfig{Config: Default()}
 		if _, err := Parse(log, b, &c); err != nil {
-			return Config{}, err
+			return testConfig{}, err
 		}
 		if err := c.Verify(); err != nil {
-			return Config{}, err
+			return testConfig{}, err
 		}
 		return c, nil
 	}
@@ -49,7 +55,7 @@ func TestParse(t *testing.T) {
 	tests := []struct {
 		name         string
 		json         string
-		want         Config
+		want         testConfig
 		wantWarnings []*loggingtest.Record
 		wantErr      testerr.Want
 	}{
@@ -61,56 +67,56 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name: "defaults/empty_input",
-			want: Default(),
+			want: with(func(*testConfig) {}),
 		},
 		{
 			name: "defaults/empty_object",
 			json: `{}`,
-			want: Default(),
+			want: with(func(*testConfig) {}),
 		},
 
 		// State & trie
 		{
 			name: "state/pruning_disabled",
 			json: `{"pruning-enabled":false}`,
-			want: with(func(c *Config) { c.Pruning = false }),
+			want: with(func(c *testConfig) { c.Pruning = false }),
 		},
 		{
 			name: "state_scheme",
 			json: `{"state-scheme":"firewood"}`,
-			want: with(func(c *Config) { c.StateScheme = firewood.Scheme }),
+			want: with(func(c *testConfig) { c.StateScheme = firewood.Scheme }),
 		},
 		{
 			name: "state/commit_interval",
 			json: `{"commit-interval":256}`,
-			want: with(func(c *Config) { c.CommitInterval = 256 }),
+			want: with(func(c *testConfig) { c.CommitInterval = 256 }),
 		},
 		{
 			name: "state/trie_clean_cache",
 			json: `{"trie-clean-cache":256}`,
-			want: with(func(c *Config) { c.TrieCleanCache = 256 }),
+			want: with(func(c *testConfig) { c.TrieCleanCache = 256 }),
 		},
 		{
 			name: "state/snapshot_cache",
 			json: `{"snapshot-cache":128}`,
-			want: with(func(c *Config) { c.SnapshotCache = 128 }),
+			want: with(func(c *testConfig) { c.SnapshotCache = 128 }),
 		},
 		{
 			name: "state/allow_missing_tries",
 			json: `{"allow-missing-tries":true}`,
-			want: with(func(c *Config) { c.AllowMissingTries = true }),
+			want: with(func(c *testConfig) { c.AllowMissingTries = true }),
 		},
 
 		// Transaction pool
 		{
 			name: "tx_pool/local_txs_enabled",
 			json: `{"local-txs-enabled":true}`,
-			want: with(func(c *Config) { c.LocalTxsEnabled = true }),
+			want: with(func(c *testConfig) { c.LocalTxsEnabled = true }),
 		},
 		{
 			name: "tx_pool/slots",
 			json: `{"tx-pool-account-slots":32,"tx-pool-global-slots":9000}`,
-			want: with(func(c *Config) {
+			want: with(func(c *testConfig) {
 				c.TxPoolAccountSlots = 32
 				c.TxPoolGlobalSlots = 9000
 			}),
@@ -120,14 +126,14 @@ func TestParse(t *testing.T) {
 		{
 			name: "api/apis",
 			json: `{"apis":["subscription","db","net","web3"]}`,
-			want: with(func(c *Config) {
+			want: with(func(c *testConfig) {
 				c.APIs = set.Of(rpc.APISubscription, rpc.APIDB, rpc.APINet, rpc.APIWeb3)
 			}),
 		},
 		{
 			name: "api/apis_explicit_empty",
 			json: `{"apis":[]}`,
-			want: with(func(c *Config) { c.APIs.Clear() }),
+			want: with(func(c *testConfig) { c.APIs.Clear() }),
 		},
 		{
 			name:    "api/apis_unknown_name",
@@ -137,22 +143,22 @@ func TestParse(t *testing.T) {
 		{
 			name: "api/allow_unprotected_txs",
 			json: `{"allow-unprotected-txs":true}`,
-			want: with(func(c *Config) { c.AllowUnprotectedTxs = true }),
+			want: with(func(c *testConfig) { c.AllowUnprotectedTxs = true }),
 		},
 		{
 			name: "api/max_blocks_per_request",
 			json: `{"api-max-blocks-per-request":2000}`,
-			want: with(func(c *Config) { c.MaxBlocksPerRequest = 2000 }),
+			want: with(func(c *testConfig) { c.MaxBlocksPerRequest = 2000 }),
 		},
 		{
 			name: "api/batch_request_limit",
 			json: `{"batch-request-limit":50}`,
-			want: with(func(c *Config) { c.BatchRequestLimit = 50 }),
+			want: with(func(c *testConfig) { c.BatchRequestLimit = 50 }),
 		},
 		{
 			name: "api/batch_request_limit_explicit_zero",
 			json: `{"batch-request-limit":0}`, // 0 disables the batch limit
-			want: with(func(c *Config) { c.BatchRequestLimit = 0 }),
+			want: with(func(c *testConfig) { c.BatchRequestLimit = 0 }),
 		},
 		{
 			name:    "api/batch_request_limit_too_large",
@@ -162,7 +168,7 @@ func TestParse(t *testing.T) {
 		{
 			name: "api/api_max_duration",
 			json: `{"api-max-duration":"1m"}`,
-			want: with(func(c *Config) { c.APIMaxDuration = duration{time.Minute} }),
+			want: with(func(c *testConfig) { c.APIMaxDuration = duration{time.Minute} }),
 		},
 		{
 			name:    "api/api_max_duration_number",
@@ -177,19 +183,26 @@ func TestParse(t *testing.T) {
 		{
 			name: "api/enable_map_pending_to_last_executed",
 			json: `{"api-resolve-pending-to-last-executed":true}`,
-			want: with(func(c *Config) { c.ResolvePendingToLastExecuted = true }),
+			want: with(func(c *testConfig) { c.ResolvePendingToLastExecuted = true }),
 		},
 		{
 			name: "api/disable_map_pending_to_last_executed",
 			json: `{"api-resolve-pending-to-last-executed":false}`,
-			want: with(func(c *Config) { c.ResolvePendingToLastExecuted = false }),
+			want: with(func(c *testConfig) { c.ResolvePendingToLastExecuted = false }),
+		},
+
+		// Embedding config
+		{
+			name: "embedding/extra",
+			json: `{"extra":"hello from the past"}`,
+			want: with(func(c *testConfig) { c.Extra = "hello from the past" }),
 		},
 
 		// Internal
 		{
 			name: "internal/state_sync_ids",
 			json: fmt.Sprintf(`{"state-sync-ids":["%s"]}`, nodeID),
-			want: with(func(c *Config) {
+			want: with(func(c *testConfig) {
 				c.StateSyncIDs = set.Of(nodeID)
 			}),
 		},
@@ -197,8 +210,11 @@ func TestParse(t *testing.T) {
 		// Unrecognized options
 		{
 			name: "unrecognized/options",
-			json: `{"rpc-gas-cap":50,"hello austin larson":1,"trie-clean-cache":256}`,
-			want: with(func(c *Config) { c.TrieCleanCache = 256 }),
+			json: `{"rpc-gas-cap":50,"hello austin larson":1,"trie-clean-cache":256,"extra":"hello from the past"}`,
+			want: with(func(c *testConfig) {
+				c.TrieCleanCache = 256
+				c.Extra = "hello from the past"
+			}),
 			wantWarnings: []*loggingtest.Record{{
 				Level:  logging.Warn,
 				Msg:    "ignoring unrecognized config options",
@@ -225,9 +241,10 @@ func TestParse(t *testing.T) {
 				"batch-request-limit":50,
 				"api-max-duration":"30s",
 				"api-resolve-pending-to-last-executed":true,
-				"state-sync-ids":["` + nodeID.String() + `"]
+				"state-sync-ids":["` + nodeID.String() + `"],
+				"extra":"hello from the past"
 			}`,
-			want: Config{
+			want: testConfig{Config: Config{
 				Pruning:                      false,
 				StateScheme:                  firewood.Scheme,
 				CommitInterval:               256,
@@ -246,7 +263,7 @@ func TestParse(t *testing.T) {
 				internalConfig: internalConfig{
 					StateSyncIDs: set.Of(nodeID),
 				},
-			},
+			}, Extra: "hello from the past"},
 		},
 	}
 	for _, test := range tests {
