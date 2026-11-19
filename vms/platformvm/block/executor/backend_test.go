@@ -20,7 +20,7 @@ import (
 func TestGetState(t *testing.T) {
 	require := require.New(t)
 	s := statetest.New(t, statetest.Config{})
-	onAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	onAcceptState, err := state.NewDiffOn(s)
 	require.NoError(err)
 	var (
 		blkID1 = ids.GenerateTestID()

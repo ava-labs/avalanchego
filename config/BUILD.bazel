@@ -74,6 +74,7 @@ go_test(
         "//snow/consensus/simplex",
         "//snow/consensus/snowball",
         "//subnets",
+        "//upgrade",
         "//utils/constants",
         "//utils/crypto/bls/signer/localsigner",
         "//utils/formatting",

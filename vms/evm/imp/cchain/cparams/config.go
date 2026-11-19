@@ -1,0 +1,222 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package cparams
+
+import (
+	"fmt"
+	"math/big"
+	"sort"
+
+	"github.com/ava-labs/libevm/params"
+
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils"
+)
+
+// ChainConfig defines all Avalanche-specific forks and network changes.
+type ChainConfig struct {
+	// Apricot Phase 1 Block introduces "atomic transactions" and gas refunds
+	// are disabled.
+	ApricotPhase1Timestamp *uint64 `json:"apricotPhase1BlockTimestamp,omitempty"`
+	// Apricot Phase 2 Block includes a modified version of the Berlin Hard
+	// Fork.
+	ApricotPhase2Timestamp *uint64 `json:"apricotPhase2BlockTimestamp,omitempty"`
+	// Apricot Phase 3 introduces dynamic fees and a modified version of the
+	// London Hard Fork.
+	ApricotPhase3Timestamp *uint64 `json:"apricotPhase3BlockTimestamp,omitempty"`
+	// Apricot Phase 4 introduces the notion of a block fee to the dynamic fee
+	// algorithm.
+	ApricotPhase4Timestamp *uint64 `json:"apricotPhase4BlockTimestamp,omitempty"`
+	// Apricot Phase 5 introduces a batch of atomic transactions with a maximum
+	// atomic gas limit per block.
+	ApricotPhase5Timestamp *uint64 `json:"apricotPhase5BlockTimestamp,omitempty"`
+	// Apricot Phase Pre-6 deprecates the NativeAssetCall precompile (soft).
+	ApricotPhasePre6Timestamp *uint64 `json:"apricotPhasePre6BlockTimestamp,omitempty"`
+	// Apricot Phase 6 deprecates the NativeAssetBalance and NativeAssetCall
+	// precompiles.
+	ApricotPhase6Timestamp *uint64 `json:"apricotPhase6BlockTimestamp,omitempty"`
+	// Apricot Phase Post-6 deprecates the NativeAssetCall precompile (soft).
+	ApricotPhasePost6Timestamp *uint64 `json:"apricotPhasePost6BlockTimestamp,omitempty"`
+	// Banff restricts import/export transactions to AVAX.
+	BanffTimestamp *uint64 `json:"banffBlockTimestamp,omitempty"`
+	// Cortina increases the block gas limit to 15M.
+	CortinaTimestamp *uint64 `json:"cortinaBlockTimestamp,omitempty"`
+	// Durango activates Avalanche Warp Messaging and the Shanghai Execution
+	// Spec Upgrade (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md#included-eips).
+	//
+	// Note: EIP-4895 is excluded since withdrawals are not relevant to Avalanche EVMs.
+	DurangoTimestamp *uint64 `json:"durangoBlockTimestamp,omitempty"`
+	// Etna activates Cancun (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/cancun.md#included-eips)
+	// and reduces the min base fee.
+	// Note: EIP-4844 BlobTxs are not enabled in the mempool and blocks are not
+	// allowed to contain them. For details see https://github.com/avalanche-foundation/ACPs/pull/131
+	EtnaTimestamp *uint64 `json:"etnaTimestamp,omitempty"`
+	// Fortuna modifies the gas price mechanism based on ACP-176
+	FortunaTimestamp *uint64 `json:"fortunaTimestamp,omitempty"`
+	// Granite adds a millisecond timestamp, precompile updates, and P-Chain epochs
+	GraniteTimestamp *uint64 `json:"graniteTimestamp,omitempty"`
+	// Helicon activates continuous execution (ACP-194) and the dynamic minimum
+	// gas price (ACP-283).
+	HeliconTimestamp *uint64 `json:"heliconTimestamp,omitempty"`
+	// Igloo is a placeholder for the next upgrade.
+	IglooTimestamp *uint64 `json:"iglooTimestamp,omitempty"`
+
+	SnowCtx *snow.Context `json:"-"` // TODO(alarso16): Delete when no longer needed for Warp.
+}
+
+// FromUpgrades creates a new ChainConfig from the given [upgrade.Config].
+func FromUpgrades(u upgrade.Config) *ChainConfig {
+	return &ChainConfig{
+		ApricotPhase1Timestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase1Time)),
+		ApricotPhase2Timestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase2Time)),
+		ApricotPhase3Timestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase3Time)),
+		ApricotPhase4Timestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase4Time)),
+		ApricotPhase5Timestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase5Time)),
+		ApricotPhasePre6Timestamp:  new(upgrade.UnixTimestamp(u.ApricotPhasePre6Time)),
+		ApricotPhase6Timestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase6Time)),
+		ApricotPhasePost6Timestamp: new(upgrade.UnixTimestamp(u.ApricotPhasePost6Time)),
+		BanffTimestamp:             new(upgrade.UnixTimestamp(u.BanffTime)),
+		CortinaTimestamp:           new(upgrade.UnixTimestamp(u.CortinaTime)),
+		DurangoTimestamp:           new(upgrade.UnixTimestamp(u.DurangoTime)),
+		EtnaTimestamp:              new(upgrade.UnixTimestamp(u.EtnaTime)),
+		FortunaTimestamp:           new(upgrade.UnixTimestamp(u.FortunaTime)),
+		GraniteTimestamp:           new(upgrade.UnixTimestamp(u.GraniteTime)),
+		HeliconTimestamp:           new(upgrade.UnixTimestamp(u.HeliconTime)),
+		IglooTimestamp:             new(upgrade.UnixTimestamp(u.IglooTime)),
+	}
+}
+
+// CheckConfigCompatible supplements [params.ChainConfig.CheckCompatible]
+// with Avalanche-specific network upgrades. This is not expected to be called
+// directly by any consumer.
+//
+//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
+func (c *ChainConfig) CheckConfigCompatible(newEth *params.ChainConfig, headNumber *big.Int, headTime uint64) *params.ConfigCompatError {
+	if c == nil {
+		c = new(ChainConfig)
+	}
+
+	// TODO(alarso16): Use GetExtra when in same package.
+	newCfg, ok := newEth.Hooks().(*ChainConfig)
+	if !ok || newCfg == nil {
+		newCfg = new(ChainConfig)
+	}
+
+	oldForks := c.forks()
+	newForks := newCfg.forks()
+	for u := range upgrade.Latest + 1 {
+		oldFork := oldForks[u]
+		newFork := newForks[u]
+		if utils.PtrEqual(oldFork.time, newFork.time) {
+			continue
+		}
+
+		// Either fork could retroactively deactivate an upgrade
+		if oldFork.isActive(headTime) || newFork.isActive(headTime) {
+			return params.NewTimestampCompatError(
+				fmt.Sprintf("%s fork block timestamp", u),
+				oldFork.time,
+				newFork.time,
+			)
+		}
+	}
+
+	return nil
+}
+
+func (*ChainConfig) Description() string {
+	return "ChainConfig.Description() not implemented"
+}
+
+// CheckConfigForkOrder supplements [params.ChainConfig.CheckConfigForkOrder]
+// with Avalanche-specific network upgrades. This is not expected to be called
+// directly by any consumer.
+func (c *ChainConfig) CheckConfigForkOrder() error {
+	if c == nil {
+		c = new(ChainConfig)
+	}
+
+	forks := c.forks()
+	for cu := upgrade.ApricotPhase1; cu <= upgrade.Latest; cu++ {
+		cur := forks[cu]
+		if cur.time == nil {
+			continue
+		}
+
+		pu := cu - 1
+		prev := forks[pu]
+		if prev.time == nil {
+			return fmt.Errorf("unsupported fork ordering: %s not enabled, but %s enabled at timestamp %d",
+				pu, cu, *cur.time)
+		}
+		if *prev.time > *cur.time {
+			return fmt.Errorf("unsupported fork ordering: %s enabled at timestamp %d, but %s enabled at timestamp %d",
+				pu, *prev.time, cu, *cur.time)
+		}
+	}
+	return nil
+}
+
+type fork struct {
+	time *uint64
+}
+
+// isActive returns whether f is active at timestamp t.
+func (f fork) isActive(t uint64) bool {
+	return f.time != nil && *f.time <= t
+}
+
+// alwaysActive is a fork that is always considered active.
+var alwaysActive = fork{time: new(uint64)}
+
+// forks returns the activation time of every network upgrade, indexed by
+// [upgrade.Upgrade].
+//
+// Timestamps are only guaranteed to actually be chronological after calling
+// [ChainConfig.CheckConfigForkOrder].
+func (c *ChainConfig) forks() [upgrade.Latest + 1]fork {
+	return [...]fork{
+		upgrade.NoUpgrades:        alwaysActive, // required for [ChainConfig.Rules] binary search
+		upgrade.ApricotPhase1:     {c.ApricotPhase1Timestamp},
+		upgrade.ApricotPhase2:     {c.ApricotPhase2Timestamp},
+		upgrade.ApricotPhase3:     {c.ApricotPhase3Timestamp},
+		upgrade.ApricotPhase4:     {c.ApricotPhase4Timestamp},
+		upgrade.ApricotPhase5:     {c.ApricotPhase5Timestamp},
+		upgrade.ApricotPhasePre6:  {c.ApricotPhasePre6Timestamp},
+		upgrade.ApricotPhase6:     {c.ApricotPhase6Timestamp},
+		upgrade.ApricotPhasePost6: {c.ApricotPhasePost6Timestamp},
+		upgrade.Banff:             {c.BanffTimestamp},
+		upgrade.Cortina:           {c.CortinaTimestamp},
+		upgrade.Durango:           {c.DurangoTimestamp},
+		upgrade.Etna:              {c.EtnaTimestamp},
+		upgrade.Fortuna:           {c.FortunaTimestamp},
+		upgrade.Granite:           {c.GraniteTimestamp},
+		upgrade.Helicon:           {c.HeliconTimestamp},
+		upgrade.Igloo:             {c.IglooTimestamp},
+	}
+}
+
+// Rules returns the [Rules] active at the specified time.
+//
+// [ChainConfig.CheckConfigForkOrder] MUST return nil as this method uses a
+// binary search.
+func (c *ChainConfig) Rules(timestamp uint64) Rules {
+	fs := c.forks()
+	// Finding the first inactive fork removes the need to iterate over any that
+	// share an upgrade time when said time is `timestamp`.
+	inactive := upgrade.Upgrade(sort.Search(len(fs), func(i int) bool {
+		return !fs[i].isActive(timestamp)
+	}))
+	// The inclusion of [upgrade.NoUpgrades] at time 0 guarantees that `inactive` >= 1.
+	return Rules{inactive - 1}
+}
+
+func (c *ChainConfig) IsActive(upg upgrade.Upgrade, timestamp uint64) bool {
+	if upg < upgrade.NoUpgrades || upg > upgrade.Latest {
+		return false
+	}
+	fs := c.forks()
+	return fs[upg].isActive(timestamp)
+}

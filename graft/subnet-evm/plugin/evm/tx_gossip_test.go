@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -49,7 +49,7 @@ func TestEthTxGossip(t *testing.T) {
 		ctx,
 		snowCtx,
 		memdb.New(),
-		[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest])),
+		[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Latest])),
 		nil,
 		nil,
 		nil,
@@ -172,7 +172,7 @@ func TestEthTxPushGossipOutbound(t *testing.T) {
 		ctx,
 		snowCtx,
 		memdb.New(),
-		[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest])),
+		[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Latest])),
 		nil,
 		nil,
 		nil,
@@ -223,7 +223,7 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 		ctx,
 		snowCtx,
 		memdb.New(),
-		[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest])),
+		[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Latest])),
 		nil,
 		nil,
 		nil,

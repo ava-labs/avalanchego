@@ -64,7 +64,7 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 		c.DB = memdb.New()
 	}
 	if c.Upgrades == (upgrade.Config{}) {
-		c.Upgrades = upgradetest.GetConfig(upgradetest.Latest)
+		c.Upgrades = upgradetest.GetConfig(upgrade.Latest)
 	}
 	if c.Context == nil {
 		c.Context = snowtest.Context(t, constants.PlatformChainID)
@@ -128,7 +128,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	var (
 		require  = require.New(t)
 		verifier = newTestVerifier(t, testVerifierConfig{
-			Upgrades: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
+			Upgrades: upgradetest.GetConfig(upgrade.ApricotPhasePost6),
 		})
 		initialTimestamp = verifier.state.GetTimestamp()
 		newTimestamp     = initialTimestamp.Add(time.Second)
@@ -200,7 +200,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	var (
 		require  = require.New(t)
 		verifier = newTestVerifier(t, testVerifierConfig{
-			Upgrades: upgradetest.GetConfig(upgradetest.ApricotPhase4),
+			Upgrades: upgradetest.GetConfig(upgrade.ApricotPhase4),
 		})
 		wallet = txstest.NewWallet(
 			t,
@@ -354,7 +354,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	var (
 		verifier = newTestVerifier(t, testVerifierConfig{
 			DB:       stateDB,
-			Upgrades: upgradetest.GetConfig(upgradetest.ApricotPhase5),
+			Upgrades: upgradetest.GetConfig(upgrade.ApricotPhase5),
 			Context:  ctx,
 		})
 		wallet = txstest.NewWallet(
@@ -470,11 +470,11 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	parentStatelessBlk := platform.NewMockBlock(ctrl)
 	timestamp := time.Now()
 	s.SetTimestamp(timestamp)
-	parentOnDecisionState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnDecisionState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnCommitState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnAbortState, err := state.NewDiffOn(s)
 	require.NoError(err)
 
 	backend := &backend{
@@ -497,7 +497,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Internal{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
+				UpgradeConfig: upgradetest.GetConfig(upgrade.ApricotPhasePost6),
 			},
 			Clk:          &mockable.Clock{},
 			Bootstrapped: utils.NewAtomic(true),
@@ -544,11 +544,11 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	parentStatelessBlk := platform.NewMockBlock(ctrl)
 	timestamp := time.Now()
 	s.SetTimestamp(timestamp)
-	parentOnDecisionState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnDecisionState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnCommitState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnAbortState, err := state.NewDiffOn(s)
 	require.NoError(err)
 
 	backend := &backend{
@@ -571,7 +571,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Internal{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
+				UpgradeConfig: upgradetest.GetConfig(upgrade.ApricotPhasePost6),
 			},
 			Clk:          &mockable.Clock{},
 			Bootstrapped: utils.NewAtomic(true),
@@ -627,7 +627,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Internal{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
+				UpgradeConfig: upgradetest.GetConfig(upgrade.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -702,7 +702,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
+						UpgradeConfig: upgradetest.GetConfig(upgrade.Banff),
 					},
 					Clk: &mockable.Clock{},
 				},
@@ -719,11 +719,11 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			s.SetTimestamp(parentTime)
 			s.SetLastAccepted(parentID)
 
-			onDecisionState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
+			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
-			onCommitState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
+			onCommitState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
-			onAbortState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
+			onAbortState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
 			backend.blkIDToState[parentID] = &blockState{
 				timestamp:      test.parentTime,
@@ -805,7 +805,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
+						UpgradeConfig: upgradetest.GetConfig(upgrade.Banff),
 					},
 					Clk: &mockable.Clock{},
 				},
@@ -822,11 +822,11 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			s.SetTimestamp(parentTime)
 			s.SetLastAccepted(parentID)
 
-			onDecisionState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
+			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
-			onCommitState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
+			onCommitState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
-			onAbortState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
+			onAbortState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
 			backend.blkIDToState[parentID] = &blockState{
 				timestamp:      test.parentTime,
@@ -863,9 +863,9 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := platform.NewMockBlock(ctrl)
-	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnCommitState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnAbortState, err := state.NewDiffOn(s)
 	require.NoError(err)
 
 	backend := &backend{
@@ -887,7 +887,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Internal{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
+				UpgradeConfig: upgradetest.GetConfig(upgrade.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -929,9 +929,9 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := platform.NewMockBlock(ctrl)
 	parentTime := time.Now()
-	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnCommitState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnAbortState, err := state.NewDiffOn(s)
 	require.NoError(err)
 
 	backend := &backend{
@@ -953,7 +953,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Internal{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
+				UpgradeConfig: upgradetest.GetConfig(upgrade.Banff),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -990,7 +990,7 @@ func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Internal{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
+				UpgradeConfig: upgradetest.GetConfig(upgrade.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -1033,7 +1033,7 @@ func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Internal{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
+				UpgradeConfig: upgradetest.GetConfig(upgrade.Banff),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -1077,7 +1077,7 @@ func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Internal{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
+				UpgradeConfig: upgradetest.GetConfig(upgrade.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -1120,7 +1120,7 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Internal{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
+				UpgradeConfig: upgradetest.GetConfig(upgrade.Banff),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -1328,7 +1328,7 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 				require.NoError(s.PutL1Validator(l1Validator))
 			}
 
-			diff, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionAllowed)
+			diff, err := state.NewDiffOn(s)
 			require.NoError(err)
 
 			config := validatorfee.Config{
@@ -1366,46 +1366,46 @@ func TestDeactivateLowBalanceL1ValidatorBlockChanges(t *testing.T) {
 
 	tests := []struct {
 		name              string
-		currentFork       upgradetest.Fork
+		currentFork       upgrade.Upgrade
 		durationToAdvance time.Duration
 		networkID         uint32
 		expectedErr       error
 	}{
 		{
 			name:              "Before F Upgrade - no L1 validators evicted",
-			currentFork:       upgradetest.Etna,
+			currentFork:       upgrade.Etna,
 			durationToAdvance: 0,
 			networkID:         constants.UnitTestID,
 			expectedErr:       ErrStandardBlockWithoutChanges,
 		},
 		{
 			name:              "After F Upgrade - no L1 validators evicted",
-			currentFork:       upgradetest.Fortuna,
+			currentFork:       upgrade.Fortuna,
 			durationToAdvance: 0,
 			networkID:         constants.UnitTestID,
 			expectedErr:       ErrStandardBlockWithoutChanges,
 		},
 		{
 			name:              "Before F Upgrade - L1 validators evicted",
-			currentFork:       upgradetest.Etna,
+			currentFork:       upgrade.Etna,
 			durationToAdvance: time.Second,
 			networkID:         constants.UnitTestID,
 		},
 		{
 			name:              "After F Upgrade - L1 validators evicted",
-			currentFork:       upgradetest.Fortuna,
+			currentFork:       upgrade.Fortuna,
 			durationToAdvance: time.Second,
 			networkID:         constants.UnitTestID,
 		},
 		{
 			name:              "Before F Upgrade - L1 validators evicted - on Fuji",
-			currentFork:       upgradetest.Etna,
+			currentFork:       upgrade.Etna,
 			durationToAdvance: time.Second,
 			networkID:         constants.FujiID,
 		},
 		{
 			name:              "After F Upgrade - L1 validators evicted - on Fuji",
-			currentFork:       upgradetest.Fortuna,
+			currentFork:       upgrade.Fortuna,
 			durationToAdvance: time.Second,
 			networkID:         constants.FujiID,
 		},

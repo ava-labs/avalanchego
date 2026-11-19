@@ -26,9 +26,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -139,7 +139,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 }
 
 func TestNetworkUpgradesOverridden(t *testing.T) {
-	fork := upgradetest.Granite
+	fork := upgrade.Granite
 	chainConfig := paramstest.ForkToChainConfig[fork]
 	extraConfig := params.GetExtra(chainConfig)
 	extraConfig.NetworkUpgrades.GraniteTimestamp = utils.PointerTo(uint64(upgrade.InitiallyActiveTime.Unix()))
@@ -238,7 +238,7 @@ func TestVMStateUpgrade(t *testing.T) {
 	upgradedCodeStr := "0xdeadbeef" // this code will be applied during the upgrade
 	upgradedCode, err := hexutil.Decode(upgradedCodeStr)
 	// This modification will be applied to an existing account
-	genesisAccountUpgrade := &extras.StateUpgradeAccount{
+	genesisAccountUpgrade := &stateupgrade.Account{
 		BalanceChange: (*math.HexOrDecimal256)(big.NewInt(100)),
 		Storage:       map[common.Hash]common.Hash{storageKey: {}},
 		Code:          upgradedCode,
@@ -247,7 +247,7 @@ func TestVMStateUpgrade(t *testing.T) {
 	// This modification will be applied to a new account
 	newAccount := common.Address{42}
 	require.NoError(t, err)
-	newAccountUpgrade := &extras.StateUpgradeAccount{
+	newAccountUpgrade := &stateupgrade.Account{
 		BalanceChange: (*math.HexOrDecimal256)(big.NewInt(100)),
 		Storage:       map[common.Hash]common.Hash{storageKey: common.HexToHash("0x6666")},
 		Code:          upgradedCode,
@@ -334,20 +334,20 @@ func TestVMEtnaActivatesCancun(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		fork        upgradetest.Fork
+		fork        upgrade.Upgrade
 		upgradeJSON string
 		check       func(*testing.T, *VM) // function to check the VM state
 	}{
 		{
 			name: "Etna activates Cancun",
-			fork: upgradetest.Etna,
+			fork: upgrade.Etna,
 			check: func(t *testing.T, vm *VM) {
 				require.True(t, vm.chainConfig.IsCancun(common.Big0, defaultEtnaTime))
 			},
 		},
 		{
 			name: "Changed Etna changes Cancun",
-			fork: upgradetest.Etna,
+			fork: upgrade.Etna,
 			upgradeJSON: func() string {
 				upgrade := &extras.UpgradeConfig{
 					NetworkUpgradeOverrides: &extras.NetworkUpgrades{

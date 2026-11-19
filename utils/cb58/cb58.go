@@ -20,6 +20,7 @@ var (
 	ErrBase58Decoding   = errors.New("base58 decoding error")
 	ErrMissingChecksum  = errors.New("input string is smaller than the checksum size")
 	ErrBadChecksum      = errors.New("invalid input checksum")
+	ErrInputTooLong     = errors.New("input string is too long")
 	errEncodingOverFlow = errors.New("encoding overflow")
 )
 
@@ -37,8 +38,23 @@ func Encode(bytes []byte) (string, error) {
 	return base58.Encode(checked), nil
 }
 
-// Decode [str] to bytes from cb58.
-func Decode(str string) ([]byte, error) {
+// MaxEncodedLen returns an upper bound on the cb58 encoding length of a
+// [payloadLen]-byte payload. The bound is exact for 20, 32, and 65-byte
+// payloads and at most one character loose below ~230 bytes.
+func MaxEncodedLen(payloadLen int) int {
+	// base58 rewrites the input from base 256 (one byte per digit) to base
+	// 58 (one character per digit), so n bytes need
+	// ceil(n * log(256)/log(58)) = ceil(n * 1.36565...) characters. Rounding
+	// the ratio up to 1.37 and adding 1 to the floor never underestimates.
+	return (payloadLen+checksumLen)*137/100 + 1
+}
+
+// Decode [str] to bytes from cb58. [str] is rejected without decoding if it
+// is longer than any encoding of a [maxLen]-byte payload.
+func Decode(str string, maxLen int) ([]byte, error) {
+	if maxInputLen := MaxEncodedLen(maxLen); len(str) > maxInputLen {
+		return nil, fmt.Errorf("%w: got %d characters, max %d", ErrInputTooLong, len(str), maxInputLen)
+	}
 	decodedBytes, err := base58.Decode(str)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrBase58Decoding, err)

@@ -11,15 +11,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 )
 
 func TestPredicateBytesFromExtra(t *testing.T) {
 	tests := []struct {
 		name  string
-		rules cparams.Rules
+		fork  upgrade.Upgrade
 		extra []byte
 		want  []byte
 	}{
@@ -43,29 +43,21 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_empty_extra",
-			rules: cparams.Rules{
-				IsFortuna: true,
-			},
+			fork: upgrade.Fortuna,
 		},
 		{
-			name: "fortuna_too_short",
-			rules: cparams.Rules{
-				IsFortuna: true,
-			},
+			name:  "fortuna_too_short",
+			fork:  upgrade.Fortuna,
 			extra: make([]byte, acp176StateSize-1),
 		},
 		{
-			name: "fortuna_empty_predicate",
-			rules: cparams.Rules{
-				IsFortuna: true,
-			},
+			name:  "fortuna_empty_predicate",
+			fork:  upgrade.Fortuna,
 			extra: make([]byte, acp176StateSize),
 		},
 		{
 			name: "fortuna_non_empty_predicate",
-			rules: cparams.Rules{
-				IsFortuna: true,
-			},
+			fork: upgrade.Fortuna,
 			extra: []byte{
 				acp176StateSize: 5,
 			},
@@ -73,23 +65,19 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "helicon_empty_predicate",
-			rules: cparams.Rules{
-				IsHelicon: true,
-			},
+			fork: upgrade.Helicon,
 		},
 		{
-			name: "helicon_non_empty_predicate",
-			rules: cparams.Rules{
-				IsHelicon: true,
-			},
+			name:  "helicon_non_empty_predicate",
+			fork:  upgrade.Helicon,
 			extra: []byte{5},
 			want:  []byte{5},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := PredicateBytesFromExtra(tt.rules, tt.extra)
-			require.Equal(t, tt.want, got, "PredicateBytesFromExtra()")
+			got := predicateBytesFromExtra(tt.fork, tt.extra)
+			require.Equal(t, tt.want, got, "predicateBytesFromExtra()")
 		})
 	}
 }

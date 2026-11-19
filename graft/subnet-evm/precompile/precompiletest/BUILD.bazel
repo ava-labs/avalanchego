@@ -14,6 +14,7 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest",
     deps = [
+        "//graft/evm/predicate",
         "//graft/evm/utils/utilstest",
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/core/extstate",
@@ -21,7 +22,6 @@ go_library(
         "//graft/subnet-evm/precompile/contract",
         "//graft/subnet-evm/precompile/modules",
         "//graft/subnet-evm/precompile/precompileconfig",
-        "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",

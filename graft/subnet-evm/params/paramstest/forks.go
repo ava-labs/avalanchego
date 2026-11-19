@@ -5,17 +5,17 @@ package paramstest
 
 import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 )
 
 // ForkToChainConfig maps a fork to a chain config
-var ForkToChainConfig = map[upgradetest.Fork]*params.ChainConfig{
-	upgradetest.ApricotPhase5: params.TestPreSubnetEVMChainConfig,
-	upgradetest.ApricotPhase6: params.TestSubnetEVMChainConfig,
-	upgradetest.Durango:       params.TestDurangoChainConfig,
-	upgradetest.Etna:          params.TestEtnaChainConfig,
-	upgradetest.Fortuna:       params.TestFortunaChainConfig,
-	upgradetest.Granite:       params.TestGraniteChainConfig,
-	upgradetest.Helicon:       params.TestHeliconChainConfig,
-	upgradetest.Igloo:         params.TestIglooChainConfig,
+var ForkToChainConfig = map[upgrade.Upgrade]*params.ChainConfig{
+	upgrade.ApricotPhase5: params.TestPreSubnetEVMChainConfig,
+	upgrade.ApricotPhase6: params.TestSubnetEVMChainConfig,
+	upgrade.Durango:       params.TestDurangoChainConfig,
+	upgrade.Etna:          params.TestEtnaChainConfig,
+	upgrade.Fortuna:       params.TestFortunaChainConfig,
+	upgrade.Granite:       params.TestGraniteChainConfig,
+	upgrade.Helicon:       params.TestHeliconChainConfig,
+	upgrade.Igloo:         params.TestIglooChainConfig,
 }

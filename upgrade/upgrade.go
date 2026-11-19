@@ -12,6 +12,33 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
+//go:generate go run golang.org/x/tools/cmd/stringer -type=Upgrade -output upgrade_string.gen.go
+
+// Upgrade is an enum of all the major network upgrades.
+type Upgrade int
+
+const (
+	NoUpgrades Upgrade = iota
+	ApricotPhase1
+	ApricotPhase2
+	ApricotPhase3
+	ApricotPhase4
+	ApricotPhase5
+	ApricotPhasePre6
+	ApricotPhase6
+	ApricotPhasePost6
+	Banff
+	Cortina
+	Durango
+	Etna
+	Fortuna
+	Granite
+	Helicon
+	Igloo
+
+	Latest Upgrade = iota - 1
+)
+
 var (
 	InitiallyActiveTime       = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 	UnscheduledActivationTime = time.Date(9999, time.December, 1, 0, 0, 0, 0, time.UTC)
@@ -114,8 +141,8 @@ type Config struct {
 	// When adding a new upgrade, follow new_upgrade_checklist.md.
 }
 
-func (c *Config) Validate() error {
-	upgrades := []time.Time{
+func (c *Config) times() []time.Time {
+	return []time.Time{
 		c.ApricotPhase1Time,
 		c.ApricotPhase2Time,
 		c.ApricotPhase3Time,
@@ -133,6 +160,10 @@ func (c *Config) Validate() error {
 		c.HeliconTime,
 		c.IglooTime,
 	}
+}
+
+func (c *Config) Validate() error {
+	upgrades := c.times()
 	for i := 0; i < len(upgrades)-1; i++ {
 		if upgrades[i].After(upgrades[i+1]) {
 			return fmt.Errorf("%w: upgrade %d (%s) is after upgrade %d (%s)",

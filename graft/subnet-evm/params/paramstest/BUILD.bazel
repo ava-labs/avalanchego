@@ -11,6 +11,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest",
     deps = [
         "//graft/subnet-evm/params",
-        "//upgrade/upgradetest",
+        "//upgrade",
     ],
 )

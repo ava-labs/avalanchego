@@ -5,8 +5,12 @@ package common
 
 import (
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTimeoutScheduler(t *testing.T) {
@@ -112,4 +116,28 @@ func makeMockedTimer(clock chan time.Time) func(time.Duration) *time.Timer {
 		timer.C = clock
 		return timer
 	}
+}
+
+// TestTimeoutSchedulerStop tests that the timeout is not called if it fires
+// after the timeoutScheduler has stopped.
+func TestTimeoutSchedulerStop(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var called atomic.Bool
+		ts := NewTimeoutScheduler(func() { called.Store(true) }, nil)
+		ts.RegisterTimeout(time.Hour)
+		synctest.Wait()
+
+		ts.Stop()
+		time.Sleep(2 * time.Hour)
+
+		require.False(t, called.Load(), "timeout fired after Stop")
+	})
+}
+
+// TestTimeoutSchedulerStopTwice tests that Stop is idempotent
+func TestTimeoutSchedulerStopTwice(*testing.T) {
+	ts := NewTimeoutScheduler(func() {}, nil)
+
+	ts.Stop()
+	ts.Stop()
 }

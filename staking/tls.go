@@ -43,33 +43,13 @@ func InitNodeStakingKeyPair(keyPath, certPath string) error {
 	}
 
 	// Write cert to disk
-	certFile, err := os.Create(certPath)
-	if err != nil {
-		return fmt.Errorf("couldn't create cert file: %w", err)
-	}
-	if _, err := certFile.Write(certBytes); err != nil {
+	if err := perms.WriteFile(certPath, certBytes, perms.ReadOnly); err != nil {
 		return fmt.Errorf("couldn't write cert file: %w", err)
-	}
-	if err := certFile.Close(); err != nil {
-		return fmt.Errorf("couldn't close cert file: %w", err)
-	}
-	if err := os.Chmod(certPath, perms.ReadOnly); err != nil { // Make cert read-only
-		return fmt.Errorf("couldn't change permissions on cert: %w", err)
 	}
 
 	// Write key to disk
-	keyOut, err := os.Create(keyPath)
-	if err != nil {
-		return fmt.Errorf("couldn't create key file: %w", err)
-	}
-	if _, err := keyOut.Write(keyBytes); err != nil {
+	if err := perms.WriteFile(keyPath, keyBytes, perms.ReadOnly); err != nil {
 		return fmt.Errorf("couldn't write private key: %w", err)
-	}
-	if err := keyOut.Close(); err != nil {
-		return fmt.Errorf("couldn't close key file: %w", err)
-	}
-	if err := os.Chmod(keyPath, perms.ReadOnly); err != nil { // Make key read-only
-		return fmt.Errorf("couldn't change permissions on key: %w", err)
 	}
 	return nil
 }

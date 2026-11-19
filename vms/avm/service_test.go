@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/btcsuite/btcd/btcutil/bech32"
 	"github.com/stretchr/testify/require"
@@ -19,9 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -45,7 +43,7 @@ func TestServiceIssueTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -64,394 +62,11 @@ func TestServiceIssueTx(t *testing.T) {
 	require.Equal(tx.ID(), txReply.TxID)
 }
 
-func TestServiceGetTxStatus(t *testing.T) {
-	require := require.New(t)
-
-	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
-	})
-	service := &Service{vm: env.vm}
-	env.vm.ctx.Lock.Unlock()
-
-	statusArgs := &api.JSONTxID{}
-	statusReply := &GetTxStatusReply{}
-	err := service.GetTxStatus(nil, statusArgs, statusReply)
-	require.ErrorIs(err, errNilTxID)
-
-	newTx := newAvaxBaseTxWithOutputs(t, env)
-	txID := newTx.ID()
-
-	statusArgs = &api.JSONTxID{
-		TxID: txID,
-	}
-	statusReply = &GetTxStatusReply{}
-	require.NoError(service.GetTxStatus(nil, statusArgs, statusReply))
-	require.Equal(choices.Unknown, statusReply.Status)
-
-	issueAndAccept(require, env.vm, newTx)
-
-	statusReply = &GetTxStatusReply{}
-	require.NoError(service.GetTxStatus(nil, statusArgs, statusReply))
-	require.Equal(choices.Accepted, statusReply.Status)
-}
-
-// Test the GetBalance method when argument Strict is true
-func TestServiceGetBalanceStrict(t *testing.T) {
-	require := require.New(t)
-
-	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
-	})
-	service := &Service{vm: env.vm}
-
-	assetID := ids.GenerateTestID()
-	addr := ids.GenerateTestShortID()
-	addrStr, err := env.vm.FormatLocalAddress(addr)
-	require.NoError(err)
-
-	// A UTXO with a 2 out of 2 multisig
-	// where one of the addresses is [addr]
-	twoOfTwoUTXO := &avax.UTXO{
-		UTXOID: avax.UTXOID{
-			TxID:        ids.GenerateTestID(),
-			OutputIndex: 0,
-		},
-		Asset: avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 1337,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 2,
-				Addrs:     []ids.ShortID{addr, ids.GenerateTestShortID()},
-			},
-		},
-	}
-	// Insert the UTXO
-	env.vm.state.AddUTXO(twoOfTwoUTXO)
-	require.NoError(env.vm.state.Commit())
-
-	env.vm.ctx.Lock.Unlock()
-
-	// Check the balance with IncludePartial set to true
-	balanceArgs := &GetBalanceArgs{
-		Address:        addrStr,
-		AssetID:        assetID.String(),
-		IncludePartial: true,
-	}
-	balanceReply := &GetBalanceReply{}
-	require.NoError(service.GetBalance(nil, balanceArgs, balanceReply))
-	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Equal(uint64(1337), uint64(balanceReply.Balance))
-	require.Len(balanceReply.UTXOIDs, 1)
-
-	// Check the balance with IncludePartial set to false
-	balanceArgs = &GetBalanceArgs{
-		Address: addrStr,
-		AssetID: assetID.String(),
-	}
-	balanceReply = &GetBalanceReply{}
-	require.NoError(service.GetBalance(nil, balanceArgs, balanceReply))
-	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Zero(balanceReply.Balance)
-	require.Empty(balanceReply.UTXOIDs)
-
-	env.vm.ctx.Lock.Lock()
-
-	// A UTXO with a 1 out of 2 multisig
-	// where one of the addresses is [addr]
-	oneOfTwoUTXO := &avax.UTXO{
-		UTXOID: avax.UTXOID{
-			TxID:        ids.GenerateTestID(),
-			OutputIndex: 0,
-		},
-		Asset: avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 1337,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{addr, ids.GenerateTestShortID()},
-			},
-		},
-	}
-	// Insert the UTXO
-	env.vm.state.AddUTXO(oneOfTwoUTXO)
-	require.NoError(env.vm.state.Commit())
-
-	env.vm.ctx.Lock.Unlock()
-
-	// Check the balance with IncludePartial set to true
-	balanceArgs = &GetBalanceArgs{
-		Address:        addrStr,
-		AssetID:        assetID.String(),
-		IncludePartial: true,
-	}
-	balanceReply = &GetBalanceReply{}
-	require.NoError(service.GetBalance(nil, balanceArgs, balanceReply))
-	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Equal(uint64(1337+1337), uint64(balanceReply.Balance))
-	require.Len(balanceReply.UTXOIDs, 2)
-
-	// Check the balance with IncludePartial set to false
-	balanceArgs = &GetBalanceArgs{
-		Address: addrStr,
-		AssetID: assetID.String(),
-	}
-	balanceReply = &GetBalanceReply{}
-	require.NoError(service.GetBalance(nil, balanceArgs, balanceReply))
-	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Zero(balanceReply.Balance)
-	require.Empty(balanceReply.UTXOIDs)
-
-	env.vm.ctx.Lock.Lock()
-
-	// A UTXO with a 1 out of 1 multisig
-	// but with a locktime in the future
-	now := env.vm.clock.Time()
-	futureUTXO := &avax.UTXO{
-		UTXOID: avax.UTXOID{
-			TxID:        ids.GenerateTestID(),
-			OutputIndex: 0,
-		},
-		Asset: avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 1337,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  uint64(now.Add(10 * time.Hour).Unix()),
-				Threshold: 1,
-				Addrs:     []ids.ShortID{addr},
-			},
-		},
-	}
-	// Insert the UTXO
-	env.vm.state.AddUTXO(futureUTXO)
-	require.NoError(env.vm.state.Commit())
-
-	env.vm.ctx.Lock.Unlock()
-
-	// Check the balance with IncludePartial set to true
-	balanceArgs = &GetBalanceArgs{
-		Address:        addrStr,
-		AssetID:        assetID.String(),
-		IncludePartial: true,
-	}
-	balanceReply = &GetBalanceReply{}
-	require.NoError(service.GetBalance(nil, balanceArgs, balanceReply))
-	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Equal(uint64(1337*3), uint64(balanceReply.Balance))
-	require.Len(balanceReply.UTXOIDs, 3)
-
-	// Check the balance with IncludePartial set to false
-	balanceArgs = &GetBalanceArgs{
-		Address: addrStr,
-		AssetID: assetID.String(),
-	}
-	balanceReply = &GetBalanceReply{}
-	require.NoError(service.GetBalance(nil, balanceArgs, balanceReply))
-	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Zero(balanceReply.Balance)
-	require.Empty(balanceReply.UTXOIDs)
-}
-
-func TestServiceGetAllBalances(t *testing.T) {
-	require := require.New(t)
-
-	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
-	})
-	service := &Service{vm: env.vm}
-
-	assetID := ids.GenerateTestID()
-	addr := ids.GenerateTestShortID()
-	addrStr, err := env.vm.FormatLocalAddress(addr)
-	require.NoError(err)
-	// A UTXO with a 2 out of 2 multisig
-	// where one of the addresses is [addr]
-	twoOfTwoUTXO := &avax.UTXO{
-		UTXOID: avax.UTXOID{
-			TxID:        ids.GenerateTestID(),
-			OutputIndex: 0,
-		},
-		Asset: avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 1337,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 2,
-				Addrs:     []ids.ShortID{addr, ids.GenerateTestShortID()},
-			},
-		},
-	}
-	// Insert the UTXO
-	env.vm.state.AddUTXO(twoOfTwoUTXO)
-	require.NoError(env.vm.state.Commit())
-
-	env.vm.ctx.Lock.Unlock()
-
-	// Check the balance with IncludePartial set to true
-	balanceArgs := &GetAllBalancesArgs{
-		JSONAddress:    api.JSONAddress{Address: addrStr},
-		IncludePartial: true,
-	}
-	reply := &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
-	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Len(reply.Balances, 1)
-	require.Equal(assetID.String(), reply.Balances[0].AssetID)
-	require.Equal(uint64(1337), uint64(reply.Balances[0].Balance))
-
-	// Check the balance with IncludePartial set to false
-	balanceArgs = &GetAllBalancesArgs{
-		JSONAddress: api.JSONAddress{Address: addrStr},
-	}
-	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
-	require.Empty(reply.Balances)
-
-	env.vm.ctx.Lock.Lock()
-
-	// A UTXO with a 1 out of 2 multisig
-	// where one of the addresses is [addr]
-	oneOfTwoUTXO := &avax.UTXO{
-		UTXOID: avax.UTXOID{
-			TxID:        ids.GenerateTestID(),
-			OutputIndex: 0,
-		},
-		Asset: avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 1337,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{addr, ids.GenerateTestShortID()},
-			},
-		},
-	}
-	// Insert the UTXO
-	env.vm.state.AddUTXO(oneOfTwoUTXO)
-	require.NoError(env.vm.state.Commit())
-
-	env.vm.ctx.Lock.Unlock()
-
-	// Check the balance with IncludePartial set to true
-	balanceArgs = &GetAllBalancesArgs{
-		JSONAddress:    api.JSONAddress{Address: addrStr},
-		IncludePartial: true,
-	}
-	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
-	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Len(reply.Balances, 1)
-	require.Equal(assetID.String(), reply.Balances[0].AssetID)
-	require.Equal(uint64(1337*2), uint64(reply.Balances[0].Balance))
-
-	// Check the balance with IncludePartial set to false
-	balanceArgs = &GetAllBalancesArgs{
-		JSONAddress: api.JSONAddress{Address: addrStr},
-	}
-	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
-	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Empty(reply.Balances)
-
-	env.vm.ctx.Lock.Lock()
-
-	// A UTXO with a 1 out of 1 multisig
-	// but with a locktime in the future
-	now := env.vm.clock.Time()
-	futureUTXO := &avax.UTXO{
-		UTXOID: avax.UTXOID{
-			TxID:        ids.GenerateTestID(),
-			OutputIndex: 0,
-		},
-		Asset: avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 1337,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  uint64(now.Add(10 * time.Hour).Unix()),
-				Threshold: 1,
-				Addrs:     []ids.ShortID{addr},
-			},
-		},
-	}
-	// Insert the UTXO
-	env.vm.state.AddUTXO(futureUTXO)
-	require.NoError(env.vm.state.Commit())
-
-	env.vm.ctx.Lock.Unlock()
-
-	// Check the balance with IncludePartial set to true
-	balanceArgs = &GetAllBalancesArgs{
-		JSONAddress:    api.JSONAddress{Address: addrStr},
-		IncludePartial: true,
-	}
-	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
-	// The balance should include the UTXO since it is partly owned by [addr]
-	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Len(reply.Balances, 1)
-	require.Equal(assetID.String(), reply.Balances[0].AssetID)
-	require.Equal(uint64(1337*3), uint64(reply.Balances[0].Balance))
-	// Check the balance with IncludePartial set to false
-	balanceArgs = &GetAllBalancesArgs{
-		JSONAddress: api.JSONAddress{Address: addrStr},
-	}
-	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
-	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Empty(reply.Balances)
-
-	env.vm.ctx.Lock.Lock()
-
-	// A UTXO for a different asset
-	otherAssetID := ids.GenerateTestID()
-	otherAssetUTXO := &avax.UTXO{
-		UTXOID: avax.UTXOID{
-			TxID:        ids.GenerateTestID(),
-			OutputIndex: 0,
-		},
-		Asset: avax.Asset{ID: otherAssetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 1337,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 2,
-				Addrs:     []ids.ShortID{addr, ids.GenerateTestShortID()},
-			},
-		},
-	}
-	// Insert the UTXO
-	env.vm.state.AddUTXO(otherAssetUTXO)
-	require.NoError(env.vm.state.Commit())
-
-	env.vm.ctx.Lock.Unlock()
-
-	// Check the balance with IncludePartial set to true
-	balanceArgs = &GetAllBalancesArgs{
-		JSONAddress:    api.JSONAddress{Address: addrStr},
-		IncludePartial: true,
-	}
-	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
-	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Len(reply.Balances, 2)
-	gotAssetIDs := []string{reply.Balances[0].AssetID, reply.Balances[1].AssetID}
-	require.Contains(gotAssetIDs, assetID.String())
-	require.Contains(gotAssetIDs, otherAssetID.String())
-	gotBalances := []uint64{uint64(reply.Balances[0].Balance), uint64(reply.Balances[1].Balance)}
-	require.Contains(gotBalances, uint64(1337))
-	require.Contains(gotBalances, uint64(1337*3))
-
-	// Check the balance with IncludePartial set to false
-	balanceArgs = &GetAllBalancesArgs{
-		JSONAddress: api.JSONAddress{Address: addrStr},
-	}
-	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
-	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Empty(reply.Balances)
-}
-
 func TestServiceGetTxFee(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -467,7 +82,7 @@ func TestServiceGetTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -492,7 +107,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -580,7 +195,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -670,7 +285,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -863,7 +478,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1005,7 +620,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1186,7 +801,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1329,7 +944,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Durango,
+		fork: upgrade.Durango,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1516,7 +1131,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1651,7 +1266,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1982,7 +1597,7 @@ func TestServiceGetNilTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -1996,7 +1611,7 @@ func TestServiceGetUnknownTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -2008,7 +1623,7 @@ func TestServiceGetUnknownTx(t *testing.T) {
 
 func TestServiceGetUTXOs(t *testing.T) {
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -2260,7 +1875,7 @@ func TestGetAssetDescription(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -2274,28 +1889,6 @@ func TestGetAssetDescription(t *testing.T) {
 
 	require.Equal("AVAX", reply.Name)
 	require.Equal("SYMB", reply.Symbol)
-}
-
-func TestGetBalance(t *testing.T) {
-	require := require.New(t)
-
-	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
-	})
-	service := &Service{vm: env.vm}
-	env.vm.ctx.Lock.Unlock()
-
-	avaxAssetID := env.genesisTx.ID()
-
-	reply := GetBalanceReply{}
-	addrStr, err := env.vm.FormatLocalAddress(keys[0].PublicKey().Address())
-	require.NoError(err)
-	require.NoError(service.GetBalance(nil, &GetBalanceArgs{
-		Address: addrStr,
-		AssetID: avaxAssetID.String(),
-	}, &reply))
-
-	require.Equal(startBalance, uint64(reply.Balance))
 }
 
 func TestServiceGetBlock(t *testing.T) {
