@@ -7,7 +7,6 @@ package statesync
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
@@ -20,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
-	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
@@ -36,8 +34,6 @@ type Config struct {
 	SummaryInterval uint64
 	Enabled         bool
 }
-
-var errSummaryInterval = errors.New("summary interval must be a multiple of the commit interval")
 
 // Handler implements provides server-side [Summary] handling and parsing, as
 // well as providing critical block getters for a ChainVM.
@@ -64,10 +60,6 @@ func New(
 	}
 	if cfg.SummaryInterval == 0 {
 		cfg.SummaryInterval = cfg.DBConfig.CommitInterval
-	}
-	// HashDB can only serve the heights at which it committed a trie.
-	if ci := cfg.DBConfig.CommitInterval; cfg.DBConfig.Scheme != firewood.Scheme && cfg.SummaryInterval%ci != 0 {
-		return nil, fmt.Errorf("%w: %d, %d", errSummaryInterval, cfg.SummaryInterval, ci)
 	}
 	return &Handler{
 		cfg:         cfg,

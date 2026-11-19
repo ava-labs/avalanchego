@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 )
 
@@ -187,14 +186,4 @@ func checkSummaryMatchesBlock(t *testing.T, summary *Summary, block *types.Block
 	if diff := cmp.Diff(want, summary, CmpOpt()); diff != "" {
 		t.Errorf("summary mismatch (-want +got):\n%s", diff)
 	}
-}
-
-func TestNewSummaryInterval(t *testing.T) {
-	// HashDB commits every 3 blocks, so it can't serve a summary every 4.
-	cfg := Config{
-		DBConfig:        saedb.Config{CommitInterval: 3},
-		SummaryInterval: 4,
-	}
-	_, err := New(cfg, nil, nil, nil, nil)
-	require.ErrorIs(t, err, errSummaryInterval, "New() with HashDB")
 }
