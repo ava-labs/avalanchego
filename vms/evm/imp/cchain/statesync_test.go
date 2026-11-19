@@ -97,7 +97,7 @@ func (s *SUT) awaitStateSync(ctx context.Context, t *testing.T) {
 	msg, err := s.WaitForEvent(ctx)
 	require.NoErrorf(t, err, "%T.WaitForEvent()", s.VM)
 	require.Equalf(t, snowcommon.StateSyncDone, msg, "%T.WaitForEvent()", s.VM)
-	require.NoErrorf(t, s.Handler.SyncError(), "%T.Error()", s.Handler)
+	require.NoErrorf(t, s.Acceptor.SyncError(), "%T.SyncError()", s.Acceptor)
 }
 
 // bootstrapFrom transitions s to [snow.Bootstrapping], replays src's accepted
