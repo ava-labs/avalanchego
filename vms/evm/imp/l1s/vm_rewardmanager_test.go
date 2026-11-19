@@ -283,41 +283,35 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 	})
 }
 
-// TestRewardManagerForgedCoinbaseFailsVerifyBlock asserts SAE's
-// rebuild-and-compare path in [VM.VerifyBlock] rejects blocks whose
-// `Coinbase` deviates from the value the rebuilder would deterministically
-// stamp. This is what makes the deterministic branches of `resolveCoinbase`
-// enforceable -- without it a malicious builder could redirect fees to an
-// arbitrary address in the pinned arms.
+// TestRewardManagerCoinbaseVerifyBlock asserts that [VM.VerifyBlock] MUST
+// reject a block whose Coinbase differs from the one the chain determines, and
+// MUST accept the received Coinbase when builders choose it.
 //
-// Two pinned arms exercised here:
-//   - vanilla Igloo (`AllowFeeRecipients=false`, no rewardmanager) =>
-//     deterministic [BlackholeAddr]; any other Coinbase is forged.
-//   - rewardmanager active with stored `allowFeeRecipients == false` =>
-//     deterministic stored reward address; any other Coinbase is forged.
-func TestRewardManagerForgedCoinbaseFailsVerifyBlock(t *testing.T) {
+// The chain determines the Coinbase when:
+//   - AllowFeeRecipients is false and rewardmanager is inactive, so it is
+//     [blackhole.Address].
+//   - rewardmanager is active with allowFeeRecipients false, so it is the
+//     stored reward address.
+func TestRewardManagerCoinbaseVerifyBlock(t *testing.T) {
 	const adminIdx = 0
 	rewardAddr := common.HexToAddress("0x00000000000000000000000000000000DeadBeef")
 
 	tests := []struct {
 		name string
 		opts []l1SUTOption
-		// forgedCoinbase MUST differ from what `resolveCoinbase` would
-		// deterministically stamp at build time, so the rebuilt block hashes
-		// differently and `VerifyBlock` returns a hash-mismatch error.
-		forgedCoinbase common.Address
+		// coinbase MUST differ from the one this node builds with, so the
+		// received block is not the one this node would build.
+		coinbase common.Address
+		wantErr  error
 	}{
 		{
-			name:           "no_precompile_no_AllowFeeRecipients_must_be_blackhole",
-			forgedCoinbase: common.HexToAddress("0xfeedfacefeedfacefeedfacefeedfacefeedface"),
+			name:     "no_precompile_no_AllowFeeRecipients_must_be_blackhole",
+			coinbase: common.HexToAddress("0xfeedfacefeedfacefeedfacefeedfacefeedface"),
+			wantErr:  sae.ErrHashMismatch,
 		},
 		{
-			// Pre-populate the precompile's reward-address slot at genesis
-			// via `InitialRewardConfig.RewardAddress`, so the deterministic
-			// branch produces `rewardAddr` from the very first block (no
-			// admin-tx + settle dance needed). We then forge with
-			// `BlackholeAddr` (a different but plausible value) to show
-			// the verifier doesn't accept it.
+			// Seeding the reward address at genesis makes the first block
+			// pay it, without an admin tx that must settle first.
 			name: "rewardmanager_active_must_be_stored_reward_address",
 			opts: []l1SUTOption{
 				withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
@@ -332,7 +326,17 @@ func TestRewardManagerForgedCoinbaseFailsVerifyBlock(t *testing.T) {
 					}
 				}),
 			},
-			forgedCoinbase: blackhole.Address,
+			coinbase: blackhole.Address,
+			wantErr:  sae.ErrHashMismatch,
+		},
+		{
+			name: "AllowFeeRecipients_accepts_received_coinbase",
+			opts: []l1SUTOption{
+				withGenesisConfig(func(genesis *core.Genesis, _ []common.Address) {
+					legacyparams.GetExtra(genesis.Config).AllowFeeRecipients = true
+				}),
+			},
+			coinbase: common.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
 		},
 	}
 
@@ -346,34 +350,31 @@ func TestRewardManagerForgedCoinbaseFailsVerifyBlock(t *testing.T) {
 			}, test.opts...)
 			sut := newL1SUT(t, opts...)
 
-			// Build an honest block (verify but DO NOT accept; we want the
-			// forged twin to be admissible at the same height), then forge
-			// by replacing its header's Coinbase. We re-use the body via
-			// [types.Block.WithSeal] so the only divergence is the header
-			// (and thus the hash).
+			// Verify but don't accept the honest block, so its twin is
+			// admissible at the same height. [types.Block.WithSeal] keeps the
+			// body, so the twin differs only in its header.
 			sut.advanceTime(t, blockBuildAdvance)
 			_ = sendTippedTransferTxTo(t, sut, adminIdx, dustSink, common.Big1)
 			honest := sut.buildAndVerifyBlock(t, nil)
 
 			honestBlk := honest.EthBlock()
 			honestHdr := honestBlk.Header()
-			require.NotEqual(t, test.forgedCoinbase, honestHdr.Coinbase,
-				"sanity: forged Coinbase must actually differ from the honest one")
+			require.NotEqual(t, test.coinbase, honestHdr.Coinbase,
+				"sanity: received Coinbase must differ from the honest one")
 
-			forgedHdr := types.CopyHeader(honestHdr)
-			forgedHdr.Coinbase = test.forgedCoinbase
-			forgedBlk := honestBlk.WithSeal(forgedHdr)
+			receivedHdr := types.CopyHeader(honestHdr)
+			receivedHdr.Coinbase = test.coinbase
+			receivedBlk := honestBlk.WithSeal(receivedHdr)
 
-			// Round-trip through ParseBlock so the forged block is built by
-			// the VM's own hooks, exactly as a peer-delivered block would be.
-			forgedBytes, err := rlp.EncodeToBytes(forgedBlk)
-			require.NoError(t, err, "rlp.EncodeToBytes(forged block)")
-			forged, err := sut.vm.ParseBlock(sut.ctx, forgedBytes)
-			require.NoError(t, err, "sut.vm.ParseBlock(forged block)")
+			// ParseBlock builds the block with the VM's own hooks, as for a
+			// peer-delivered block.
+			receivedBytes, err := rlp.EncodeToBytes(receivedBlk)
+			require.NoError(t, err, "rlp.EncodeToBytes(received block)")
+			received, err := sut.vm.ParseBlock(sut.ctx, receivedBytes)
+			require.NoError(t, err, "sut.vm.ParseBlock(received block)")
 
-			err = sut.vm.VerifyBlock(sut.ctx, nil, forged)
-			require.ErrorIs(t, err, sae.ErrHashMismatch,
-				"forged Coinbase must trip SAE's rebuild-and-compare hash check")
+			err = sut.vm.VerifyBlock(sut.ctx, nil, received)
+			require.ErrorIs(t, err, test.wantErr, "sut.vm.VerifyBlock(received block)")
 		})
 	}
 }
