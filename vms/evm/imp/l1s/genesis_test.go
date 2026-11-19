@@ -134,10 +134,9 @@ func withFeeConfig(c commontype.FeeConfig) genesisOption {
 	})
 }
 
-// withAllGenesisPrecompiles enables every registered precompile at the given
-// timestamp, with non-trivial initial state where supported. It excludes
-// gaspricemanager, which requires Igloo.
-func withAllGenesisPrecompiles(timestamp uint64) genesisOption {
+// withPreIglooGenesisPrecompiles enables every precompile available before
+// Igloo at the given timestamp, with non-trivial initial state where possible.
+func withPreIglooGenesisPrecompiles(timestamp uint64) genesisOption {
 	// The native minter also mints to [testAllocAddr], making the
 	// state root depend on the allocation being applied after activation.
 	return withGenesis(func(g *ethcore.Genesis) {
@@ -427,12 +426,12 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 		spec{
 			name:     "precompiles",
 			upgrades: upgrade.Helicon,
-			genesis:  testGenesisJSON(withAllGenesisPrecompiles(testGenesisTime)),
+			genesis:  testGenesisJSON(withPreIglooGenesisPrecompiles(testGenesisTime)),
 		},
 		spec{
 			name:     "precompiles_after_genesis",
 			upgrades: upgrade.Helicon,
-			genesis:  testGenesisJSON(withAllGenesisPrecompiles(testGenesisTime + 1)),
+			genesis:  testGenesisJSON(withPreIglooGenesisPrecompiles(testGenesisTime + 1)),
 		},
 		spec{
 			name:     "header_fields",
