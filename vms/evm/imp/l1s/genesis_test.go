@@ -495,7 +495,7 @@ func TestGenesisBlockStampsGasConfig(t *testing.T) {
 			}
 			genesisJSON := testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
 				l1params.GetExtra(g.Config).GenesisPrecompiles = extras.Precompiles{
-					gaspricemanager.ConfigKey: gaspricemanager.NewConfig(new(uint64(0)), nil, nil, nil, &stored),
+					gaspricemanager.ConfigKey: gaspricemanager.NewConfig(new(g.Timestamp), nil, nil, nil, &stored),
 				}
 			}))
 			ctx := &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgrade.Latest)}

@@ -46,7 +46,7 @@ var (
 	errNonZeroGenesisParentHash   = errors.New("non-zero genesis parentHash")
 	errNonNilGenesisExcessBlobGas = errors.New("non-nil genesis excessBlobGas")
 	errNonNilGenesisBlobGasUsed   = errors.New("non-nil genesis blobGasUsed")
-	errGasPriceManagerBeforeIgloo = errors.New("gaspricemanager activated before Igloo")
+	errGasPriceManagerBeforeIgloo = errors.New("gaspricemanager scheduled before Igloo")
 )
 
 type genesis core.Genesis
@@ -111,7 +111,7 @@ func updateChainConfig(cfg *params.ChainConfig, genesisTimestamp uint64, upgrade
 			return err
 		}
 	}
-	if err := verifyGasPriceManagerAfterIgloo(extra, genesisTimestamp); err != nil {
+	if err := verifyGasPriceManagerAfterIgloo(extra); err != nil {
 		return err
 	}
 
@@ -125,15 +125,12 @@ func updateChainConfig(cfg *params.ChainConfig, genesisTimestamp uint64, upgrade
 	return cfg.CheckConfigForkOrder()
 }
 
-// verifyGasPriceManagerAfterIgloo returns an error if gaspricemanager activates
-// before Igloo, since only Igloo headers carry its gas config.
-func verifyGasPriceManagerAfterIgloo(cfg *extras.ChainConfig, genesisTimestamp uint64) error {
+// verifyGasPriceManagerAfterIgloo returns an error if gaspricemanager is
+// scheduled before Igloo, since only Igloo headers carry its gas config.
+func verifyGasPriceManagerAfterIgloo(cfg *extras.ChainConfig) error {
 	if c, ok := cfg.GenesisPrecompiles[gaspricemanager.ConfigKey]; ok && !c.IsDisabled() {
-		if ts := c.Timestamp(); ts != nil {
-			activation := max(*ts, genesisTimestamp)
-			if !cfg.IsIgloo(activation) {
-				return fmt.Errorf("%w: genesis precompile activates at %d", errGasPriceManagerBeforeIgloo, activation)
-			}
+		if ts := c.Timestamp(); ts != nil && !cfg.IsIgloo(*ts) {
+			return fmt.Errorf("%w: genesis precompile scheduled at %d", errGasPriceManagerBeforeIgloo, *ts)
 		}
 	}
 	for i, u := range cfg.PrecompileUpgrades {
@@ -141,7 +138,7 @@ func verifyGasPriceManagerAfterIgloo(cfg *extras.ChainConfig, genesisTimestamp u
 			continue
 		}
 		if ts := u.Timestamp(); ts != nil && !cfg.IsIgloo(*ts) {
-			return fmt.Errorf("%w: precompileUpgrades[%d] activates at %d", errGasPriceManagerBeforeIgloo, i, *ts)
+			return fmt.Errorf("%w: precompileUpgrades[%d] scheduled at %d", errGasPriceManagerBeforeIgloo, i, *ts)
 		}
 	}
 	return nil

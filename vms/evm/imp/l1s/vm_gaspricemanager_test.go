@@ -91,7 +91,7 @@ func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					new(uint64(0)),
+					new(genesis.Timestamp),
 					[]common.Address{addresses[adminIdx]},
 					nil,
 					nil,
@@ -146,7 +146,7 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					new(uint64(0)),
+					new(genesis.Timestamp),
 					[]common.Address{addresses[adminIdx]},
 					nil,
 					nil,
@@ -214,7 +214,7 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 			withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 				legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 					gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-						new(uint64(0)),
+						new(genesis.Timestamp),
 						[]common.Address{addresses[adminIdx]},
 						nil, nil, &cfg,
 					),
@@ -317,7 +317,7 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					new(uint64(0)),
+					new(genesis.Timestamp),
 					[]common.Address{addresses[adminIdx]},
 					nil, nil, &initialConfig,
 				),
@@ -398,10 +398,10 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 	now := postIglooStartTime(t)
 	midChainActivation := now.Add(saeparams.Tau)
 
-	pinnedGenesisPrecompiles := func(addresses []common.Address) extras.Precompiles {
+	pinnedGenesisPrecompiles := func(genesis *core.Genesis, addresses []common.Address) extras.Precompiles {
 		return extras.Precompiles{
 			gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-				new(uint64(0)),
+				new(genesis.Timestamp),
 				[]common.Address{addresses[adminIdx]},
 				nil, nil, &pinnedCfg,
 			),
@@ -441,7 +441,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 
 	cases := []struct {
 		name               string
-		genesisPrecompiles func(addresses []common.Address) extras.Precompiles
+		genesisPrecompiles func(*core.Genesis, []common.Address) extras.Precompiles
 		upgrades           func(addresses []common.Address, activationTime time.Time) []extras.PrecompileUpgrade
 		activationTime     time.Time
 		preTransition      baseFeeExpectation
@@ -488,7 +488,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 				opts = append(opts,
 					withIglooGenesis(),
 					withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
-						legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = tc.genesisPrecompiles(addresses)
+						legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = tc.genesisPrecompiles(genesis, addresses)
 					}),
 				)
 			}
@@ -540,7 +540,7 @@ func TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE(t *testing.T) {
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					new(uint64(0)),
+					new(genesis.Timestamp),
 					[]common.Address{addresses[adminIdx]},
 					nil,
 					nil,
