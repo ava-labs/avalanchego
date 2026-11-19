@@ -49,7 +49,7 @@ func setGasConfig(he *customtypes.HeaderExtra, c commontype.GasPriceConfig) {
 }
 
 // scalingFromTimeToDouble converts ACP-224's TimeToDouble into ACP-176's
-// TargetToExcessScaling, scaling 87 for 60s linearly.
+// TargetToExcessScaling.
 func scalingFromTimeToDouble(ttd uint64) uint64 {
 	const defaultTimeToDouble = 60 // seconds
 	scaling, _, err := intmath.MulDiv(ttd, gastime.DefaultTargetToExcessScaling, defaultTimeToDouble)
