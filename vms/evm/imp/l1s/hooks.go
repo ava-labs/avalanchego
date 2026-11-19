@@ -185,15 +185,15 @@ func (*hooks) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts)
 }
 
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
-	if mde := customtypes.GetHeaderExtra(b.Header()).MinDelayExcess; mde != nil {
+	header := b.Header()
+	if mde := customtypes.GetHeaderExtra(header).MinDelayExcess; mde != nil {
 		h.metrics.SetMinBlockDelay(dynamic.DelayExponent(*mde).DelayDuration())
 	}
 
 	// Genesis and state upgrades can place arbitrary code at the Warp address.
 	// Only once the precompile is active are its logs guaranteed to be Warp
 	// messages.
-	rules := h.chainConfig.Rules(b.Number(), true /*isMerge*/, b.Time())
-	if _, ok := activeWarpConfig(rules); !ok {
+	if _, ok := h.activeWarpConfig(header); !ok {
 		return nil
 	}
 	messages, err := saewarp.FromReceipts(receipts)
@@ -206,9 +206,14 @@ func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) err
 	return nil
 }
 
-func activeWarpConfig(rules ethparams.Rules) (*legacywarp.Config, bool) {
-	config, ok := legacyparams.GetRulesExtra(rules).Precompiles[legacywarp.ContractAddress].(*legacywarp.Config)
-	return config, ok
+// activeWarpConfig returns the Warp precompile config and true if the
+// precompile is active at header.
+func (b *builder) activeWarpConfig(header *types.Header) (*legacywarp.Config, bool) {
+	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
+	rulesExtra := legacyparams.GetRulesExtra(rules)
+	config := rulesExtra.Precompiles[legacywarp.ContractAddress]
+	warpConfig, ok := config.(*legacywarp.Config)
+	return warpConfig, ok
 }
 
 var _ hookadaptor.BlockBuilder = (*builder)(nil)
@@ -308,9 +313,8 @@ func (b *builder) BuildBlock(
 	headerExtra := customtypes.GetHeaderExtra(header)
 	setGasConfig(headerExtra, readGasConfig(settledRulesExtra, worstCaseState))
 
-	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
 	var warpValidity predicate.BlockResults
-	if warpConfig, ok := activeWarpConfig(rules); ok {
+	if warpConfig, ok := b.activeWarpConfig(header); ok {
 		var err error
 		warpValidity, err = saewarp.VerifyBlock(b.ctx, blockCtx, warpConfig, txs)
 		if err != nil {
