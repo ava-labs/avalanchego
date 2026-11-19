@@ -106,8 +106,8 @@ BlockDB provides configurable durability through the `syncToDisk` parameter:
 
 **Index File Behavior:**
 
-- **When `syncToDisk=true`**: The index file is fsync'd every `CheckpointInterval` blocks (when the header is written).
-- **When `syncToDisk=false`**: The index file relies on OS buffering and is not explicitly fsync'd.
+- The index file is fsync'd every `CheckpointInterval` blocks, before the header is written.
+- **When `syncToDisk=false`**: The data files are also fsync'd before the header is written, so the header never covers data that is not on disk.
 
 ### Recovery Mechanism
 
