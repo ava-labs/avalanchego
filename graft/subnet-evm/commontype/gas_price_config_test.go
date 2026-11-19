@@ -121,7 +121,7 @@ func TestGasPriceConfigPackFormat(t *testing.T) {
 		{
 			name:   "default config",
 			config: DefaultGasPriceConfig(),
-			want:   common.HexToHash("0x0000000000000f4240000000000000000001000000000000003c000000000000"),
+			want:   common.HexToHash("0x010000000000000000000000000000000001000000000000003c000000000000"),
 		},
 		{
 			name: "all flags true and max uint64",

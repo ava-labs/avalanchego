@@ -364,7 +364,7 @@ func (b *builder) BuildBlock(
 	// The gas-config group is stamped even while gaspricemanager is disabled,
 	// because header fields can't be removed once populated.
 	headerExtra := customtypes.GetHeaderExtra(header)
-	stored := disabledGasConfig()
+	stored := commontype.DefaultGasPriceConfig()
 	if settledRulesExtra.IsPrecompileEnabled(gaspricemanager.ContractAddress) {
 		stored = gaspricemanager.GetStoredGasPriceConfig(worstCaseState, gaspricemanager.ContractAddress)
 		if stored == (commontype.GasPriceConfig{}) {

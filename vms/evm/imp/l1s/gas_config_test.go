@@ -48,7 +48,7 @@ func TestGasConfigRoundTrip(t *testing.T) {
 	}{
 		{
 			name:   "disabled",
-			stored: disabledGasConfig(),
+			stored: commontype.DefaultGasPriceConfig(),
 			want:   gastime.DefaultGasPriceConfig(),
 		},
 		{

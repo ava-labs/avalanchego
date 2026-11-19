@@ -19,19 +19,10 @@ import (
 // approximates as a TargetToExcessScaling of 87.
 const defaultTimeToDouble = 60
 
-// disabledGasConfig returns the gaspricemanager config equivalent to the
-// ACP-176 defaults, which applies while the precompile is disabled.
-func disabledGasConfig() commontype.GasPriceConfig {
-	return commontype.GasPriceConfig{
-		ValidatorTargetGas: true,
-		MinGasPrice:        uint64(gastime.DefaultMinPrice),
-		TimeToDouble:       defaultTimeToDouble,
-	}
-}
-
-// setGasConfig writes the gaspricemanager config c into he. ACP-224 requires
-// TimeToDouble to be 0 exactly for static pricing, so static pricing is written
-// as a zero TargetToExcessScaling.
+// setGasConfig writes the gaspricemanager config c into he, overwriting
+// he.TargetExponent if c pins the target. ACP-224 requires TimeToDouble to be 0
+// exactly for static pricing, so static pricing is written as a zero
+// TargetToExcessScaling.
 func setGasConfig(he *customtypes.HeaderExtra, c commontype.GasPriceConfig) {
 	if !c.ValidatorTargetGas {
 		he.TargetExponent = new(dynamic.DesiredTargetExponent(gas.Gas(c.TargetGas)))

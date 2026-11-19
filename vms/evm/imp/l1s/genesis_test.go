@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -28,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
@@ -513,6 +515,28 @@ func TestGenesisBlockStampsGasConfig(t *testing.T) {
 	}
 }
 
+// TestGenesisBlockRLPRoundTrip asserts that the genesis header MUST decode to
+// itself. RLP decodes an unset optional field followed by a set one as zero, so
+// every such field MUST be set.
+func TestGenesisBlockRLPRoundTrip(t *testing.T) {
+	for fork := upgrade.NoUpgrades; fork <= upgrade.Latest; fork++ {
+		t.Run(fork.String(), func(t *testing.T) {
+			ctx := &snow.Context{NetworkUpgrades: upgradetest.GetConfig(fork)}
+			g, err := parseGenesis(ctx, []byte(testGenesisJSON()), nil)
+			require.NoError(t, err, "parseGenesis(...)")
+			block, err := g.block()
+			require.NoError(t, err, "%T.block()", g)
+
+			want := block.Header()
+			b, err := rlp.EncodeToBytes(want)
+			require.NoError(t, err, "rlp.EncodeToBytes()")
+			got := new(types.Header)
+			require.NoError(t, rlp.DecodeBytes(b, got), "rlp.DecodeBytes()")
+			require.Equal(t, customtypes.GetHeaderExtra(want), customtypes.GetHeaderExtra(got), "decoded header extra")
+		})
+	}
+}
+
 // This test is intentionally a change detector: the genesis hash is part of
 // consensus, so any change would break deployed networks.
 func TestHistoricalGenesisHashes(t *testing.T) {
@@ -539,8 +563,7 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 		upgrade.Granite: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
 		upgrade.Helicon: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
 
-		// Added the gas-config group.
-		// TODO(alarso16): Add the remaining SAE required fields.
+		// Added the SAE fields.
 		upgrade.Igloo: "0x8afed61aa179a138084218c162f3b50b5664f0e1d4bfb4c2655ca581889eeabc",
 	}
 	_ = hashes[upgrade.Latest] // Enforce completeness at compile time.
