@@ -30,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 
-	legacycore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
@@ -317,8 +317,8 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 		return common.Hash{}, err
 	}
 
-	blockContext := legacycore.NewBlockContext(new(big.Int).SetUint64(genesisNumber), g.Timestamp)
-	if err := legacycore.ApplyPrecompileActivations(g.Config, nil, blockContext, statedb); err != nil {
+	blockContext := legacy.NewBlockContext(new(big.Int).SetUint64(genesisNumber), g.Timestamp)
+	if err := legacy.ApplyPrecompileActivations(g.Config, nil, blockContext, statedb); err != nil {
 		return common.Hash{}, fmt.Errorf("configuring genesis precompiles: %w", err)
 	}
 
