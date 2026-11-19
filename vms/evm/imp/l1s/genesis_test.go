@@ -152,11 +152,11 @@ func withPreIglooGenesisPrecompiles(timestamp uint64) genesisOption {
 				{0x11}:        mint,
 				testAllocAddr: mint,
 			}),
+			feemanager.ConfigKey: feemanager.NewConfig(ts, admins, nil, nil, new(l1params.DefaultFeeConfig)),
 			rewardmanager.ConfigKey: rewardmanager.NewConfig(ts, admins, nil, nil, &rewardmanager.InitialRewardConfig{
 				RewardAddress: common.Address{0x22},
 			}),
-			feemanager.ConfigKey: feemanager.NewConfig(ts, admins, nil, nil, new(l1params.DefaultFeeConfig)),
-			warp.ConfigKey:       warp.NewDefaultConfig(ts),
+			warp.ConfigKey: warp.NewDefaultConfig(ts),
 		}
 	})
 }
