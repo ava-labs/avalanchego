@@ -41,25 +41,23 @@ func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 			return nil, fmt.Errorf("couldn't get current subnet validator of %q: %w", subnetID, err)
 		}
 
-		_, validating := vm.Validators.GetValidator(subnetID, vm.ctx.NodeID)
-		vm.metrics.SetLocalValidating(subnetID, validating)
-
-		if err := vm.updateLocalL1ValidatorBalance(subnetID); err != nil {
+		if err := vm.updateLocalL1ValidatorMetrics(subnetID); err != nil {
 			return nil, err
 		}
 	}
 	return nil, nil
 }
 
-// updateLocalL1ValidatorBalance reports the remaining balance of this node's
-// L1 validator of subnetID. Nothing is reported if this node is not an L1
-// validator of subnetID.
-func (vm *VM) updateLocalL1ValidatorBalance(subnetID ids.ID) error {
+// updateLocalL1ValidatorMetrics reports whether this node is an active L1
+// validator of subnetID and the remaining balance of that validator. The
+// balance is not reported if this node is not an L1 validator of subnetID.
+func (vm *VM) updateLocalL1ValidatorMetrics(subnetID ids.ID) error {
 	isL1Validator, err := vm.state.HasL1Validator(subnetID, vm.ctx.NodeID)
 	if err != nil {
 		return fmt.Errorf("checking for L1 validator of %s: %w", subnetID, err)
 	}
 	if !isL1Validator {
+		vm.metrics.SetLocalL1ValidatorActive(subnetID, false)
 		vm.metrics.DeleteLocalL1ValidatorBalance(subnetID)
 		return nil
 	}
@@ -67,6 +65,7 @@ func (vm *VM) updateLocalL1ValidatorBalance(subnetID ids.ID) error {
 	// Inactive L1 validators are not in the validator manager under their
 	// nodeID.
 	vdr, ok := vm.Validators.GetValidator(subnetID, vm.ctx.NodeID)
+	vm.metrics.SetLocalL1ValidatorActive(subnetID, ok)
 	if !ok {
 		vm.metrics.SetLocalL1ValidatorBalance(subnetID, 0)
 		return nil
