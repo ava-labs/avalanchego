@@ -1,2 +1,56 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
 # gazelle:prefix github.com/ava-labs/avalanchego/graft/simplex
 # gazelle:map_kind go_test graft_go_test //.bazel:defs.bzl
+
+go_library(
+    name = "simplex",
+    srcs = [
+        "adapters.go",
+        "config.go",
+        "external.go",
+        "instance.go",
+        "transition_listener.go",
+        "util.go",
+        "vdr_cache.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/simplex",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/simplex/avalanchego",
+        "//graft/simplex/common",
+        "//graft/simplex/msm",
+        "//graft/simplex/nonvalidator",
+        "//graft/simplex/simplex",
+        "//graft/simplex/wal",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+graft_go_test(
+    name = "simplex_test",
+    srcs = [
+        "adapters_test.go",
+        "external_test.go",
+        "instance_helpers_test.go",
+        "instance_test.go",
+        "leak_test.go",
+        "transition_listener_test.go",
+        "util_test.go",
+        "vdr_cache_test.go",
+    ],
+    embed = [":simplex"],
+    deps = [
+        "//graft/simplex/avalanchego",
+        "//graft/simplex/common",
+        "//graft/simplex/msm",
+        "//graft/simplex/simplex",
+        "//graft/simplex/testutil",
+        "//graft/simplex/wal",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
+        "@org_uber_go_zap//:zap",
+    ],
+)
