@@ -66,7 +66,7 @@ func TestDeployerAllowListPrecompileUpgradesSAE(t *testing.T) {
 			}
 		}),
 		withUpgradeConfig(func(addresses []common.Address) []byte {
-			return mustMarshalJSON(t, &extras.UpgradeConfig{
+			return marshalJSON(t, &extras.UpgradeConfig{
 				PrecompileUpgrades: []extras.PrecompileUpgrade{
 					{
 						Config: deployerallowlist.NewDisableConfig(new(uint64(disableTime.Unix()))), // #nosec G115 -- known positive test timestamp

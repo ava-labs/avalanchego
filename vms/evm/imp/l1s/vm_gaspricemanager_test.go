@@ -572,7 +572,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 					legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = tc.genesisPrecompiles(addresses)
 				}),
 				withUpgradeConfig(func(addresses []common.Address) []byte {
-					return mustMarshalJSON(t, &extras.UpgradeConfig{
+					return marshalJSON(t, &extras.UpgradeConfig{
 						PrecompileUpgrades: tc.upgrades(addresses, tc.activationTime),
 					})
 				}),

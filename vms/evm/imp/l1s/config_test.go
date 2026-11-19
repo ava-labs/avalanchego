@@ -6,183 +6,104 @@ package l1s
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"testing"
-	"time"
 
+	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
-	"github.com/ava-labs/avalanchego/vms/evm/saedb"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 )
 
-func TestParseConfig_FeeRecipient(t *testing.T) {
-	tests := []struct {
-		name    string
-		json    string
-		want    common.Address
-		wantErr bool
-	}{
-		{
-			name: "unset_burns",
-			json: `{}`,
-			want: blackhole.Address,
-		},
-		{
-			name: "address",
-			json: `{"fee-recipient":"0x0123456789abcdef0123456789abcdef01234567"}`,
-			want: common.HexToAddress("0x0123456789abcdef0123456789abcdef01234567"),
-		},
-		{
-			name:    "missing_prefix",
-			json:    `{"fee-recipient":"0123456789abcdef0123456789abcdef01234567"}`,
-			wantErr: true,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			c, err := parseConfig(snowtest.Context(t, ids.GenerateTestID()), []byte(test.json))
-			if test.wantErr {
-				var typeErr *json.UnmarshalTypeError
-				require.ErrorAs(t, err, &typeErr)
-				return
-			}
-			require.NoError(t, err)
-			require.Equal(t, test.want, c.FeeRecipient)
-		})
-	}
-}
-
-// TestParseConfig_DefaultsAndOverrides asserts that ParseConfig
-// pre-populates from DefaultConfig (legacy-compatible defaults) and
-// that operator overrides via flat legacy-shaped JSON keys take
-// effect.
-func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
+// TestParseConfig asserts that options specific to the L1 VM MUST override
+// [defaultConfig] and pass verification.
+func TestParseConfig(t *testing.T) {
 	snowCtx := snowtest.Context(t, ids.GenerateTestID())
 	defaults := defaultConfig(snowCtx.ChainDataDir)
 
-	t.Run("nil_bytes_yields_defaults", func(t *testing.T) {
-		c, err := parseConfig(snowCtx, nil)
-		require.NoError(t, err)
-		require.Equal(t, defaults, c)
-	})
+	with := func(mod func(*config)) config {
+		c := defaultConfig(snowCtx.ChainDataDir)
+		mod(&c)
+		return c
+	}
 
-	t.Run("empty_object_yields_defaults", func(t *testing.T) {
-		c, err := parseConfig(snowCtx, []byte(`{}`))
-		require.NoError(t, err)
-		require.Equal(t, defaults, c)
-	})
+	const addr = "0x0123456789abcdef0123456789abcdef01234567"
+	dbPath := filepath.Join(t.TempDir(), "db")
 
-	t.Run("partial_override_keeps_other_defaults", func(t *testing.T) {
-		c, err := parseConfig(snowCtx, []byte(`{"database-type":"leveldb","commit-interval":8192}`))
-		require.NoError(t, err)
-		want := defaultConfig(snowCtx.ChainDataDir)
-		want.DatabaseType = "leveldb"
-		want.CommitInterval = 8192
-		require.Equal(t, want, c)
-	})
-
-	t.Run("unknown_field_ignored", func(t *testing.T) {
-		// Legacy keys with no SAE counterpart MUST NOT prevent an existing
-		// node config from starting the VM.
-		c, err := parseConfig(snowCtx, []byte(`{"airdrop":"genesis.json"}`))
-		require.NoError(t, err)
-		require.Equal(t, defaults, c)
-	})
-
-	t.Run("duration_string", func(t *testing.T) {
-		c, err := parseConfig(snowCtx, []byte(`{"api-max-duration":"30m"}`))
-		require.NoError(t, err)
-		require.Equal(t, 30*time.Minute, c.APIMaxDuration.Duration)
-	})
-
-	t.Run("duration_numeric_rejected", func(t *testing.T) {
-		_, err := parseConfig(snowCtx, []byte(`{"api-max-duration":900000000000}`))
-		var typeErr *json.UnmarshalTypeError
-		require.ErrorAs(t, err, &typeErr)
-	})
-
-	t.Run("marshal_roundtrip", func(t *testing.T) {
-		out, err := json.Marshal(defaults)
-		require.NoError(t, err)
-		c, err := parseConfig(snowCtx, out)
-		require.NoError(t, err)
-		require.Equal(t, defaults, c)
-	})
-}
-
-// TestConfig_SAEConfig spot-checks the [sae.Config] produced from operator
-// fields so the Initialize-time wiring keeps matching what operators wrote.
-func TestConfig_SAEConfig(t *testing.T) {
-	c := defaultConfig(t.TempDir())
-	c.LocalTxsEnabled = true
-	c.Pruning = false
-	c.CommitInterval = 8192
-
-	got := c.saeConfig(nil)
-	require.False(t, got.MempoolConfig.NoLocals, "LocalTxsEnabled=true => NoLocals=false")
-	require.Empty(t, got.MempoolConfig.Journal)
-	require.True(t, got.DBConfig.Archival, "Pruning=false => Archival=true")
-	require.Equal(t, uint64(8192), got.DBConfig.CommitInterval)
-
-	// Defaults round-trip to the legacy-equivalent SAE state: pruning on
-	// (Archival=false), commit interval at the saedb default.
-	d := defaultConfig(t.TempDir()).saeConfig(nil)
-	require.False(t, d.DBConfig.Archival)
-	require.Equal(t, uint64(saedb.DefaultCommitInterval), d.DBConfig.CommitInterval)
-}
-
-// TestParseConfig_ValidatesSAEConfig pins parse-time validation of the
-// derived SAE configuration: values the SAE core would only reject at
-// runtime (or worse, divide by) MUST fail at chain-config parse time.
-func TestParseConfig_ValidatesSAEConfig(t *testing.T) {
-	_, err := parseConfig(snowtest.Context(t, ids.GenerateTestID()), []byte(`{"commit-interval":0}`))
-	require.ErrorIs(t, err, saedb.Config{}.Verify(), "parseConfig()")
-}
-
-func TestParseConfig_RPC(t *testing.T) {
 	tests := []struct {
-		name            string
-		config          string
-		wantDuration    time.Duration
-		wantBatchLimit  uint64
-		wantResolveLast bool
+		name    string
+		json    string
+		want    config
+		wantErr testerr.Want
 	}{
 		{
-			name:            "string_duration",
-			config:          `{"api-max-duration":"5s","batch-request-limit":25,"api-resolve-pending-to-last-executed":true}`,
-			wantDuration:    5 * time.Second,
-			wantBatchLimit:  25,
-			wantResolveLast: true,
+			name: "empty_input",
+			want: defaults,
 		},
 		{
-			name:            "disable_resolve_pending",
-			config:          `{"api-max-duration":"10s","batch-request-limit":50,"api-resolve-pending-to-last-executed":false}`,
-			wantDuration:    10 * time.Second,
-			wantBatchLimit:  50,
-			wantResolveLast: false,
+			name: "empty_object",
+			json: `{}`,
+			want: defaults,
+		},
+		{
+			name: "fee_recipient",
+			json: `{"fee-recipient":"` + addr + `"}`,
+			want: with(func(c *config) {
+				c.FeeRecipient = common.HexToAddress(addr)
+			}),
+		},
+		{
+			name:    "fee_recipient_missing_prefix",
+			json:    `{"fee-recipient":"0123456789abcdef0123456789abcdef01234567"}`,
+			wantErr: errIsType[*json.UnmarshalTypeError](),
+		},
+		{
+			name: "standalone_database",
+			json: `{
+				"use-standalone-database":false,
+				"database-config":{"maxOpenFiles":1},
+				"database-path":` + string(marshalJSON(t, dbPath)) + `,
+				"database-type":"leveldb"
+			}`,
+			want: with(func(c *config) {
+				c.UseStandaloneDatabase = false
+				c.DatabaseConfig = json.RawMessage(`{"maxOpenFiles":1}`)
+				c.DatabasePath = dbPath
+				c.DatabaseType = leveldb.Name
+			}),
+		},
+		{
+			name: "apis_with_validator",
+			json: `{"apis":["validator","net"]}`,
+			want: with(func(c *config) {
+				c.APIs = set.Of(validatorAPI, rpc.APINet)
+			}),
+		},
+		{
+			name: "apis_without_validator",
+			json: `{"apis":["net"]}`,
+			want: with(func(c *config) {
+				c.APIs = set.Of(rpc.APINet)
+			}),
+		},
+		{
+			name:    "apis_unknown_name",
+			json:    `{"apis":["bogus"]}`,
+			wantErr: testerr.Is(rpc.ErrUnknownAPI),
 		},
 	}
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			config, err := parseConfig(snowtest.Context(t, ids.GenerateTestID()), []byte(test.config))
-			require.NoError(t, err, "parseConfig(..., %q)", test.config)
-
-			rpcConfig := config.saeConfig(nil).RPCConfig
-			require.Equal(t, test.wantDuration, rpcConfig.CallTimeout, "parseConfig(..., %q)", test.config)
-			require.Equal(t, test.wantBatchLimit, rpcConfig.BatchRequestLimit, "parseConfig(..., %q)", test.config)
-			require.Equal(t, test.wantResolveLast, rpcConfig.ResolvePendingToLastExecuted, "parseConfig(..., %q)", test.config)
+			got, err := parseConfig(snowCtx, []byte(test.json))
+			if diff := testerr.Diff(err, test.wantErr); diff != "" {
+				t.Fatalf("parseConfig(...) error (-want +got)\n%s", diff)
+			}
+			require.Equal(t, test.want, got, "parseConfig(...)")
 		})
 	}
-}
-
-func TestDefaultConfig_Resources(t *testing.T) {
-	config := defaultConfig(t.TempDir()).saeConfig(nil)
-	require.Equal(t, uint64(1000), config.RPCConfig.BatchRequestLimit, "defaultConfig(...).saeConfig(nil)")
-	require.True(t, config.RPCConfig.ResolvePendingToLastExecuted, "defaultConfig(...).saeConfig(nil)")
-	require.Equal(t, uint64(saedb.DefaultTrieCacheSizeMiB), config.DBConfig.TrieCacheMiB, "defaultConfig(...).saeConfig(nil)")
-	require.Equal(t, uint64(saedb.DefaultSnapshotCacheSizeMiB), config.DBConfig.SnapshotCacheMiB, "defaultConfig(...).saeConfig(nil)")
 }

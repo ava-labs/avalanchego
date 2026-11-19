@@ -165,7 +165,7 @@ func newL1SUT(t *testing.T, opts ...l1SUTOption) *l1SUT {
 	}
 	chainConfig.UseStandaloneDatabase = cfg.databasePath != ""
 	chainConfig.DatabasePath = cfg.databasePath
-	configBytes := mustMarshalJSON(t, &chainConfig)
+	configBytes := marshalJSON(t, &chainConfig)
 
 	sut := &l1SUT{
 		ctx: ctx,
@@ -725,7 +725,7 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 		withNumAccounts(2),
 		withNow(now),
 		withUpgradeConfig(func(_ []common.Address) []byte {
-			return mustMarshalJSON(t, &extras.UpgradeConfig{
+			return marshalJSON(t, &extras.UpgradeConfig{
 				StateUpgrades: []stateupgrade.Block{
 					{
 						Timestamp: &activationTS,
@@ -770,7 +770,7 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 	require.Equal(t, storageValue.Bytes(), postStorage, "storage slot must reflect the StateUpgrade")
 }
 
-func mustMarshalJSON(t *testing.T, v interface{}) []byte {
+func marshalJSON(t *testing.T, v interface{}) []byte {
 	t.Helper()
 
 	bytes, err := json.Marshal(v)
@@ -789,7 +789,7 @@ func newSnowCtx(t *testing.T, upgrades upgrade.Config) *snow.Context {
 func TestRestartRejectsActivatedNetworkUpgradeChange(t *testing.T) {
 	initialIgloo := uint64(upgrade.InitiallyActiveTime.Unix() + 2) // #nosec G115 -- known positive test timestamp
 	upgradeBytes := func(timestamp uint64) []byte {
-		return mustMarshalJSON(t, extras.UpgradeConfig{
+		return marshalJSON(t, extras.UpgradeConfig{
 			NetworkUpgradeOverrides: &extras.NetworkUpgrades{
 				IglooTimestamp: new(timestamp),
 			},

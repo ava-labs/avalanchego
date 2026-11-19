@@ -90,7 +90,7 @@ func TestParseConfigDeprecated(t *testing.T) {
 		},
 		{
 			name: "database_config_file",
-			json: `{"database-config-file":` + string(mustMarshalJSON(t, dbConfigFile)) + `}`,
+			json: `{"database-config-file":` + string(marshalJSON(t, dbConfigFile)) + `}`,
 			want: withDBConfig,
 		},
 		{

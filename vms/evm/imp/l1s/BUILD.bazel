@@ -111,6 +111,7 @@ go_test(
     embed = [":l1s"],
     deps = [
         "//database",
+        "//database/leveldb",
         "//database/memdb",
         "//graft/evm/acp226",
         "//graft/evm/customrawdb",
@@ -171,7 +172,6 @@ go_test(
         "//vms/evm/params",
         "//vms/evm/sae",
         "//vms/evm/sae/rpc",
-        "//vms/evm/saedb",
         "//vms/evm/saetest",
         "//vms/evm/txgossip/txgossiptest",
         "//vms/evm/types",
