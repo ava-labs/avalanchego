@@ -8,6 +8,7 @@ together:
 | Main | `github.com/ava-labs/avalanchego` |
 | Coreth | `github.com/ava-labs/avalanchego/graft/coreth` |
 | EVM | `github.com/ava-labs/avalanchego/graft/evm` |
+| Simplex | `github.com/ava-labs/avalanchego/graft/simplex` |
 | Subnet-EVM | `github.com/ava-labs/avalanchego/graft/subnet-evm` |
 
 For the rationale behind this document, see [Multi-Module Release
@@ -28,6 +29,7 @@ $ go list -m all | grep avalanchego
 github.com/ava-labs/avalanchego v1.15.0
 github.com/ava-labs/avalanchego/graft/coreth v1.15.0
 github.com/ava-labs/avalanchego/graft/evm v1.15.0
+github.com/ava-labs/avalanchego/graft/simplex v1.15.0
 github.com/ava-labs/avalanchego/graft/subnet-evm v1.15.0
 ```
 
@@ -56,6 +58,7 @@ replace (
     github.com/ava-labs/avalanchego => /path/to/avalanchego
     github.com/ava-labs/avalanchego/graft/coreth => /path/to/avalanchego/graft/coreth
     github.com/ava-labs/avalanchego/graft/evm => /path/to/avalanchego/graft/evm
+    github.com/ava-labs/avalanchego/graft/simplex => /path/to/avalanchego/graft/simplex
     github.com/ava-labs/avalanchego/graft/subnet-evm => /path/to/avalanchego/graft/subnet-evm
 )
 ```

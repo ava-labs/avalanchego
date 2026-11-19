@@ -11,7 +11,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -209,13 +208,14 @@ func (a *SignatureAggregator) Aggregate(signatures []common.Signature) (common.Q
 
 // AboveByzantineThreshold is not implemented yet.
 func (*SignatureAggregator) AboveByzantineThreshold([]common.NodeID) bool {
-	panic("AboveByzantineThreshold is not implemented")
+	// TODO(yacovm): https://github.com/ava-labs/avalanchego/issues/6335
+	return false
 }
 
 // AppendSignatures appends signatures to an existing signature.
 // If the existing signature is empty, it just aggregates the given signatures.
 func (*SignatureAggregator) AppendSignatures(common.SignatureBytes, ...common.SignatureBytes) (common.SignatureBytes, error) {
-	// TODO: implement
+	// TODO(yacovm): https://github.com/ava-labs/avalanchego/issues/6335
 	return nil, nil
 }
 

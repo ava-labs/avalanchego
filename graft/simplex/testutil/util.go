@@ -15,6 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// DefaultTimeout is how long tests wait for an expected event before failing.
+// It is generous so that tests do not flake on slow or loaded machines, such as CI runners with the race detector.
+const DefaultTimeout = 30 * time.Second
+
 // DefaultTestNodeEpochConfig returns a default epoch config for a given node.
 func DefaultTestNodeEpochConfig(t *testing.T, nodeID common.NodeID, comm common.Communication, bb common.BlockBuilder) (simplex.EpochConfig, *TestWAL, *InMemStorage) {
 	l := MakeLogger(t, int(nodeID[0]))
