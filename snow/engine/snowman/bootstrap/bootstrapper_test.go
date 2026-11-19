@@ -435,6 +435,61 @@ func TestBootstrapperAncestors(t *testing.T) {
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
+// executingRecorder is a [snow.Acceptor] that records the value of
+// [snow.ConsensusContext.Executing] each time a block is accepted.
+type executingRecorder struct {
+	observed []bool
+}
+
+func (e *executingRecorder) Accept(ctx *snow.ConsensusContext, _ ids.ID, _ []byte) error {
+	e.observed = append(e.observed, ctx.Executing.Get())
+	return nil
+}
+
+// TestBootstrapperMarksChainAsExecuting tests that the chain is marked
+// as executing while the bootstrapper executes the fetched blocks.
+func TestBootstrapperMarksChainAsExecuting(t *testing.T) {
+	require := require.New(t)
+
+	config, peerID, sender, vm, _ := newConfig(t)
+
+	recorder := &executingRecorder{}
+	config.Ctx.BlockAcceptor = recorder
+
+	blks := snowmantest.BuildChain(4)
+	initializeVMWithBlockchain(vm, blks)
+
+	bs, err := New(
+		config,
+		func(context.Context, uint32) error {
+			config.Ctx.State.Set(snow.EngineState{
+				Type:  p2ppb.EngineType_ENGINE_TYPE_CHAIN,
+				State: snow.NormalOp,
+			})
+			return nil
+		},
+	)
+	require.NoError(err)
+	bs.TimeoutRegistrar = &enginetest.Timer{}
+
+	require.NoError(bs.Start(t.Context(), 0))
+
+	var requestID uint32
+	sender.SendGetAncestorsF = func(_ context.Context, _ ids.NodeID, reqID uint32, _ ids.ID) {
+		requestID = reqID
+	}
+
+	require.NoError(bs.startSyncing(t.Context(), blocksToIDs(blks[3:4])))
+	require.False(config.Ctx.Executing.Get())
+
+	require.NoError(bs.Ancestors(t.Context(), peerID, requestID, blocksToBytes(blks)))
+	snowmantest.RequireStatusIs(require, snowtest.Accepted, blks...)
+
+	// The genesis block was already accepted, so only the remaining blocks are executed.
+	require.Equal([]bool{true, true, true}, recorder.observed)
+	require.False(config.Ctx.Executing.Get())
+}
+
 func TestBootstrapperFinalized(t *testing.T) {
 	require := require.New(t)
 
