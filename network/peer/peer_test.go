@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -194,17 +195,17 @@ func TestReady(t *testing.T) {
 	require.NoError(peer1.AwaitClosed(t.Context()))
 }
 
-// stallingInboundMsgThrottler delays the first call to Acquire by [stall],
+// blockingInboundMsgThrottler delays the first call to Acquire by [stall],
 // emulating an exhausted inbound message throttler. All later calls return
 // immediately.
-type stallingInboundMsgThrottler struct {
+type blockingInboundMsgThrottler struct {
 	throttling.InboundMsgThrottler
 
 	stall time.Duration
 	once  sync.Once
 }
 
-func (s *stallingInboundMsgThrottler) Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID) throttling.ReleaseFunc {
+func (s *blockingInboundMsgThrottler) Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID) throttling.ReleaseFunc {
 	s.once.Do(func() {
 		select {
 		case <-time.After(s.stall):
@@ -223,39 +224,41 @@ func (s *stallingInboundMsgThrottler) Acquire(ctx context.Context, msgSize uint6
 // blocked in the throttler is therefore counted as
 // clock skew, and a well-behaved peer is disconnected.
 func TestHandshakeDelayedByInboundThrottler(t *testing.T) {
-	require := require.New(t)
+	synctest.Test(t, func(t *testing.T) {
+		require := require.New(t)
 
-	const (
-		maxClockDifference = time.Second
-		// Unix timestamps are truncated to seconds, so the stall must exceed
-		// [maxClockDifference] by more than a second to be reliably observed.
-		stall = 3 * time.Second
-	)
+		const (
+			maxClockDifference = time.Second
+			// Unix timestamps are truncated to seconds, so the stall must exceed
+			// [maxClockDifference] by more than a second to be reliably observed.
+			stall = 3 * time.Second
+		)
 
-	config0 := newConfig(t)
-	config0.MaxClockDifference = maxClockDifference
-	config0.InboundMsgThrottler = &stallingInboundMsgThrottler{
-		InboundMsgThrottler: throttling.NewNoInboundThrottler(),
-		stall:               stall,
-	}
-	config1 := newConfig(t)
+		config0 := newConfig(t)
+		config0.MaxClockDifference = maxClockDifference
+		config0.InboundMsgThrottler = &blockingInboundMsgThrottler{
+			InboundMsgThrottler: throttling.NewNoInboundThrottler(),
+			stall:               stall,
+		}
+		config1 := newConfig(t)
 
-	rawPeer0 := newRawTestPeer(t, config0)
-	rawPeer1 := newRawTestPeer(t, config1)
+		rawPeer0 := newRawTestPeer(t, config0)
+		rawPeer1 := newRawTestPeer(t, config1)
 
-	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+		peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
 
-	// Both peers read the same system clock, so there is no real clock skew
-	// and the handshake should succeed despite the throttler delay.
-	require.NoError(
-		peer0.AwaitReady(t.Context()),
-		"peer0 rejected a handshake that was only delayed by its own inbound throttler",
-	)
-	require.NoError(peer1.AwaitReady(t.Context()))
+		// Both peers read the same clock, so there is no real clock skew and
+		// the handshake should succeed despite the throttler delay.
+		require.NoError(
+			peer0.AwaitReady(t.Context()),
+			"peer0 rejected a handshake that was only delayed by its own inbound throttler",
+		)
+		require.NoError(peer1.AwaitReady(t.Context()))
 
-	peer0.StartClose()
-	require.NoError(peer0.AwaitClosed(t.Context()))
-	require.NoError(peer1.AwaitClosed(t.Context()))
+		peer0.StartClose()
+		require.NoError(peer0.AwaitClosed(t.Context()))
+		require.NoError(peer1.AwaitClosed(t.Context()))
+	})
 }
 
 func TestSend(t *testing.T) {
