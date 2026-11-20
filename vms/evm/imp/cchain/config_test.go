@@ -8,7 +8,6 @@ import (
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -82,17 +81,11 @@ func TestParseConfig(t *testing.T) {
 			name: "all_active_fields",
 			json: `{
 				"min-price-target":500,
-				"gas-target":1500,
-				"min-delay-target":3000,
-				"state-sync-enabled":false,
-				"warp-off-chain-messages":["0x1234"]
+				"gas-target":1500
 			}`,
 			want: with(func(c *config) {
 				c.PriceTarget = new(gas.Price(500))
 				c.GasTarget = new(gas.Gas(1500))
-				c.MinDelayTarget = new(uint64(3000))
-				c.StateSyncEnabled = false
-				c.WarpOffChainMessages = []hexutil.Bytes{{0x12, 0x34}}
 			}),
 		},
 	}
@@ -166,26 +159,27 @@ func TestConfigResolvePendingToLastExecuted(t *testing.T) {
 	// functionality is performed in the SAE code.
 
 	tests := []struct {
-		name    string
-		opt     func(*sutConfig)
-		wantErr testerr.Want
+		name         string
+		opt          func(*sutConfig)
+		wantResolved bool
 	}{
 		{
-			name: "default_config",
-			opt:  func(*sutConfig) {},
+			name:         "default_config",
+			opt:          func(*sutConfig) {},
+			wantResolved: true,
 		},
 		{
 			name: "explicitly_enable_mapping",
 			opt: func(c *sutConfig) {
 				c.vmConfig.ResolvePendingToLastExecuted = true
 			},
+			wantResolved: true,
 		},
 		{
 			name: "explicitly_disable_mapping",
 			opt: func(c *sutConfig) {
 				c.vmConfig.ResolvePendingToLastExecuted = false
 			},
-			wantErr: testerr.Contains("pending"),
 		},
 	}
 
@@ -202,12 +196,11 @@ func TestConfigResolvePendingToLastExecuted(t *testing.T) {
 			)
 
 			got, err := sut.EthClient().PendingCodeAt(ctx, addr)
-			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
-				t.Fatalf("%T.PendingCodeAt(%v): %s", sut.EthClient(), addr, diff)
-			}
-			if tt.wantErr != nil {
+			if !tt.wantResolved {
+				require.ErrorContainsf(t, err, "pending", "%T.PendingCodeAt(%v)", sut.EthClient(), addr)
 				return
 			}
+			require.NoErrorf(t, err, "%T.PendingCodeAt(%v)", sut.EthClient(), addr)
 			assert.Equalf(t, code, got, "%T.PendingCodeAt(%v)", sut.EthClient(), addr)
 		})
 	}

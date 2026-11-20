@@ -17,7 +17,8 @@ Default values are overridden only if specified in the given config file. It is 
   "commit-interval": 4096,
   "local-txs-enabled": false,
   "tx-pool-account-slots": 16,
-  "tx-pool-global-slots": 5120
+  "tx-pool-global-slots": 5120,
+  "warp-off-chain-messages": []
 }
 ```
 
@@ -27,7 +28,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 ## Shared Options
 
-L1s accept the options shared with the C-Chain, described in the [shared configuration](../vmconfig/config.md):
+L1s also accept the options shared with the C-Chain, described in the [shared configuration](../vmconfig/config.md):
 
 - [Block Building](../vmconfig/config.md#block-building)
 - [State and Trie](../vmconfig/config.md#state-and-trie)
@@ -39,7 +40,7 @@ L1s accept the options shared with the C-Chain, described in the [shared configu
 ### Deprecated: `eth-apis`
 
 `eth-apis`, Subnet-EVM's API allowlist, is deprecated and **WILL BE REMOVED in
-the next release**; migrate to `apis`. Until then, the node maps each
+v1.16.2**; migrate to `apis`. Until then, the node maps each
 `eth-apis` name onto the `apis` values that serve the same methods and logs the
 resulting `apis` value to copy into the config. Names whose methods no longer
 exist (e.g. `admin`, `internal-personal`) are ignored with a warning, and an

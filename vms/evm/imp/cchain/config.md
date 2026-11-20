@@ -26,8 +26,6 @@ Default values are overridden only if specified in the given config file. It is 
 
 Configuration is provided as a JSON object. All fields are optional unless otherwise specified.
 
-Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no longer exists — are ignored, and the node logs a warning naming them.
-
 ## Shared Options
 
 The C-Chain also accepts the options shared with L1s, described in the [shared configuration](../vmconfig/config.md):

@@ -58,14 +58,14 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("parsing user config: %w", err)
 	}
-	snowCtx.Log.Info("initializing L1",
-		zap.Reflect("config", userConfig),
-	)
-
 	genesis, err := parseGenesis(snowCtx, genesisBytes, upgradeBytes)
 	if err != nil {
 		return fmt.Errorf("parsing genesis: %w", err)
 	}
+	snowCtx.Log.Info("initializing L1",
+		zap.Stringer("chainID", genesis.Config.ChainID),
+		zap.Reflect("config", userConfig),
+	)
 
 	// When run as a plugin, the rpcchainvm wraps the provided database, so
 	// [prefixdb.New] and [prefixdb.NewNested] are equivalent. Using

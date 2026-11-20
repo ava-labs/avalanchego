@@ -80,6 +80,8 @@ type Config struct {
 	TxPoolAccountSlots uint64 `json:"tx-pool-account-slots"`
 	TxPoolGlobalSlots  uint64 `json:"tx-pool-global-slots"`
 
+	// APIs
+
 	// APIs is the exhaustive set of JSON-RPC APIs this node serves. Methods of
 	// any other API return "method not found".
 	APIs                set.Set[rpc.API] `json:"apis"`
@@ -134,11 +136,16 @@ func Default() Config {
 	}
 }
 
+// A config is a VM's config, which embeds [Config].
+type config interface {
+	verify() error
+}
+
 // Parse parses b as a JSON-encoded T into c, which SHOULD hold T's defaults,
-// and returns the top-level keys of b. This should be preferred over
-// [json.Unmarshal] because it warns about, and ignores, keys that don't
-// unmarshal into a field of T.
-func Parse[T any](log logging.Logger, b []byte, c *T) (map[string]json.RawMessage, error) {
+// verifies the embedded [Config], and returns the top-level keys of b. This
+// should be preferred over [json.Unmarshal] because it warns about, and
+// ignores, keys that don't unmarshal into a field of T.
+func Parse[T config](log logging.Logger, b []byte, c *T) (map[string]json.RawMessage, error) {
 	if len(b) == 0 {
 		return nil, nil
 	}
@@ -164,6 +171,9 @@ func Parse[T any](log logging.Logger, b []byte, c *T) (map[string]json.RawMessag
 			zap.Strings("options", unrecognized),
 		)
 	}
+	if err := (*c).verify(); err != nil {
+		return nil, err
+	}
 	return keys, nil
 }
 
@@ -186,8 +196,8 @@ func jsonKeys[T any]() set.Set[string] {
 	return keys
 }
 
-// Verify returns an error if c is invalid.
-func (c Config) Verify() error {
+// verify returns an error if c is invalid.
+func (c Config) verify() error {
 	saeCfg := c.SAEConfig(nil)
 	if err := saeCfg.RPCConfig.Verify(); err != nil {
 		return err

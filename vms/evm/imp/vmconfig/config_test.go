@@ -50,9 +50,6 @@ func TestParse(t *testing.T) {
 		if _, err := Parse(log, b, &c); err != nil {
 			return testConfig{}, err
 		}
-		if err := c.Verify(); err != nil {
-			return testConfig{}, err
-		}
 		return c, nil
 	}
 	nodeID := ids.GenerateTestNodeID()
@@ -193,11 +190,6 @@ func TestParse(t *testing.T) {
 			wantErr: testerr.Contains("invalid duration"),
 		},
 		{
-			name: "api/enable_map_pending_to_last_executed",
-			json: `{"api-resolve-pending-to-last-executed":true}`,
-			want: with(func(c *testConfig) { c.ResolvePendingToLastExecuted = true }),
-		},
-		{
 			name: "api/disable_map_pending_to_last_executed",
 			json: `{"api-resolve-pending-to-last-executed":false}`,
 			want: with(func(c *testConfig) { c.ResolvePendingToLastExecuted = false }),
@@ -269,7 +261,7 @@ func TestParse(t *testing.T) {
 				"api-max-blocks-per-request":2000,
 				"batch-request-limit":50,
 				"api-max-duration":"30s",
-				"api-resolve-pending-to-last-executed":true,
+				"api-resolve-pending-to-last-executed":false,
 				"state-sync-enabled":true,
 				"warp-off-chain-messages":["0x1234"],
 				"state-sync-ids":["` + nodeID.String() + `"],
@@ -291,7 +283,7 @@ func TestParse(t *testing.T) {
 				MaxBlocksPerRequest:          2000,
 				BatchRequestLimit:            50,
 				APIMaxDuration:               duration{30 * time.Second},
-				ResolvePendingToLastExecuted: true,
+				ResolvePendingToLastExecuted: false,
 				StateSyncEnabled:             true,
 				WarpOffChainMessages:         []hexutil.Bytes{{0x12, 0x34}},
 				internalConfig: internalConfig{

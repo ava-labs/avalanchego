@@ -7,11 +7,11 @@ package l1s
 import (
 	"testing"
 
-	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfigResolvePendingToLastExecuted(t *testing.T) {
@@ -19,26 +19,27 @@ func TestConfigResolvePendingToLastExecuted(t *testing.T) {
 	// functionality is performed in the SAE code.
 
 	tests := []struct {
-		name    string
-		opt     func(*sutConfig)
-		wantErr testerr.Want
+		name         string
+		opt          func(*sutConfig)
+		wantResolved bool
 	}{
 		{
-			name: "default_config",
-			opt:  func(*sutConfig) {},
+			name:         "default_config",
+			opt:          func(*sutConfig) {},
+			wantResolved: true,
 		},
 		{
 			name: "explicitly_enable_mapping",
 			opt: func(c *sutConfig) {
 				c.vmConfig.ResolvePendingToLastExecuted = true
 			},
+			wantResolved: true,
 		},
 		{
 			name: "explicitly_disable_mapping",
 			opt: func(c *sutConfig) {
 				c.vmConfig.ResolvePendingToLastExecuted = false
 			},
-			wantErr: testerr.Contains("pending"),
 		},
 	}
 
@@ -55,12 +56,11 @@ func TestConfigResolvePendingToLastExecuted(t *testing.T) {
 			)
 
 			got, err := sut.EthClient().PendingCodeAt(ctx, addr)
-			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
-				t.Fatalf("%T.PendingCodeAt(%v): %s", sut.EthClient(), addr, diff)
-			}
-			if tt.wantErr != nil {
+			if !tt.wantResolved {
+				require.ErrorContainsf(t, err, "pending", "%T.PendingCodeAt(%v)", sut.EthClient(), addr)
 				return
 			}
+			require.NoErrorf(t, err, "%T.PendingCodeAt(%v)", sut.EthClient(), addr)
 			assert.Equalf(t, code, got, "%T.PendingCodeAt(%v)", sut.EthClient(), addr)
 		})
 	}

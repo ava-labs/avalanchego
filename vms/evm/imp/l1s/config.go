@@ -18,8 +18,6 @@ type config struct {
 	// Needed for allowFeeRecipients. Keeping the camelCase key so existing
 	// configs don't break.
 	// FeeRecipient string `json:"feeRecipient"`
-	// The C-Chain's gas-target and min-price-target are left out until
-	// ACP-224 (#4717) decides whether L1s support them.
 
 	// Database
 	// UseStandaloneDatabase *PBool `json:"use-standalone-database"`
@@ -53,9 +51,6 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 		if err := c.applyDeprecatedAPINames(snowCtx.Log, apisSet); err != nil {
 			return config{}, err
 		}
-	}
-	if err := c.Verify(); err != nil {
-		return config{}, err
 	}
 	return c, nil
 }

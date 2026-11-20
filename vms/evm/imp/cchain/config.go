@@ -50,9 +50,6 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	if _, err := vmconfig.Parse(snowCtx.Log, b, &c); err != nil {
 		return config{}, err
 	}
-	if err := c.Verify(); err != nil {
-		return config{}, err
-	}
 	ci := c.CommitInterval
 	if constants.ProductionNetworkIDs.Contains(snowCtx.NetworkID) &&
 		c.StateScheme != firewood.Scheme &&
