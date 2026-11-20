@@ -107,6 +107,7 @@ type (
 		db               database.Database
 		chainDataDir     string
 		currentValidator *validators.GetCurrentValidatorOutput
+		state            snow.State
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -224,7 +225,37 @@ func withCurrentValidator(validationID ids.ID, nodeID ids.NodeID, startTime uint
 	})
 }
 
-// newSUT returns a new SUT in [snow.NormalOp]. The returned context is
+// withState sets the consensus state that the SUT starts in, which is
+// [snow.NormalOp] by default.
+func withState(state snow.State) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.state = state
+	})
+}
+
+// withCommitInterval sets the number of blocks between trie commits, which is
+// also the interval between state summaries.
+func withCommitInterval(n uint64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.CommitInterval = n
+	})
+}
+
+// withScheme sets the triedb scheme, which is HashDB by default.
+func withScheme(scheme string) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.StateScheme = scheme
+	})
+}
+
+// withStateSyncEnabled enables state sync, which is disabled by default.
+func withStateSyncEnabled() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.StateSyncEnabled = true
+	})
+}
+
+// newSUT returns a new SUT in [snow.NormalOp], unless [withState] is used. The returned context is
 // cancelled if the VM logs an error.
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
@@ -248,6 +279,7 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT, error) 
 		vmConfig:        defaultConfig(chainDataDir),
 		db:              memdb.New(),
 		chainDataDir:    chainDataDir,
+		state:           snow.NormalOp,
 	}, opts...)
 	vm := &VM{
 		now: cfg.clock.Now,
@@ -299,7 +331,7 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT, error) 
 		Upgrades: upgradeBytes,
 		Config:   configBytes,
 		Sender:   appSender,
-		State:    snow.NormalOp,
+		State:    cfg.state,
 	})
 	if err != nil {
 		return nil, nil, err

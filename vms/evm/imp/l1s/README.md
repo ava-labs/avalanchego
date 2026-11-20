@@ -21,7 +21,6 @@
   - [Header extensions](#header-extensions)
   - [Precompile enforcement](#precompile-enforcement)
 - [Behavior changes at Igloo](#behavior-changes-at-igloo)
-- [Known gaps](#known-gaps)
 - [References](#references)
 
 ## Scope
@@ -245,6 +244,8 @@ Setting both is rejected. Setting neither burns tips.
 
 #### `gasPriceManagerConfig`
 
+The gas price manager is introduced at Igloo, so `blockTimestamp` must not precede it.
+
 `initialGasPriceConfig` sets ACP-224 pricing at activation. The defaults apply when it is omitted, and on chains without the gas price manager.
 
 | Field | Meaning | Default |
@@ -334,11 +335,6 @@ Existing L1s see the following changes when they reach Igloo.
 - **The fee manager is retired.** Configurations at or after Igloo are rejected, or removed when immutable genesis contains them. If the precompile was active, its state is wiped at Igloo. Pricing then comes from ACP-176 and ACP-224. The pre-Igloo fee configuration is still validated so historical blocks verify.
 - **Base fees are burned.** The fee recipient receives only the effective tip, matching Ethereum after London. Previously it received the full effective gas price. This change is intentional.
 - **Operator configuration is smaller.** See [config.md](config.md) for supported options and how deprecated ones are converted.
-
-## Known gaps
-
-- **State sync is unsupported.** Nodes must execute from genesis.
-- **The gas price manager before Igloo is rejected.** Pre-Igloo headers lack the ACP-224 configuration needed to price the first Igloo block. Supporting these chains requires seeding that configuration explicitly at the upgrade.
 
 ## References
 

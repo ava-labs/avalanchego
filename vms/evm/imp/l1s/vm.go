@@ -9,16 +9,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"slices"
 	"sync"
 	"time"
 
 	"github.com/ava-labs/firewood-go/ffi"
+	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
 
 	// TODO(alarso16): Remove the dependency on the global module registration.
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry" // register precompiles
 
+	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/uptimetracker"
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,10 +31,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/metrics"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
+	"github.com/ava-labs/avalanchego/vms/evm/statesync"
 	"github.com/ava-labs/avalanchego/vms/evm/types"
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
@@ -46,11 +51,14 @@ var _ adaptor.ChainVM[*blocks.Block] = (*VM)(nil)
 
 // VM wraps an [sae.VM] with the pieces specific to L1s.
 type VM struct {
-	*sae.VM          // created by [VM.Initialize]
-	*network.Network // created by [VM.Initialize]
+	*sae.VM           // created by [VM.SetState] as bootstrapping or normal op
+	*network.Network  // created by [VM.Initialize]
+	*stateSyncHandler // created by [VM.Initialize]
 
-	// now is the clock provided to the [sae.VM] and the uptime tracker.
-	now func() time.Time
+	// now is the clock provided to the [sae.VM], the uptime tracker, and the
+	// block-building pacer.
+	now   func() time.Time
+	pacer *blockdelay.Pacer // created by [VM.SetState] as bootstrapping or normal op
 
 	uptime *uptimetracker.UptimeTracker
 	// startUptimeSync starts periodically syncing [VM.uptime] with the
@@ -59,7 +67,12 @@ type VM struct {
 	startUptimeSync     func(context.Context) error
 	startUptimeSyncOnce sync.Once
 
-	lastWaitForEvent utils.Atomic[time.Time]
+	mode utils.Atomic[snow.State]
+	// finishInitialize creates [VM.VM] and everything that depends on it. It
+	// MUST be called at most once, guaranteed using [VM.finishInitializeOnce].
+	finishInitialize     func(context.Context) error
+	finishInitializeOnce sync.Once
+	handlers             *api.MutableHTTPHandlers
 
 	closeMu sync.Mutex
 	onClose []func(context.Context) error // called in reverse order on shutdown
@@ -123,12 +136,6 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("writing genesis block: %w", err)
 	}
 
-	saeConfig := userConfig.saeConfig(vm.now)
-	tdbConfig := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
-	if err := genesis.setupTrieDB(ethDB, tdbConfig); err != nil {
-		return fmt.Errorf("setting up genesis trie: %w", err)
-	}
-
 	warpMessages, err := userConfig.WarpMessages()
 	if err != nil {
 		return err
@@ -144,7 +151,8 @@ func (vm *VM) Initialize(
 	}
 
 	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
-	hooks := newHooks(
+	saeConfig := userConfig.saeConfig(vm.now)
+	hooks := hookadaptor.Convert(newHooks(
 		snowCtx,
 		genesis.Config,
 		saeConfig.Now,
@@ -152,7 +160,7 @@ func (vm *VM) Initialize(
 		warpStorage,
 		userConfig.FeeRecipient,
 		chainMetrics,
-	)
+	))
 
 	vm.Network, err = network.New(snowCtx, appSender, userConfig.NetworkOptions()...)
 	if err != nil {
@@ -163,13 +171,17 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("registering firewood metrics: %w", err)
 	}
 
-	// TODO: Support state sync, which requires the [sae.VM] to be created
-	// after the node has finished state syncing.
-	vm.VM, err = sae.NewVM(ctx, hookadaptor.Convert(hooks), saeConfig, snowCtx, genesis.Config, ethDB, vm.Network)
+	vm.stateSyncHandler, err = newStateSyncHandler(
+		userConfig.sae().StateSyncConfig(snowCtx.NetworkID),
+		ethDB,
+		snowCtx,
+		vm.Network,
+		hooks,
+	)
 	if err != nil {
-		return fmt.Errorf("creating SAE VM: %w", err)
+		return fmt.Errorf("creating state sync handler: %w", err)
 	}
-	vm.onClose = append(vm.onClose, vm.VM.Shutdown)
+	vm.onClose = append(vm.onClose, vm.stateSyncHandler.Shutdown)
 
 	vm.uptime, err = uptimetracker.New(snowCtx.ValidatorState, snowCtx.SubnetID, prefixdb.New(validatorsDBPrefix, avaDB), unixClock(vm.now))
 	if err != nil {
@@ -215,15 +227,62 @@ func (vm *VM) Initialize(
 		return nil
 	}
 
-	warpVerifier := l1warp.NewVerifier(vm.VM, warpStorage, vm.uptime)
-	if err := saewarp.RegisterHandler(vm.Network, warpVerifier, snowCtx.WarpSigner); err != nil {
-		return fmt.Errorf("registering warp signature handler: %w", err)
-	}
+	vm.handlers = api.NewMutableHTTPHandlers(sae.HandlerPaths...)
 
-	if userConfig.APIs.Contains(validatorAPI) {
-		if err := vm.VM.RPCServer().RegisterName(validatorNamespace, l1api.NewValidator(vm.uptime)); err != nil {
-			return fmt.Errorf("registering %q RPC namespace: %w", validatorNamespace, err)
+	// The [sae.VM] MUST NOT be created until any state sync has finished, as it
+	// opens the state that the sync writes.
+	vm.finishInitialize = func(ctx context.Context) error {
+		vm.closeMu.Lock()
+		defer vm.closeMu.Unlock()
+		if vm.closed {
+			return errAlreadyClosed
 		}
+
+		tdbConfig := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
+		if err := genesis.setupTrieDB(ethDB, tdbConfig); err != nil {
+			return fmt.Errorf("setting up genesis trie: %w", err)
+		}
+
+		// Uses of [sae.VM] are NOT protected by [VM.closeMu]. However,
+		// [VM.activeHandler] ensures that they only occur after [VM.SetState]
+		// has called this function without error.
+		var err error
+		vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, genesis.Config, ethDB, vm.Network)
+		if err != nil {
+			return fmt.Errorf("creating SAE VM: %w", err)
+		}
+		vm.onClose = append(vm.onClose, vm.VM.Shutdown)
+		vm.pacer = blockdelay.NewPacer(vm.now, vm.VM)
+
+		warpVerifier := l1warp.NewVerifier(vm.VM, warpStorage, vm.uptime)
+		if err := saewarp.RegisterHandler(vm.Network, warpVerifier, snowCtx.WarpSigner); err != nil {
+			return fmt.Errorf("registering warp signature handler: %w", err)
+		}
+
+		if userConfig.APIs.Contains(validatorAPI) {
+			if err := vm.VM.RPCServer().RegisterName(validatorNamespace, l1api.NewValidator(vm.uptime)); err != nil {
+				return fmt.Errorf("registering %q RPC namespace: %w", validatorNamespace, err)
+			}
+		}
+		handlers, err := vm.VM.CreateHandlers(ctx)
+		if err != nil {
+			return fmt.Errorf("creating SAE handlers: %w", err)
+		}
+		vm.handlers.Set(handlers)
+
+		tdb, snaps := vm.VM.EVMState()
+		// Firewood can only be opened once. HashDB is reopened so that serving
+		// peers doesn't pollute the execution cache.
+		if saeConfig.DBConfig.Scheme != firewood.Scheme {
+			tdb = triedb.NewDatabase(ethDB, tdbConfig)
+			vm.onClose = append(vm.onClose, func(context.Context) error {
+				return tdb.Close()
+			})
+		}
+		if err := statesync.RegisterHandlers(snowCtx.Log, vm.Network.Network, ethDB, tdb, snaps, reg); err != nil {
+			return fmt.Errorf("registering state sync server: %w", err)
+		}
+		return nil
 	}
 
 	snowCtx.Log.Info("initialized L1 VM")
@@ -264,12 +323,36 @@ func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	return vm.Network.Disconnected(ctx, nodeID)
 }
 
-// SetState forwards to [sae.VM.SetState] and, on the first transition to
-// [snow.NormalOp], starts syncing the uptime tracker with the validator set.
+// CreateHandlers returns the HTTP handlers of the [sae.VM]. They are
+// unusable until the VM is bootstrapping.
+func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
+	return vm.handlers.AsInterface(), nil
+}
+
+// SetState sets the state of the VM. On the first transition to
+// [snow.Bootstrapping] or later, it creates the [sae.VM], failing if a state
+// sync failed. On the first transition to [snow.NormalOp], it starts syncing
+// the uptime tracker with the validator set. Any error returned is fatal.
 func (vm *VM) SetState(ctx context.Context, state snow.State) error {
-	if err := vm.VM.SetState(ctx, state); err != nil {
-		return err
+	if state >= snow.Bootstrapping {
+		var err error
+		vm.finishInitializeOnce.Do(func() {
+			if err = vm.stateSyncHandler.SyncError(); err != nil {
+				err = fmt.Errorf("state sync: %w", err)
+				return
+			}
+			err = vm.finishInitialize(ctx)
+		})
+		if err != nil {
+			return err
+		}
+		if err := vm.VM.SetState(ctx, state); err != nil {
+			return fmt.Errorf("setting SAE VM state: %w", err)
+		}
 	}
+
+	// MUST happen after [VM.VM] is set, which [VM.activeHandler] relies on.
+	vm.mode.Set(state)
 	if state != snow.NormalOp {
 		return nil
 	}
@@ -280,43 +363,68 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	return err
 }
 
-// minWaitForEventDelay is the minimum spacing between consecutive
-// [VM.WaitForEvent] returns, preventing busy looping when the chain is more
-// advanced than the mempool.
-const minWaitForEventDelay = 100 * time.Millisecond
+var (
+	_ stateDependent = (*sae.VM)(nil)
+	_ stateDependent = (*stateSyncHandler)(nil)
+)
 
-// WaitForEvent waits until both the ACP-226 minimum block delay since the
-// preferred block and the busy-loop throttle have elapsed, then waits for
-// the SAE VM to produce an event.
-func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
-	until := vm.lastWaitForEvent.Get().Add(minWaitForEventDelay)
-	if buildTime := earliestBlockTime(vm.VM.GetPreference().Header()); buildTime.After(until) {
-		until = buildTime
-	}
-	if err := vm.waitUntil(ctx, until); err != nil {
-		return 0, err
-	}
-
-	msg, err := vm.VM.WaitForEvent(ctx)
-	if err == nil {
-		vm.lastWaitForEvent.Set(vm.now())
-	}
-	return msg, err
+// stateDependent methods are served by the [stateSyncHandler] until the
+// [sae.VM] exists.
+type stateDependent interface {
+	HealthCheck(context.Context) (any, error)
+	ParseBlock(context.Context, []byte) (*blocks.Block, error)
+	GetBlock(context.Context, ids.ID) (*blocks.Block, error)
+	GetBlockIDAtHeight(context.Context, uint64) (ids.ID, error)
+	LastAccepted(context.Context) (ids.ID, error)
 }
 
-// waitUntil blocks until the VM clock reaches t, returning early with the
-// cancellation cause if ctx is canceled first.
-func (vm *VM) waitUntil(ctx context.Context, t time.Time) error {
-	timeToWait := t.Sub(vm.now())
-	if timeToWait <= 0 {
-		return nil
+func (vm *VM) activeHandler() stateDependent {
+	if vm.mode.Get() >= snow.Bootstrapping {
+		return vm.VM
 	}
-	select {
-	case <-ctx.Done():
-		return context.Cause(ctx)
-	case <-time.After(timeToWait):
+	return vm.stateSyncHandler
+}
+
+// HealthCheck returns the current health status of the VM.
+func (vm *VM) HealthCheck(ctx context.Context) (any, error) {
+	return vm.activeHandler().HealthCheck(ctx)
+}
+
+// ParseBlock parses a block from bytes.
+func (vm *VM) ParseBlock(ctx context.Context, blockBytes []byte) (*blocks.Block, error) {
+	return vm.activeHandler().ParseBlock(ctx, blockBytes)
+}
+
+// GetBlock returns the [blocks.Block] with the given ID.
+func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (*blocks.Block, error) {
+	return vm.activeHandler().GetBlock(ctx, id)
+}
+
+// GetBlockIDAtHeight returns the ID of the accepted block at the given height.
+func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+	return vm.activeHandler().GetBlockIDAtHeight(ctx, height)
+}
+
+// LastAccepted returns the ID of the last accepted block.
+func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
+	return vm.activeHandler().LastAccepted(ctx)
+}
+
+// WaitForEvent waits for the next event of the current state. While state
+// syncing, that is the end of the sync. Otherwise, it waits until the ACP-226
+// minimum block delay since the preferred block has elapsed, then waits for
+// the SAE VM to produce an event.
+func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
+	switch vm.mode.Get() {
+	case snow.Initializing:
+		// No event can occur while initializing.
+		<-ctx.Done()
+		return 0, context.Cause(ctx)
+	case snow.StateSyncing:
+		return vm.stateSyncHandler.WaitForEvent(ctx)
 	}
-	return nil
+
+	return vm.pacer.WaitForEvent(ctx, earliestBlockTime(vm.VM.GetPreference().Header()))
 }
 
 // Shutdown releases every resource allocated by [VM.Initialize] in reverse

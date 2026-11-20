@@ -25,6 +25,7 @@ The node ignores unrecognized options and logs a warning naming them. [Deprecate
 ## Differences from the C-Chain
 
 - `gas-target` is ignored while the `gaspricemanager` precompile sets the target.
+- `state-sync-enabled` defaults to `false`.
 - `apis` also accepts `validator`, which serves `validator_uptime` and is enabled by default.
 - `eth_subscribe` is served at `/ext/bc/{blockchainID}/ws`.
 

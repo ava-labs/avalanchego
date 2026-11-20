@@ -25,8 +25,7 @@ import (
 
 // config is the operator-supplied per-chain config for the L1 VM.
 //
-// TODO: Support [saeconfig.Config.StateSyncEnabled] and
-// [saeconfig.Config.PriceTarget], which are accepted but ignored.
+// TODO: Support [saeconfig.Config.PriceTarget], which is accepted but ignored.
 type config struct {
 	saeconfig.Config
 
@@ -61,6 +60,7 @@ func defaultConfig(chainDataDir string) config {
 		DatabasePath:          filepath.Join(chainDataDir, "db"),
 		DatabaseType:          pebbledb.Name,
 	}
+	c.StateSyncEnabled = false
 	c.APIs.Add(validatorAPI)
 	return c
 }
