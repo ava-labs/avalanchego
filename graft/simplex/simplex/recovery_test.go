@@ -786,6 +786,7 @@ func TestWalRecoveryMonitorsProgress(t *testing.T) {
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 
 	protocolMetadata := e.Metadata()
@@ -805,7 +806,7 @@ func TestWalRecoveryMonitorsProgress(t *testing.T) {
 	count := 0
 	ticker := time.NewTicker(100 * time.Millisecond)
 	time := time.Now()
-	bb.BlockShouldBeBuilt <- struct{}{}
+	bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 	for count < 3 {
 		select {
 		case <-ticker.C:

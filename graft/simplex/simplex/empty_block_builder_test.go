@@ -178,6 +178,7 @@ func TestEmptyBlockBuilderWaitForPendingBlockCancelledByShouldBuildEmpty(t *test
 // without waiting for the empty-block timeout.
 func TestEmptyBlockBuilderWaitForPendingBlockReturnsWhenUnderlyingReturns(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
+	bb.CurrentRound = func() uint64 { return 0 }
 
 	ebb := &simplex.EmptyBlockBuilder{
 		// A long timeout ensures the empty-block path is not what unblocks us.
@@ -192,7 +193,7 @@ func TestEmptyBlockBuilderWaitForPendingBlockReturnsWhenUnderlyingReturns(t *tes
 		close(done)
 	}()
 
-	bb.BlockShouldBeBuilt <- struct{}{} // application signals a pending block.
+	bb.TriggerBlockShouldBeBuilt(0) // application signals a pending block.
 
 	select {
 	case <-done:
