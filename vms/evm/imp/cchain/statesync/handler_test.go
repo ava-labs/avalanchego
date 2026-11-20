@@ -123,6 +123,7 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		net,
 		hookStub{},
 		st,
+		nil, // servable
 	)
 	require.NoError(t, err, "New()")
 	t.Cleanup(func() {

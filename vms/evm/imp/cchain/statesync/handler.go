@@ -59,6 +59,7 @@ func New(
 	network *network.Network,
 	hooks hook.Points,
 	state *state.State,
+	servable statesync.ServableFunc,
 ) (*Handler, error) {
 	inner, err := statesync.New(
 		cfg,
@@ -66,6 +67,7 @@ func New(
 		snowCtx,
 		network,
 		hooks,
+		servable,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating SAE statesync handler: %v", err)

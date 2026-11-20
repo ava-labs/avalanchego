@@ -292,6 +292,19 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	return nil
 }
 
+// HasCommitted reports whether root is a committed revision that Firewood can
+// still serve. Firewood loses all but the latest revision when it is closed.
+func (t *TrieDB) HasCommitted(root common.Hash) (bool, error) {
+	revision, err := t.Firewood.Revision(ffi.Hash(root))
+	if errors.Is(err, ffi.ErrRevisionNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, revision.Drop()
+}
+
 // newRevision returns the [ffi.Revision] at root, or a [trie.MissingNodeError]
 // if Firewood has no revision for root.
 func (t *TrieDB) newRevision(root common.Hash) (*ffi.Revision, error) {

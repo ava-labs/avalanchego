@@ -6,6 +6,8 @@ package statesync
 import (
 	"context"
 	"math/big"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -59,12 +61,16 @@ type (
 		db      ethdb.Database
 		sender  *saetest.Sender
 		clock   *saetest.Clock
+		// serving is the triedb that serves state, set once a VM is running.
+		serving atomic.Pointer[triedb.Database]
 	}
 
 	vmSUT struct {
 		*sut
 		vm     *sae.VM
 		wallet *saetest.Wallet
+		// shutdown stops the VM, and is safe to call more than once.
+		shutdown func() error
 	}
 
 	sutConfig struct {
@@ -218,17 +224,7 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 	net, err := network.New(snowCtx, sender)
 	require.NoError(t, err, "network.New()")
 
-	handler, err := New(
-		cfg.syncConfig,
-		ethDB,
-		snowCtx,
-		net,
-		settledOverride{Stub: hooks, height: cfg.lastSynchronous},
-	)
-	require.NoError(t, err, "New()")
-
 	s := &sut{
-		Handler: handler,
 		Network: net,
 		cfg:     cfg,
 		snowCtx: snowCtx,
@@ -239,6 +235,22 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 		sender:  sender,
 		clock:   clock,
 	}
+	// As with a real VM, nothing is servable until the VM is running.
+	s.Handler, err = New(
+		cfg.syncConfig,
+		ethDB,
+		snowCtx,
+		net,
+		settledOverride{Stub: hooks, height: cfg.lastSynchronous},
+		func(root ethcommon.Hash) (bool, error) {
+			tdb := s.serving.Load()
+			if tdb == nil {
+				return false, nil
+			}
+			return CanServe(tdb, root)
+		},
+	)
+	require.NoError(t, err, "New()")
 
 	s.sender.Start(t, s)
 	return s
@@ -333,20 +345,37 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 		Now:           s.clock.Now,
 	}, s.snowCtx, chainConfig, s.db, s.network)
 	require.NoError(t, err, "NewVM()")
+	shutdown := sync.OnceValue(func() error {
+		s.serving.Store(nil)
+		return vm.Shutdown(context.WithoutCancel(ctx))
+	})
 	t.Cleanup(func() {
-		require.NoError(t, vm.Shutdown(context.WithoutCancel(ctx)), "Shutdown()")
+		require.NoError(t, shutdown(), "Shutdown()")
 	})
 	require.NoError(t, vm.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
 	require.NoError(t, vm.SetState(ctx, snow.NormalOp), "SetState(NormalOp)")
 
 	tdb, snaps := vm.EVMState()
 	require.NoError(t, RegisterHandlers(s.snowCtx.Log, s.Network.Network, s.db, tdb, snaps, prometheus.NewRegistry()), "RegisterHandlers")
+	s.serving.Store(tdb)
 
 	return &vmSUT{
-		sut:    s,
-		vm:     vm,
-		wallet: saetest.NewWalletWithKeyChain(s.keys, types.LatestSigner(s.genesis.Config)),
+		sut:      s,
+		vm:       vm,
+		wallet:   saetest.NewWalletWithKeyChain(s.keys, types.LatestSigner(s.genesis.Config)),
+		shutdown: shutdown,
 	}
+}
+
+// restart shuts down the VM and starts a new one on the same disk, continuing
+// from the same time and account nonces so that it can keep accepting blocks.
+func (s *vmSUT) restart(t *testing.T) *vmSUT {
+	t.Helper()
+
+	require.NoError(t, s.shutdown(), "shutdown()")
+	restarted := s.asVM(t, s.clock.Now())
+	restarted.wallet = s.wallet
+	return restarted
 }
 
 // lastAcceptedBlock returns the VM's last accepted block.
