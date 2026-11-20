@@ -29,7 +29,10 @@ import (
 // Config provides all user-configurable information for the [Handler].
 type Config struct {
 	DBConfig saedb.Config
-	Enabled  bool
+	// SummaryInterval is the number of blocks between served summaries.
+	// Defaults to the DBConfig's CommitInterval.
+	SummaryInterval uint64
+	Enabled         bool
 }
 
 // Handler implements provides server-side [Summary] handling and parsing, as
@@ -55,6 +58,9 @@ func New(
 	if err := cfg.DBConfig.Verify(); err != nil {
 		return nil, err
 	}
+	if cfg.SummaryInterval == 0 {
+		cfg.SummaryInterval = cfg.DBConfig.CommitInterval
+	}
 	return &Handler{
 		cfg:         cfg,
 		db:          db,
@@ -73,7 +79,7 @@ func parser(hooks hook.Points) syncblocks.Parser {
 }
 
 // GetLastStateSummary returns the summary of the last accepted block at
-// multiple of [syncCommitInterval] height.
+// multiple of [Config.SummaryInterval] height.
 func (h *Handler) GetLastStateSummary(context.Context) (*Summary, error) {
 	hash, err := h.lastAcceptedHash()
 	if err != nil {
@@ -88,14 +94,14 @@ func (h *Handler) GetLastStateSummary(context.Context) (*Summary, error) {
 		return nil, err
 	}
 
-	height := saedb.LastCommittedTrieDBHeight(*lastHeight, h.cfg.DBConfig.CommitInterval)
+	height := saedb.LastCommittedTrieDBHeight(*lastHeight, h.cfg.SummaryInterval)
 	return h.getSummaryAtHeight(height)
 }
 
 // GetStateSummary returns the summary of the block at the given height, if it
 // is available to be served. Otherwise, [database.ErrNotFound] is returned.
 func (h *Handler) GetStateSummary(_ context.Context, height uint64) (*Summary, error) {
-	if !saedb.ShouldCommitTrieDB(height, h.cfg.DBConfig.CommitInterval) {
+	if !saedb.ShouldCommitTrieDB(height, h.cfg.SummaryInterval) {
 		// can't serve committed state at this height
 		return nil, database.ErrNotFound
 	}

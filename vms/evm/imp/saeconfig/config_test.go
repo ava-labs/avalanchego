@@ -12,6 +12,7 @@ import (
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -398,40 +399,52 @@ func TestVerify(t *testing.T) {
 	}
 }
 
-func TestStateSyncConfigCommitInterval(t *testing.T) {
+func TestStateSyncConfigInterval(t *testing.T) {
 	tests := []struct {
 		name           string
 		networkID      uint32
+		scheme         string
 		commitInterval uint64
-		want           uint64
+		want           uint64 // summary interval
 	}{
 		{
 			name:           "custom_network",
 			networkID:      constants.UnitTestID,
+			scheme:         rawdb.HashScheme,
 			commitInterval: 256,
 			want:           256,
 		},
 		{
 			name:           "mainnet",
 			networkID:      constants.MainnetID,
+			scheme:         rawdb.HashScheme,
 			commitInterval: 256,
 			want:           saedb.DefaultCommitInterval,
 		},
 		{
 			name:           "fuji",
 			networkID:      constants.FujiID,
+			scheme:         rawdb.HashScheme,
 			commitInterval: 256,
+			want:           saedb.DefaultCommitInterval,
+		},
+		{
+			name:           "mainnet_firewood",
+			networkID:      constants.MainnetID,
+			scheme:         firewood.Scheme,
+			commitInterval: 1,
 			want:           saedb.DefaultCommitInterval,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := Default()
-			c.StateScheme = firewood.Scheme
+			c.StateScheme = tt.scheme
 			c.CommitInterval = tt.commitInterval
 
-			got := c.StateSyncConfig(tt.networkID).DBConfig.CommitInterval
-			require.Equal(t, tt.want, got, "%T.StateSyncConfig(%d).DBConfig.CommitInterval", c, tt.networkID)
+			got := c.StateSyncConfig(tt.networkID)
+			require.Equal(t, tt.want, got.SummaryInterval, "%T.StateSyncConfig(%d).SummaryInterval", c, tt.networkID)
+			require.Equal(t, tt.commitInterval, got.DBConfig.CommitInterval, "%T.StateSyncConfig(%d).DBConfig.CommitInterval", c, tt.networkID)
 		})
 	}
 }

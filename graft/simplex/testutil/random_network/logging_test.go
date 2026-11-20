@@ -17,7 +17,7 @@ func TestFileLogging(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Create config with file logging enabled
-	config := DefaultFuzzConfig()
+	config := DefaultFuzzConfig(t)
 	config.LogDirectory = tempDir
 
 	// Create network logger
@@ -69,7 +69,7 @@ func TestLogDirectoryClearing(t *testing.T) {
 	require.FileExists(t, oldLogPath)
 
 	// Create config with file logging enabled
-	config := DefaultFuzzConfig()
+	config := DefaultFuzzConfig(t)
 	config.LogDirectory = tempDir
 
 	// Create network logger - this should clear the directory
@@ -86,7 +86,7 @@ func TestLogDirectoryClearing(t *testing.T) {
 
 func TestConsoleOnlyLogging(t *testing.T) {
 	// Create config with file logging disabled (empty directory)
-	config := DefaultFuzzConfig()
+	config := DefaultFuzzConfig(t)
 	config.LogDirectory = ""
 
 	// Create network logger - should not panic
