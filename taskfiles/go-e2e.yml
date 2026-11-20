@@ -1,0 +1,30 @@
+version: '3'
+
+tasks:
+  build:
+    desc: Builds avalanchego
+    cmd: '{{.NIX_RUN}} ./scripts/build.sh'
+
+  build-race:
+    desc: Builds avalanchego with race detection enabled
+    cmd: '{{.NIX_RUN}} ./scripts/build.sh -r'
+
+  build-xsvm:
+    desc: Builds xsvm plugin
+    cmd: '{{.NIX_RUN}} ./scripts/build_xsvm.sh'
+
+  test-e2e:
+    desc: Runs e2e tests
+    cmds:
+      - task: build
+      - task: build-xsvm
+      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
+
+  test-e2e-race-serial:
+    desc: Runs e2e tests serially with race detection enabled
+    env:
+      E2E_SERIAL: '1'
+    cmds:
+      - task: build-race
+      - task: build-xsvm
+      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
