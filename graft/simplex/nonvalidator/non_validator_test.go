@@ -1861,7 +1861,7 @@ func TestNonValidatorRoutesReplicationRequestsToValidators(t *testing.T) {
 	require.NoError(t, err)
 	forgedFinalization := common.Finalization{
 		Finalization: genuineFinalization.Finalization, // the header matches the block, so it passes the header check
-		QC:           testutil.TestQC{Signatures: []testutil.Signature{{Signer: testutil.NewNodeID(nonExistentNode), Value: []byte("forged")}}},
+		QC:           testutil.TestQC{{Signer: nonExistentNode, Value: []byte("forged")}},
 	}
 	forgedResponse := &common.Message{ReplicationResponse: &common.ReplicationResponse{
 		Data: []common.QuorumRound{{Block: sealingBlock10.(common.Block), Finalization: &forgedFinalization}},

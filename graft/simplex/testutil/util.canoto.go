@@ -19,32 +19,32 @@ const (
 )
 
 const (
-	canotoNumber_NodeID__ShortID = 1
-	canotoNumber_NodeID__LongID  = 2
+	canotoNumber_wireNodeID__ShortID = 1
+	canotoNumber_wireNodeID__LongID  = 2
 
-	canotoTag_NodeID__ShortID = "\x0a" // canoto.Tag(canotoNumber_NodeID__ShortID, canoto.Len)
-	canotoTag_NodeID__LongID  = "\x12" // canoto.Tag(canotoNumber_NodeID__LongID, canoto.Len)
+	canotoTag_wireNodeID__ShortID = "\x0a" // canoto.Tag(canotoNumber_wireNodeID__ShortID, canoto.Len)
+	canotoTag_wireNodeID__LongID  = "\x12" // canoto.Tag(canotoNumber_wireNodeID__LongID, canoto.Len)
 )
 
-type canotoData_NodeID struct {
+type canotoData_wireNodeID struct {
 	size uint64
 }
 
 // DescribeCanoto returns a [canoto.Spec] describing the fields of this
 // message and their wire types.
-func (*NodeID) DescribeCanoto(...reflect.Type) *canoto.Spec {
-	var zero NodeID
+func (*wireNodeID) DescribeCanoto(...reflect.Type) *canoto.Spec {
+	var zero wireNodeID
 	return &canoto.Spec{
-		Name: "NodeID",
+		Name: "wireNodeID",
 		Fields: []canoto.FieldType{
 			{
-				FieldNumber:    canotoNumber_NodeID__ShortID,
+				FieldNumber:    canotoNumber_wireNodeID__ShortID,
 				Name:           "ShortID",
 				OneOf:          "",
 				TypeFixedBytes: uint64(len(zero.ShortID)),
 			},
 			{
-				FieldNumber:    canotoNumber_NodeID__LongID,
+				FieldNumber:    canotoNumber_wireNodeID__LongID,
 				Name:           "LongID",
 				OneOf:          "",
 				TypeFixedBytes: uint64(len(zero.LongID)),
@@ -56,7 +56,7 @@ func (*NodeID) DescribeCanoto(...reflect.Type) *canoto.Spec {
 // UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
 //
 // During parsing, the canoto cache is saved.
-func (c *NodeID) UnmarshalCanoto(bytes []byte) error {
+func (c *wireNodeID) UnmarshalCanoto(bytes []byte) error {
 	r := canoto.Reader{
 		B:               bytes,
 		MemoryRemaining: canoto.DefaultMemoryLimit,
@@ -72,9 +72,9 @@ func (c *NodeID) UnmarshalCanoto(bytes []byte) error {
 // During parsing, the canoto cache is saved.
 //
 // This function enables configuration of reader options.
-func (c *NodeID) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, error) {
+func (c *wireNodeID) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, error) {
 	// Zero the struct before unmarshaling.
-	*c = NodeID{}
+	*c = wireNodeID{}
 	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
 
 	var minField uint32
@@ -88,7 +88,7 @@ func (c *NodeID) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, e
 		}
 
 		switch field {
-		case canotoNumber_NodeID__ShortID:
+		case canotoNumber_wireNodeID__ShortID:
 			if wireType != canoto.Len {
 				return canoto.UnmarshalResult{}, canoto.ErrUnexpectedWireType
 			}
@@ -113,7 +113,7 @@ func (c *NodeID) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, e
 				return canoto.UnmarshalResult{}, canoto.ErrZeroValue
 			}
 			r.B = r.B[expectedLength:]
-		case canotoNumber_NodeID__LongID:
+		case canotoNumber_wireNodeID__LongID:
 			if wireType != canoto.Len {
 				return canoto.UnmarshalResult{}, canoto.ErrUnexpectedWireType
 			}
@@ -149,13 +149,13 @@ func (c *NodeID) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, e
 
 // CacheCanoto populates size and OneOf caches based on the current values in
 // the struct.
-func (c *NodeID) CacheCanoto() {
+func (c *wireNodeID) CacheCanoto() {
 	var size uint64
 	if !canoto.IsZero(&c.ShortID) {
-		size += uint64(len(canotoTag_NodeID__ShortID)) + canoto.SizeBytes((&c.ShortID)[:])
+		size += uint64(len(canotoTag_wireNodeID__ShortID)) + canoto.SizeBytes((&c.ShortID)[:])
 	}
 	if !canoto.IsZero(&c.LongID) {
-		size += uint64(len(canotoTag_NodeID__LongID)) + canoto.SizeBytes((&c.LongID)[:])
+		size += uint64(len(canotoTag_wireNodeID__LongID)) + canoto.SizeBytes((&c.LongID)[:])
 	}
 	canoto.CacheUint64(&c.canotoData.size, size)
 }
@@ -165,26 +165,26 @@ func (c *NodeID) CacheCanoto() {
 //
 // If CacheCanoto has not yet been called, or the struct has been modified
 // since the last call to CacheCanoto, the returned size may be incorrect.
-func (c *NodeID) SizeCanoto() uint64 {
+func (c *wireNodeID) SizeCanoto() uint64 {
 	return atomic.LoadUint64(&c.canotoData.size)
 }
 
 // ValidCanoto validates that the struct can be correctly marshaled into the
 // Canoto format.
-func (c *NodeID) ValidCanoto() bool {
+func (c *wireNodeID) ValidCanoto() bool {
 	return c.CheckCanoto()
 }
 
 // CheckCanoto validates that the struct can be correctly marshaled into the
 // Canoto format. Most users should just use ValidCanoto.
-func (c *NodeID) CheckCanoto() bool {
+func (c *wireNodeID) CheckCanoto() bool {
 	return true
 }
 
 // MarshalCanoto returns the Canoto representation of this struct.
 //
 // It is assumed that this struct is ValidCanoto.
-func (c *NodeID) MarshalCanoto() []byte {
+func (c *wireNodeID) MarshalCanoto() []byte {
 	c.CacheCanoto()
 	w := canoto.Writer{
 		B: make([]byte, 0, c.SizeCanoto()),
@@ -200,27 +200,27 @@ func (c *NodeID) MarshalCanoto() []byte {
 // to this struct.
 //
 // It is assumed that this struct is ValidCanoto.
-func (c *NodeID) AppendCanoto(w canoto.Writer) canoto.Writer {
+func (c *wireNodeID) AppendCanoto(w canoto.Writer) canoto.Writer {
 	if !canoto.IsZero(&c.ShortID) {
-		canoto.Append(&w, canotoTag_NodeID__ShortID)
+		canoto.Append(&w, canotoTag_wireNodeID__ShortID)
 		canoto.AppendBytes(&w, (&c.ShortID)[:])
 	}
 	if !canoto.IsZero(&c.LongID) {
-		canoto.Append(&w, canotoTag_NodeID__LongID)
+		canoto.Append(&w, canotoTag_wireNodeID__LongID)
 		canoto.AppendBytes(&w, (&c.LongID)[:])
 	}
 	return w
 }
 
 const (
-	canotoNumber_Signature__Signer = 1
-	canotoNumber_Signature__Value  = 2
+	canotoNumber_wireSignature__Signer = 1
+	canotoNumber_wireSignature__Value  = 2
 
-	canotoTag_Signature__Signer = "\x0a" // canoto.Tag(canotoNumber_Signature__Signer, canoto.Len)
-	canotoTag_Signature__Value  = "\x12" // canoto.Tag(canotoNumber_Signature__Value, canoto.Len)
+	canotoTag_wireSignature__Signer = "\x0a" // canoto.Tag(canotoNumber_wireSignature__Signer, canoto.Len)
+	canotoTag_wireSignature__Value  = "\x12" // canoto.Tag(canotoNumber_wireSignature__Value, canoto.Len)
 )
 
-type canotoData_Signature struct {
+type canotoData_wireSignature struct {
 	size uint64
 }
 
@@ -228,15 +228,15 @@ type canotoData_Signature struct {
 // message and their wire types.
 //
 // types is used as a stack of ancestor messages to detect recursive specs.
-func (*Signature) DescribeCanoto(types ...reflect.Type) *canoto.Spec {
-	types = append(types, reflect.TypeFor[Signature]())
-	var zero Signature
+func (*wireSignature) DescribeCanoto(types ...reflect.Type) *canoto.Spec {
+	types = append(types, reflect.TypeFor[wireSignature]())
+	var zero wireSignature
 	return &canoto.Spec{
-		Name: "Signature",
+		Name: "wireSignature",
 		Fields: []canoto.FieldType{
 			canoto.FieldTypeFromField(
 				/*type inference:*/ (&zero.Signer),
-				/*FieldNumber:   */ canotoNumber_Signature__Signer,
+				/*FieldNumber:   */ canotoNumber_wireSignature__Signer,
 				/*Name:          */ "Signer",
 				/*FixedLength:   */ 0,
 				/*Repeated:      */ false,
@@ -245,7 +245,7 @@ func (*Signature) DescribeCanoto(types ...reflect.Type) *canoto.Spec {
 				/*types:         */ types,
 			),
 			{
-				FieldNumber: canotoNumber_Signature__Value,
+				FieldNumber: canotoNumber_wireSignature__Value,
 				Name:        "Value",
 				OneOf:       "",
 				TypeBytes:   true,
@@ -257,7 +257,7 @@ func (*Signature) DescribeCanoto(types ...reflect.Type) *canoto.Spec {
 // UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
 //
 // During parsing, the canoto cache is saved.
-func (c *Signature) UnmarshalCanoto(bytes []byte) error {
+func (c *wireSignature) UnmarshalCanoto(bytes []byte) error {
 	r := canoto.Reader{
 		B:               bytes,
 		MemoryRemaining: canoto.DefaultMemoryLimit,
@@ -273,9 +273,9 @@ func (c *Signature) UnmarshalCanoto(bytes []byte) error {
 // During parsing, the canoto cache is saved.
 //
 // This function enables configuration of reader options.
-func (c *Signature) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, error) {
+func (c *wireSignature) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, error) {
 	// Zero the struct before unmarshaling.
-	*c = Signature{}
+	*c = wireSignature{}
 	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
 
 	var minField uint32
@@ -289,7 +289,7 @@ func (c *Signature) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult
 		}
 
 		switch field {
-		case canotoNumber_Signature__Signer:
+		case canotoNumber_wireSignature__Signer:
 			if wireType != canoto.Len {
 				return canoto.UnmarshalResult{}, canoto.ErrUnexpectedWireType
 			}
@@ -307,7 +307,7 @@ func (c *Signature) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult
 				return canoto.UnmarshalResult{}, err
 			}
 			r.MemoryRemaining = result.MemoryRemaining
-		case canotoNumber_Signature__Value:
+		case canotoNumber_wireSignature__Value:
 			if wireType != canoto.Len {
 				return canoto.UnmarshalResult{}, canoto.ErrUnexpectedWireType
 			}
@@ -329,14 +329,14 @@ func (c *Signature) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult
 
 // CacheCanoto populates size and OneOf caches based on the current values in
 // the struct.
-func (c *Signature) CacheCanoto() {
+func (c *wireSignature) CacheCanoto() {
 	var size uint64
 	(&c.Signer).CacheCanoto()
 	if fieldSize := (&c.Signer).SizeCanoto(); fieldSize != 0 {
-		size += uint64(len(canotoTag_Signature__Signer)) + canoto.SizeUint(fieldSize) + fieldSize
+		size += uint64(len(canotoTag_wireSignature__Signer)) + canoto.SizeUint(fieldSize) + fieldSize
 	}
 	if len(c.Value) != 0 {
-		size += uint64(len(canotoTag_Signature__Value)) + canoto.SizeBytes(c.Value)
+		size += uint64(len(canotoTag_wireSignature__Value)) + canoto.SizeBytes(c.Value)
 	}
 	canoto.CacheUint64(&c.canotoData.size, size)
 }
@@ -346,13 +346,13 @@ func (c *Signature) CacheCanoto() {
 //
 // If CacheCanoto has not yet been called, or the struct has been modified
 // since the last call to CacheCanoto, the returned size may be incorrect.
-func (c *Signature) SizeCanoto() uint64 {
+func (c *wireSignature) SizeCanoto() uint64 {
 	return atomic.LoadUint64(&c.canotoData.size)
 }
 
 // ValidCanoto validates that the struct can be correctly marshaled into the
 // Canoto format.
-func (c *Signature) ValidCanoto() bool {
+func (c *wireSignature) ValidCanoto() bool {
 	c.CacheCanoto()
 	return c.CheckCanoto()
 }
@@ -362,7 +362,7 @@ func (c *Signature) ValidCanoto() bool {
 //
 // It is assumed that CacheCanoto has been called since the last modification
 // to this struct.
-func (c *Signature) CheckCanoto() bool {
+func (c *wireSignature) CheckCanoto() bool {
 	if !(&c.Signer).CheckCanoto() {
 		return false
 	}
@@ -372,7 +372,7 @@ func (c *Signature) CheckCanoto() bool {
 // MarshalCanoto returns the Canoto representation of this struct.
 //
 // It is assumed that this struct is ValidCanoto.
-func (c *Signature) MarshalCanoto() []byte {
+func (c *wireSignature) MarshalCanoto() []byte {
 	c.CacheCanoto()
 	w := canoto.Writer{
 		B: make([]byte, 0, c.SizeCanoto()),
@@ -388,26 +388,26 @@ func (c *Signature) MarshalCanoto() []byte {
 // to this struct.
 //
 // It is assumed that this struct is ValidCanoto.
-func (c *Signature) AppendCanoto(w canoto.Writer) canoto.Writer {
+func (c *wireSignature) AppendCanoto(w canoto.Writer) canoto.Writer {
 	if fieldSize := (&c.Signer).SizeCanoto(); fieldSize != 0 {
-		canoto.Append(&w, canotoTag_Signature__Signer)
+		canoto.Append(&w, canotoTag_wireSignature__Signer)
 		canoto.AppendUint(&w, fieldSize)
 		w = (&c.Signer).AppendCanoto(w)
 	}
 	if len(c.Value) != 0 {
-		canoto.Append(&w, canotoTag_Signature__Value)
+		canoto.Append(&w, canotoTag_wireSignature__Value)
 		canoto.AppendBytes(&w, c.Value)
 	}
 	return w
 }
 
 const (
-	canotoNumber_TestQC__Signatures = 1
+	canotoNumber_wireQC__Signatures = 1
 
-	canotoTag_TestQC__Signatures = "\x0a" // canoto.Tag(canotoNumber_TestQC__Signatures, canoto.Len)
+	canotoTag_wireQC__Signatures = "\x0a" // canoto.Tag(canotoNumber_wireQC__Signatures, canoto.Len)
 )
 
-type canotoData_TestQC struct {
+type canotoData_wireQC struct {
 	size uint64
 }
 
@@ -415,15 +415,15 @@ type canotoData_TestQC struct {
 // message and their wire types.
 //
 // types is used as a stack of ancestor messages to detect recursive specs.
-func (*TestQC) DescribeCanoto(types ...reflect.Type) *canoto.Spec {
-	types = append(types, reflect.TypeFor[TestQC]())
-	var zero TestQC
+func (*wireQC) DescribeCanoto(types ...reflect.Type) *canoto.Spec {
+	types = append(types, reflect.TypeFor[wireQC]())
+	var zero wireQC
 	return &canoto.Spec{
-		Name: "TestQC",
+		Name: "wireQC",
 		Fields: []canoto.FieldType{
 			canoto.FieldTypeFromField(
 				/*type inference:*/ (canoto.MakeEntryNilPointer(zero.Signatures)),
-				/*FieldNumber:   */ canotoNumber_TestQC__Signatures,
+				/*FieldNumber:   */ canotoNumber_wireQC__Signatures,
 				/*Name:          */ "Signatures",
 				/*FixedLength:   */ 0,
 				/*Repeated:      */ true,
@@ -438,7 +438,7 @@ func (*TestQC) DescribeCanoto(types ...reflect.Type) *canoto.Spec {
 // UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
 //
 // During parsing, the canoto cache is saved.
-func (c *TestQC) UnmarshalCanoto(bytes []byte) error {
+func (c *wireQC) UnmarshalCanoto(bytes []byte) error {
 	r := canoto.Reader{
 		B:               bytes,
 		MemoryRemaining: canoto.DefaultMemoryLimit,
@@ -454,9 +454,9 @@ func (c *TestQC) UnmarshalCanoto(bytes []byte) error {
 // During parsing, the canoto cache is saved.
 //
 // This function enables configuration of reader options.
-func (c *TestQC) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, error) {
+func (c *wireQC) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, error) {
 	// Zero the struct before unmarshaling.
-	*c = TestQC{}
+	*c = wireQC{}
 	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
 
 	var minField uint32
@@ -470,7 +470,7 @@ func (c *TestQC) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, e
 		}
 
 		switch field {
-		case canotoNumber_TestQC__Signatures:
+		case canotoNumber_wireQC__Signatures:
 			if wireType != canoto.Len {
 				return canoto.UnmarshalResult{}, canoto.ErrUnexpectedWireType
 			}
@@ -483,7 +483,7 @@ func (c *TestQC) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, e
 			}
 
 			// Count the number of additional entries after the first entry.
-			countMinus1, err := canoto.CountBytes(r.B, canotoTag_TestQC__Signatures)
+			countMinus1, err := canoto.CountBytes(r.B, canotoTag_wireQC__Signatures)
 			if err != nil {
 				return canoto.UnmarshalResult{}, err
 			}
@@ -504,7 +504,7 @@ func (c *TestQC) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, e
 
 			// Read the rest of the entries, stripping the tag each time.
 			for i := range additionalField {
-				r.B = r.B[len(canotoTag_TestQC__Signatures):]
+				r.B = r.B[len(canotoTag_wireQC__Signatures):]
 				if err := canoto.ReadSubReader(&r, &msgReader); err != nil {
 					return canoto.UnmarshalResult{}, err
 				}
@@ -529,14 +529,14 @@ func (c *TestQC) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, e
 
 // CacheCanoto populates size and OneOf caches based on the current values in
 // the struct.
-func (c *TestQC) CacheCanoto() {
+func (c *wireQC) CacheCanoto() {
 	var size uint64
 	{
 		field := c.Signatures
 		for i := range field {
 			(&field[i]).CacheCanoto()
 			fieldSize := (&field[i]).SizeCanoto()
-			size += uint64(len(canotoTag_TestQC__Signatures)) + canoto.SizeUint(fieldSize) + fieldSize
+			size += uint64(len(canotoTag_wireQC__Signatures)) + canoto.SizeUint(fieldSize) + fieldSize
 		}
 	}
 	canoto.CacheUint64(&c.canotoData.size, size)
@@ -547,13 +547,13 @@ func (c *TestQC) CacheCanoto() {
 //
 // If CacheCanoto has not yet been called, or the struct has been modified
 // since the last call to CacheCanoto, the returned size may be incorrect.
-func (c *TestQC) SizeCanoto() uint64 {
+func (c *wireQC) SizeCanoto() uint64 {
 	return atomic.LoadUint64(&c.canotoData.size)
 }
 
 // ValidCanoto validates that the struct can be correctly marshaled into the
 // Canoto format.
-func (c *TestQC) ValidCanoto() bool {
+func (c *wireQC) ValidCanoto() bool {
 	c.CacheCanoto()
 	return c.CheckCanoto()
 }
@@ -563,7 +563,7 @@ func (c *TestQC) ValidCanoto() bool {
 //
 // It is assumed that CacheCanoto has been called since the last modification
 // to this struct.
-func (c *TestQC) CheckCanoto() bool {
+func (c *wireQC) CheckCanoto() bool {
 	{
 		field := c.Signatures
 		for i := range field {
@@ -578,7 +578,7 @@ func (c *TestQC) CheckCanoto() bool {
 // MarshalCanoto returns the Canoto representation of this struct.
 //
 // It is assumed that this struct is ValidCanoto.
-func (c *TestQC) MarshalCanoto() []byte {
+func (c *wireQC) MarshalCanoto() []byte {
 	c.CacheCanoto()
 	w := canoto.Writer{
 		B: make([]byte, 0, c.SizeCanoto()),
@@ -594,11 +594,11 @@ func (c *TestQC) MarshalCanoto() []byte {
 // to this struct.
 //
 // It is assumed that this struct is ValidCanoto.
-func (c *TestQC) AppendCanoto(w canoto.Writer) canoto.Writer {
+func (c *wireQC) AppendCanoto(w canoto.Writer) canoto.Writer {
 	{
 		field := c.Signatures
 		for i := range field {
-			canoto.Append(&w, canotoTag_TestQC__Signatures)
+			canoto.Append(&w, canotoTag_wireQC__Signatures)
 			canoto.AppendUint(&w, (&field[i]).SizeCanoto())
 			w = (&field[i]).AppendCanoto(w)
 		}

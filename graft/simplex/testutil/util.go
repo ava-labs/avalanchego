@@ -145,11 +145,7 @@ func (t *TestSignatureAggregator) AppendSignatures(existing common.SignatureByte
 }
 
 func (t *TestSignatureAggregator) Aggregate(signatures []common.Signature) (common.QuorumCertificate, error) {
-	qc := TestQC{Signatures: make([]Signature, len(signatures))}
-	for i, sig := range signatures {
-		qc.Signatures[i] = Signature{Signer: NewNodeID(sig.Signer), Value: sig.Value}
-	}
-	return qc, t.Err
+	return TestQC(signatures), t.Err
 }
 
 func (t *TestSignatureAggregator) IsQuorum(signers []common.NodeID) bool {
@@ -174,44 +170,38 @@ func (t *TestSignatureAggregator) AboveByzantineThreshold(signers []common.NodeI
 	return len(signers) >= common.F(t.N)+1
 }
 
-// NodeID is the serializable form of a [common.NodeID].
+// wireNodeID is the serializable form of a [common.NodeID].
 // It cannot be [metadata.NodeID] because msm tests import this package.
-type NodeID struct {
+type wireNodeID struct {
 	ShortID [20]byte `canoto:"fixed bytes,1"`
 	LongID  [32]byte `canoto:"fixed bytes,2"`
 
-	canotoData canotoData_NodeID
+	canotoData canotoData_wireNodeID
 }
 
-// NewNodeID converts a [common.NodeID] to its serializable form.
-func NewNodeID(nodeID common.NodeID) NodeID {
-	return NodeID{ShortID: nodeID.ShortID, LongID: nodeID.LongID}
+// wireSignature is the serializable form of a [common.Signature].
+type wireSignature struct {
+	Signer wireNodeID            `canoto:"value,1"`
+	Value  common.SignatureBytes `canoto:"bytes,2"`
+
+	canotoData canotoData_wireSignature
 }
 
-// ToNodeID converts the serializable form back to a [common.NodeID].
-func (nodeID NodeID) ToNodeID() common.NodeID {
-	return common.NodeID{ShortID: nodeID.ShortID, LongID: nodeID.LongID}
+// wireQC is the serializable form of a [TestQC].
+type wireQC struct {
+	Signatures []wireSignature `canoto:"repeated value,1"`
+
+	canotoData canotoData_wireQC
 }
 
-type Signature struct {
-	// Signer is the NodeID of the creator of the signature.
-	Signer NodeID `canoto:"value,1"`
-	// Value is the byte representation of the signature.
-	Value common.SignatureBytes `canoto:"bytes,2"`
-
-	canotoData canotoData_Signature
-}
-
-type TestQC struct {
-	Signatures []Signature `canoto:"repeated value,1"`
-
-	canotoData canotoData_TestQC
-}
+// TestQC is a [common.QuorumCertificate] that is just the list of its signatures.
+// It is converted to [wireQC] only when serialized, so it never holds canoto caches.
+type TestQC []common.Signature
 
 func (t TestQC) Signers() []common.NodeID {
-	res := make([]common.NodeID, 0, len(t.Signatures))
-	for _, sig := range t.Signatures {
-		res = append(res, sig.Signer.ToNodeID())
+	res := make([]common.NodeID, 0, len(t))
+	for _, sig := range t {
+		res = append(res, sig.Signer)
 	}
 	return res
 }
@@ -221,35 +211,32 @@ func (t TestQC) Verify([]byte, common.Nodes) error {
 }
 
 func (t TestQC) Bytes() []byte {
-	// Marshal a copy so the canoto size caches never end up in t itself,
-	// otherwise two equal TestQCs would not be equal in require.Equal once one of them was marshaled.
-	qc := t.withoutCache()
-	return qc.MarshalCanoto()
-}
-
-// withoutCache returns a deep copy of the TestQC whose canoto caches are empty.
-func (t TestQC) withoutCache() TestQC {
-	if len(t.Signatures) == 0 {
-		return TestQC{}
-	}
-	signatures := make([]Signature, len(t.Signatures))
-	for i, sig := range t.Signatures {
-		signatures[i] = Signature{
-			Signer: NodeID{ShortID: sig.Signer.ShortID, LongID: sig.Signer.LongID},
+	wire := wireQC{Signatures: make([]wireSignature, len(t))}
+	for i, sig := range t {
+		wire.Signatures[i] = wireSignature{
+			Signer: wireNodeID{ShortID: sig.Signer.ShortID, LongID: sig.Signer.LongID},
 			Value:  sig.Value,
 		}
 	}
-	return TestQC{Signatures: signatures}
+	return wire.MarshalCanoto()
 }
 
 // DeserializeTestQC parses bytes produced by [TestQC.Bytes].
 func DeserializeTestQC(bytes []byte) (TestQC, error) {
-	var qc TestQC
-	if err := qc.UnmarshalCanoto(bytes); err != nil {
-		return TestQC{}, err
+	var wire wireQC
+	if err := wire.UnmarshalCanoto(bytes); err != nil {
+		return nil, err
 	}
-	return qc.withoutCache(), nil
+	var qc TestQC
+	for _, sig := range wire.Signatures {
+		qc = append(qc, common.Signature{
+			Signer: common.NodeID{ShortID: sig.Signer.ShortID, LongID: sig.Signer.LongID},
+			Value:  sig.Value,
+		})
+	}
+	return qc, nil
 }
+
 func (t TestQC) Size() int {
 	return len(t.Bytes())
 }

@@ -933,9 +933,9 @@ func TestReplicationVerifyNotarization(t *testing.T) {
 	corruptQC := func(qc common.QuorumCertificate) common.QuorumCertificate {
 		badQC := qc.(testutil.TestQC)
 		// Duplicate the last signature
-		badQC.Signatures = append(badQC.Signatures, badQC.Signatures[len(badQC.Signatures)-1])
+		badQC = append(badQC, badQC[len(badQC)-1])
 		// Remove the first signature
-		badQC.Signatures = badQC.Signatures[1:]
+		badQC = badQC[1:]
 
 		// Finalization should have 3 signers
 		require.Len(t, badQC.Signers(), 3)
@@ -1022,9 +1022,9 @@ func TestReplicationVerifyEmptyNotarization(t *testing.T) {
 	corruptQC := func(qc common.QuorumCertificate) common.QuorumCertificate {
 		badQC := qc.(testutil.TestQC)
 		// Duplicate the last signature
-		badQC.Signatures = append(badQC.Signatures, badQC.Signatures[len(badQC.Signatures)-1])
+		badQC = append(badQC, badQC[len(badQC)-1])
 		// Remove the first signature
-		badQC.Signatures = badQC.Signatures[1:]
+		badQC = badQC[1:]
 
 		// Finalization should have 3 signers
 		require.Len(t, badQC.Signers(), 3)

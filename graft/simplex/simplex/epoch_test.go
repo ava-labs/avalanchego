@@ -1493,7 +1493,7 @@ func TestEpochQCSignedByNonExistentNodes(t *testing.T) {
 		require.NoError(t, err)
 
 		tqc := notarization.QC.(testutil.TestQC)
-		tqc.Signatures = append(tqc.Signatures, testutil.Signature{Signer: testutil.NewNodeID(nodes[2]), Value: []byte{0}})
+		tqc = append(tqc, Signature{Signer: nodes[2], Value: []byte{0}})
 		notarization.QC = tqc
 
 		err = e.HandleMessage(&Message{
@@ -1507,7 +1507,7 @@ func TestEpochQCSignedByNonExistentNodes(t *testing.T) {
 	t.Run("empty notarization with unknown signer isn't taken into account", func(t *testing.T) {
 		var qc testutil.TestQC
 		for i, n := range []NodeID{{ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{5}}} {
-			qc.Signatures = append(qc.Signatures, testutil.Signature{Signer: testutil.NewNodeID(n), Value: []byte{byte(i)}})
+			qc = append(qc, Signature{Signer: n, Value: []byte{byte(i)}})
 		}
 
 		err = e.HandleMessage(&Message{
@@ -1527,7 +1527,7 @@ func TestEpochQCSignedByNonExistentNodes(t *testing.T) {
 	t.Run("empty notarization with double signer isn't taken into account", func(t *testing.T) {
 		var qc testutil.TestQC
 		for i, n := range []NodeID{{ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{2}}} {
-			qc.Signatures = append(qc.Signatures, testutil.Signature{Signer: testutil.NewNodeID(n), Value: []byte{byte(i)}})
+			qc = append(qc, Signature{Signer: n, Value: []byte{byte(i)}})
 		}
 
 		err = e.HandleMessage(&Message{
@@ -2815,7 +2815,7 @@ func TestEpochVoteSentTwiceKeepsVerifiedVote(t *testing.T) {
 			}
 			qc, ok := msg.Notarization.QC.(testutil.TestQC)
 			require.True(t, ok)
-			for _, sig := range qc.Signatures {
+			for _, sig := range qc {
 				require.NotEqual(t, forged, sig.Value,
 					"notarization QC contains a signature that failed verification, signer %x", sig.Signer)
 			}

@@ -15,7 +15,7 @@ func NewEmptyNotarization(nodes []common.NodeID, round uint64) *common.EmptyNota
 	var qc TestQC
 
 	for i, node := range nodes {
-		qc.Signatures = append(qc.Signatures, Signature{Signer: NewNodeID(node), Value: []byte{byte(i)}})
+		qc = append(qc, common.Signature{Signer: node, Value: []byte{byte(i)}})
 	}
 
 	return &common.EmptyNotarization{

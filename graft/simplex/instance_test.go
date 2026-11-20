@@ -1342,7 +1342,7 @@ func TestNonValidatorSurvivesStaleTelockQuorumRound(t *testing.T) {
 	require.NoError(t, err)
 	telockFinalization := common.Finalization{
 		Finalization: toBeSigned,
-		QC:           testutil.TestQC{Signatures: []testutil.Signature{{Signer: testutil.NewNodeID(v1.NodeID.ToNodeID()), Value: sig}}},
+		QC:           testutil.TestQC{{Signer: v1.NodeID.ToNodeID(), Value: sig}},
 	}
 	replay := &common.Message{ReplicationResponse: &common.ReplicationResponse{
 		Data: []common.QuorumRound{{Block: secondTelock, Finalization: &telockFinalization}},
@@ -1422,7 +1422,7 @@ func TestNonValidatorStallsOnStaleTelockDependency(t *testing.T) {
 	// A quorum of the old epoch finalized T2.
 	var qc testutil.TestQC
 	for _, id := range oldValidatorSet.NodeIDs() {
-		qc.Signatures = append(qc.Signatures, testutil.Signature{Signer: testutil.NewNodeID(id)})
+		qc = append(qc, common.Signature{Signer: id})
 	}
 	t2Finalization := common.Finalization{
 		Finalization: common.ToBeSignedFinalization{BlockHeader: t2.BlockHeader()},
