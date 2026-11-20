@@ -595,7 +595,7 @@ func TestReplicationStuckInProposingBlock(t *testing.T) {
 
 	tbb := testutil.NewTestBlockBuilder()
 	bb := testutil.NewTestControlledBlockBuilder(t)
-	bb.TestBlockBuilder = *tbb
+	bb.TestBlockBuilder = tbb
 	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
 	blocks := createBlocks(t, nodes, 5)
 
@@ -623,7 +623,7 @@ func TestReplicationStuckInProposingBlock(t *testing.T) {
 	require.NoError(t, e.Start())
 
 	bb.TriggerNewBlock()
-	notarizeAndFinalizeRoundWithMetadata(t, e, &bb.TestBlockBuilder, &blocks[0].Finalization.Finalization.ProtocolMetadata)
+	notarizeAndFinalizeRoundWithMetadata(t, e, bb.TestBlockBuilder, &blocks[0].Finalization.Finalization.ProtocolMetadata)
 
 	gb := storage.WaitForBlockCommit(0)
 	require.Equal(t, gb, blocks[0].VerifiedBlock.(*testutil.TestBlock))
@@ -643,14 +643,6 @@ func TestReplicationStuckInProposingBlock(t *testing.T) {
 		msg := <-sentMessages
 		if msg.ReplicationRequest != nil {
 			break
-		}
-	}
-
-	// Drain the block builder channels
-	for len(bb.BlockShouldBeBuilt) > 0 {
-		select {
-		case <-bb.BlockShouldBeBuilt:
-		default:
 		}
 	}
 
@@ -1493,6 +1485,9 @@ func TestReplicationChain(t *testing.T) {
 	// nodes send a block but can't notarize so they time out
 	net.SetAllNodesMessageFilter(allowFinalizeVotes)
 
+	// The lagging node times out on the current round, as it can't notarize the block.
+	laggingNode.BlockShouldBeBuilt()
+
 	for _, n := range net.Instances {
 		// the message filter blocks finalizations for blockFinalize3
 		if n.E.ID.Equals(blockFinalize3.E.ID) {
@@ -1540,6 +1535,7 @@ func TestReplicationStartsRoundFromFinalization(t *testing.T) {
 	conf.ReplicationEnabled = true
 	e, err := simplex.NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 	require.NoError(t, e.Start())
 
@@ -1622,9 +1618,7 @@ messages:
 				time.Duration(iteration) * simplex.DefaultEmptyVoteRebroadcastTimeout,
 			)
 			iteration++
-			if len(bb.BlockShouldBeBuilt) == 0 {
-				bb.BlockShouldBeBuilt <- struct{}{}
-			}
+			bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 			e.AdvanceTime(newTime)
 		}
 	}
@@ -1650,6 +1644,7 @@ func TestReplicationStartsRoundFromFinalizationWithBlock(t *testing.T) {
 	conf.ReplicationEnabled = true
 	e, err := simplex.NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 	require.NoError(t, e.Start())
 
@@ -1744,9 +1739,7 @@ messages:
 				time.Duration(iteration) * simplex.DefaultEmptyVoteRebroadcastTimeout,
 			)
 			iteration++
-			if len(bb.BlockShouldBeBuilt) == 0 {
-				bb.BlockShouldBeBuilt <- struct{}{}
-			}
+			bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 			e.AdvanceTime(newTime)
 		}
 	}

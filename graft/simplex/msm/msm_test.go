@@ -2287,6 +2287,10 @@ func (b *blockingBlockBuilder) BuildBlock(context.Context, uint64) (avalanchego.
 }
 
 func (b *blockingBlockBuilder) WaitForPendingBlock(ctx context.Context) {
+	if ctx.Err() != nil {
+		return
+	}
+
 	select {
 	case <-b.pending:
 	case <-ctx.Done():

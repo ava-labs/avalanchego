@@ -529,6 +529,10 @@ func (s *pendingBlockSignal) wait(ctx context.Context) {
 func (s *pendingBlockSignal) consume(ctx context.Context) bool {
 	for {
 		s.lock.Lock()
+		if ctx.Err() != nil {
+			s.lock.Unlock()
+			return false
+		}
 		ch := s.ch
 		if s.pending {
 			s.pending = false

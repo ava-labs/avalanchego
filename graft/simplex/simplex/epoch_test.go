@@ -1088,6 +1088,7 @@ func TestEpochResizesBlacklistOnEpochChange(t *testing.T) {
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	require.NoError(t, e.Start())
 	require.Equal(t, uint64(1), e.Metadata().Epoch)
 
@@ -1095,7 +1096,7 @@ func TestEpochResizesBlacklistOnEpochChange(t *testing.T) {
 	// blacklist must be computed for the new validator set (2 nodes with a total weight of 40),
 	// not the parent's (1 node with a total weight of 5), otherwise its blacklist
 	// is malformed and the block cannot be notarized.
-	bb.BlockShouldBeBuilt <- struct{}{}
+	bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 	block := bb.GetBuiltBlock()
 	blockBlacklist := block.Blacklist()
 	e.Stop()
@@ -1108,6 +1109,7 @@ func TestEpochResizesBlacklistOnEpochChange(t *testing.T) {
 
 	e, err = NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	require.NoError(t, e.Start())
 	t.Cleanup(e.Stop)
 	require.Equal(t, uint64(1), e.Metadata().Epoch)
@@ -1942,6 +1944,7 @@ func TestEpochFinalizeVoteRebroadcastSkipsTimedOutFork(t *testing.T) {
 	conf.ReplicationEnabled = true
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 
 	require.NoError(t, e.Start())
@@ -1951,7 +1954,7 @@ func TestEpochFinalizeVoteRebroadcastSkipsTimedOutFork(t *testing.T) {
 	testutil.WaitToEnterRound(t, e, 1)
 
 	// we time out on round 1, then learn that block1 was notarized anyway
-	bb.BlockShouldBeBuilt <- struct{}{}
+	bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 	testutil.WaitForBlockProposerTimeout(t, e, &e.StartTime, 1)
 
 	_, built := bb.BuildBlock(ctx, e.Metadata(), emptyBlacklist)
@@ -2052,6 +2055,7 @@ func TestEpochFinalizeVoteRebroadcastForTimedOutAncestor(t *testing.T) {
 	conf.ReplicationEnabled = true
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 
 	require.NoError(t, e.Start())
@@ -2061,7 +2065,7 @@ func TestEpochFinalizeVoteRebroadcastForTimedOutAncestor(t *testing.T) {
 	testutil.WaitToEnterRound(t, e, 1)
 
 	// we time out on round 1, then learn that block1 was notarized anyway
-	bb.BlockShouldBeBuilt <- struct{}{}
+	bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 	testutil.WaitForBlockProposerTimeout(t, e, &e.StartTime, 1)
 
 	_, built := bb.BuildBlock(ctx, e.Metadata(), emptyBlacklist)
@@ -2275,6 +2279,7 @@ func TestEpochReplicatedNotarizationVerifiedAfterFinalizationIsNotFinalized(t *t
 	conf.ReplicationEnabled = true
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 
 	require.NoError(t, e.Start())
@@ -2282,7 +2287,7 @@ func TestEpochReplicatedNotarizationVerifiedAfterFinalizationIsNotFinalized(t *t
 	advanceRoundFromNotarization(t, e, bb)
 
 	// we time out on round 1, which is then empty notarized
-	bb.BlockShouldBeBuilt <- struct{}{}
+	bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 	testutil.WaitForBlockProposerTimeout(t, e, &e.StartTime, 1)
 	require.NoError(t, e.HandleMessage(&Message{EmptyNotarization: testutil.NewEmptyNotarization(nodes, 1)}, nodes[1]))
 
@@ -2452,6 +2457,7 @@ func TestFailedNotarizationAppendHaltsEpoch(t *testing.T) {
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 	require.NoError(t, e.Start())
 
@@ -2488,7 +2494,7 @@ func TestFailedNotarizationAppendHaltsEpoch(t *testing.T) {
 	require.ErrorIs(t, err, errDisk)
 
 	// Let the round timer of round 2 expire several times over.
-	bb.BlockShouldBeBuilt <- struct{}{}
+	bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 	now := conf.StartTime
 	for range 15 {
 		now = now.Add(e.MaxProposalWait / 5)
@@ -2539,6 +2545,7 @@ func TestRejectsOldNotarizationAndVotes(t *testing.T) {
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 
 	require.NoError(t, e.Start())
@@ -2573,9 +2580,7 @@ func TestRejectsOldNotarizationAndVotes(t *testing.T) {
 	increment := 1
 	// wait for the empty vote
 	for !wal.ContainsEmptyVote(2) {
-		if len(bb.BlockShouldBeBuilt) == 0 {
-			bb.BlockShouldBeBuilt <- struct{}{}
-		}
+		bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 		e.AdvanceTime(e.StartTime.Add(conf.MaxProposalWait * time.Duration(increment)))
 		time.Sleep(100 * time.Millisecond)
 		increment++
@@ -2599,9 +2604,7 @@ func TestRejectsOldNotarizationAndVotes(t *testing.T) {
 			require.False(t, wal.ContainsNotarization(1), "notarization for old round should not be recorded")
 			return
 		default:
-			if len(bb.BlockShouldBeBuilt) == 0 {
-				bb.BlockShouldBeBuilt <- struct{}{}
-			}
+			bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 			wal.AssertHealthy(e.BlockDeserializer, e.QCDeserializer)
 			e.AdvanceTime(e.StartTime.Add(conf.MaxProposalWait * time.Duration(increment)))
 			time.Sleep(100 * time.Millisecond)
@@ -2965,7 +2968,7 @@ func TestNotarizedNotFinalizedTipCausesEmptyBlockProposal(t *testing.T) {
 
 			for r, finalized := range testCase.finalizedRounds {
 				if finalized {
-					notarizeAndFinalizeRound(t, e, &bb.TestBlockBuilder)
+					notarizeAndFinalizeRound(t, e, bb.TestBlockBuilder)
 					continue
 				}
 				block := notarizeRoundNotFinalized(t, e, nodes, uint64(r))
@@ -3816,6 +3819,7 @@ func TestEpochFollowerIgnoresStaleBlacklistOnEpochChange(t *testing.T) {
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 	require.NoError(t, e.Start())
 
@@ -3827,7 +3831,7 @@ func TestEpochFollowerIgnoresStaleBlacklistOnEpochChange(t *testing.T) {
 
 	// Tell the follower it is time for the leader to propose, which starts the proposal timeout,
 	// and let half of it pass. The leader is not late yet.
-	bb.BlockShouldBeBuilt <- struct{}{}
+	bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 	e.AdvanceTime(e.StartTime.Add(conf.MaxProposalWait / 2))
 
 	// The leader proposes the first block of the new epoch, with an empty blacklist.
@@ -4043,6 +4047,7 @@ func TestRebroadcastDoesNotFinalizeVoteOnTimedOutRound(t *testing.T) {
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 	require.NoError(t, e.Start())
 
@@ -4052,7 +4057,7 @@ func TestRebroadcastDoesNotFinalizeVoteOnTimedOutRound(t *testing.T) {
 
 	// Round 1: the leader never proposes, so we time out and cast an empty vote.
 	const timedOutRound = uint64(1)
-	bb.BlockShouldBeBuilt <- struct{}{}
+	bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 	now := conf.StartTime
 	testutil.WaitForBlockProposerTimeout(t, e, &now, timedOutRound)
 	require.True(t, wal.ContainsEmptyVote(timedOutRound))
@@ -4288,6 +4293,7 @@ func TestReplicatedFinalizationExecutesBlockDependents(t *testing.T) {
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 	require.NoError(t, e.Start())
 
@@ -4298,7 +4304,7 @@ func TestReplicatedFinalizationExecutesBlockDependents(t *testing.T) {
 	wal.AssertBlockProposal(0)
 
 	// Round 0 times out and is empty notarized, so we enter round 1 holding block0 without a notarization.
-	bb.BlockShouldBeBuilt <- struct{}{}
+	bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 	testutil.WaitForBlockProposerTimeout(t, e, &e.StartTime, 0)
 	require.NoError(t, e.HandleMessage(&Message{EmptyNotarization: testutil.NewEmptyNotarization(nodes, 0)}, nodes[1]))
 	testutil.WaitToEnterRound(t, e, 1)
@@ -4347,12 +4353,13 @@ func TestFailedVerificationDoesNotExecuteBlockDependents(t *testing.T) {
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 	require.NoError(t, e.Start())
 
 	// Round 0 times out and is empty notarized, so we enter round 1 without having seen block0.
 	block0 := testutil.NewTestBlock(e.Metadata(), emptyBlacklist)
-	bb.BlockShouldBeBuilt <- struct{}{}
+	bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 	testutil.WaitForBlockProposerTimeout(t, e, &e.StartTime, 0)
 	require.NoError(t, e.HandleMessage(&Message{EmptyNotarization: testutil.NewEmptyNotarization(nodes, 0)}, nodes[1]))
 	testutil.WaitToEnterRound(t, e, 1)
@@ -4460,6 +4467,7 @@ func TestReplicatedNotarizationForEmptyNotarizedRound(t *testing.T) {
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 	require.NoError(t, e.Start())
 
@@ -4470,7 +4478,7 @@ func TestReplicatedNotarizationForEmptyNotarizedRound(t *testing.T) {
 	wal.AssertBlockProposal(0)
 
 	// Round 0 times out and is empty notarized while we hold block0 without a notarization.
-	bb.BlockShouldBeBuilt <- struct{}{}
+	bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 	testutil.WaitForBlockProposerTimeout(t, e, &e.StartTime, 0)
 	require.NoError(t, e.HandleMessage(&Message{EmptyNotarization: testutil.NewEmptyNotarization(nodes, 0)}, nodes[1]))
 	testutil.WaitToEnterRound(t, e, 1)
@@ -4571,6 +4579,7 @@ func TestLateNotarizationForPastRoundHaltsLeader(t *testing.T) {
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
+	bb.CurrentRound = testutil.RoundOf(e)
 	t.Cleanup(e.Stop)
 	require.NoError(t, e.Start())
 
@@ -4581,7 +4590,7 @@ func TestLateNotarizationForPastRoundHaltsLeader(t *testing.T) {
 	wal.AssertBlockProposal(0)
 
 	// Round 0 times out and is empty notarized while we hold block0 without a notarization.
-	bb.BlockShouldBeBuilt <- struct{}{}
+	bb.TriggerBlockShouldBeBuilt(e.Metadata().Round)
 	testutil.WaitForBlockProposerTimeout(t, e, &e.StartTime, 0)
 	require.NoError(t, e.HandleMessage(&Message{EmptyNotarization: testutil.NewEmptyNotarization(nodes, 0)}, nodes[2]))
 	testutil.WaitToEnterRound(t, e, 1)
