@@ -71,7 +71,7 @@ As a consequence, `Commit` for a single root may queue many proposals to be comm
 
 ### Why `Reader` is unimplemented (custom trie reader)
 
-`TrieDB.Reader(root)` always returns an error. The `triedb.Backend` interface expects `Reader` to supply node bytes to a generic `trie.Trie`, which then reassembles the Merkle Trie from encoded node data. Firewood does not store state in that format, and the resulting `trie.Trie` created would be nonsensical.
+`TrieDB.Reader(root)` only reports whether `root` is a committed revision: it returns an error if not, and otherwise a reader whose `Node` always returns an error. The `triedb.Backend` interface expects `Reader` to supply node bytes to a generic `trie.Trie`, which then reassembles the Merkle Trie from encoded node data. Firewood does not store state in that format, and the resulting `trie.Trie` created would be nonsensical.
 
 Instead, this package provides custom `accountTrie` and `storageTrie` implementations that read directly from `ffi.Revision` and `ffi.Proposal` objects via flat key-value `Get` calls. This avoids another implementation of a reader-like object, and allows re-using the Firewood API.
 

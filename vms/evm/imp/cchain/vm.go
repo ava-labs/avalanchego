@@ -341,9 +341,9 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 // canServe reports whether the state at root can be served to syncing peers.
 // Nothing can be served until [VM.finishInitialize] has created the [sae.VM]
 // and registered the state sync server.
-func (vm *VM) canServe(root common.Hash) (bool, error) {
+func (vm *VM) canServe(root common.Hash) bool {
 	if vm.mode.Get() < snow.Bootstrapping {
-		return false, nil
+		return false
 	}
 	tdb, _ := vm.VM.EVMState()
 	return saestatesync.CanServe(tdb, root)

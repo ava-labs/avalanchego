@@ -242,12 +242,9 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 		snowCtx,
 		net,
 		settledOverride{Stub: hooks, height: cfg.lastSynchronous},
-		func(root ethcommon.Hash) (bool, error) {
+		func(root ethcommon.Hash) bool {
 			tdb := s.serving.Load()
-			if tdb == nil {
-				return false, nil
-			}
-			return CanServe(tdb, root)
+			return tdb != nil && CanServe(tdb, root)
 		},
 	)
 	require.NoError(t, err, "New()")

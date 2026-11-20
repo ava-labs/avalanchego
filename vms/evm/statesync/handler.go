@@ -49,7 +49,7 @@ type Handler struct {
 
 // A ServableFunc reports whether this node can currently serve the state at
 // root to syncing peers.
-type ServableFunc func(root common.Hash) (bool, error)
+type ServableFunc func(root common.Hash) bool
 
 // New constructs a new [Handler] with the given configuration and
 // database. See the README for the guarantees expected of the database.
@@ -125,10 +125,7 @@ func (h *Handler) checkServable(summary *Summary) error {
 	if hdr == nil {
 		return database.ErrNotFound
 	}
-	switch has, err := h.servable(hdr.Root); {
-	case err != nil:
-		return err
-	case !has:
+	if !h.servable(hdr.Root) {
 		return fmt.Errorf("%w: state root %s of summary at height %d", database.ErrNotFound, hdr.Root, summary.AcceptedHeight)
 	}
 	return nil
