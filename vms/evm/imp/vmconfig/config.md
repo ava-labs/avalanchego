@@ -3,6 +3,12 @@
 
 This document describes the configuration options shared by the C-Chain and L1s. Default values for each option are specified below.
 
+## Block Building
+
+| Option | Type | Description | Default |
+|--------|------|-------------|---------|
+| `min-delay-target` | integer | The minimum delay between blocks (in milliseconds) that this node will attempt to use when creating blocks. | Parent block's target |
+
 ## State and Trie
 
 | Option | Type | Description | Default |
@@ -32,7 +38,7 @@ This document describes the configuration options shared by the C-Chain and L1s.
 | `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call (`0` = no limit). | `1000` |
 | `api-max-duration` | duration | Maximum duration of each call to the `/rpc` and `/ws` endpoints. A call that times out doesn't close its WebSocket connection. Accepts a [Go duration string](https://pkg.go.dev/time#ParseDuration), such as `"30s"`. Non-positive values result in no limit. | `0` |
 | `api-max-blocks-per-request` | uint64 | Maximum number of blocks per `eth_getLogs` request (`0` = no limit). | `0` |
-| `api-resolve-pending-to-last-executed` | bool | Requests for the "pending" block return the last-executed instead of the last-accepted to allow compatibility with EVM-ecosystem tooling that expect the pending block to have post-execution artefacts. | `true` on the C-Chain, `false` on L1s |
+| `api-resolve-pending-to-last-executed` | bool | Requests for the "pending" block return the last-executed instead of the last-accepted to allow compatibility with EVM-ecosystem tooling that expect the pending block to have post-execution artefacts. | `true` |
 
 ### Available APIs
 
@@ -53,3 +59,17 @@ This document describes the configuration options shared by the C-Chain and L1s.
 | `profile` | disabled | Process introspection and profiling: `debug_blockProfile`, `debug_cpuProfile`, `debug_freeOSMemory`, `debug_gcStats`, `debug_goTrace`, `debug_memStats`, `debug_mutexProfile`, `debug_setBlockProfileRate`, `debug_setGCPercent`, `debug_setMutexProfileFraction`, `debug_stacks`, `debug_start{CPUProfile,GoTrace}`, `debug_stop{CPUProfile,GoTrace}`, `debug_verbosity`, `debug_vmodule`, `debug_write{Block,Mem,Mutex}Profile` |
 
 `eth_subscribe` is only available over the websocket endpoint (`/ext/bc/{blockchainID}/ws`, or `/ext/bc/C/ws` for the C-Chain).
+
+## State Sync
+
+> **Note:** If state sync is enabled, the peer will download chain state from peers up to a recent block near tip, then proceed with normal bootstrapping. If you need historical data, state sync isn't the right option; however, it is sufficient if you are just running a validator.
+
+| Option | Type | Description | Default |
+|--------|------|-------------|---------|
+| `state-sync-enabled` | bool | Enable state sync. | `true` on the C-Chain, `false` on L1s |
+
+## Warp
+
+| Option | Type | Description | Default |
+|--------|------|-------------|---------|
+| `warp-off-chain-messages` | array of strings | Hex-encoded off-chain Warp messages the node should be willing to sign. These messages do not need to correspond to any on-chain event. | empty array |

@@ -7,12 +7,14 @@ package vmconfig
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"go.uber.org/zap"
 
@@ -23,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 // duration is a [time.Duration] that JSON-unmarshals from a duration string
@@ -55,6 +58,14 @@ func (d duration) MarshalJSON() ([]byte, error) {
 // Config is the operator-supplied node configuration shared by the C-Chain and
 // L1 VMs, which embed it in their own config.
 type Config struct {
+	// Block building
+
+	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
+	// for; nil follows the parent.
+	//
+	// TODO(JonathanOppenheimer): wire into L1s.
+	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
+
 	// State & trie
 	Pruning           bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
 	CommitInterval    uint64 `json:"commit-interval"` // HashDB: blocks between trie persistence. Firewood: max unpersisted revisions.
@@ -84,6 +95,19 @@ type Config struct {
 	MaxBlocksPerRequest          uint64 `json:"api-max-blocks-per-request"`
 	ResolvePendingToLastExecuted bool   `json:"api-resolve-pending-to-last-executed"`
 
+	// State sync
+
+	// TODO(JonathanOppenheimer): wire into L1s.
+	StateSyncEnabled bool `json:"state-sync-enabled"`
+
+	// Warp
+
+	// WarpOffChainMessages encodes messages that the node is willing to sign.
+	// These messages don't need to correspond to any on-chain events.
+	//
+	// TODO(JonathanOppenheimer): wire into L1s.
+	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
+
 	internalConfig
 }
 
@@ -105,6 +129,8 @@ func Default() Config {
 		TxPoolGlobalSlots:  legacypool.DefaultConfig.GlobalSlots,
 		APIs:               rpc.DefaultAPIs(),
 		BatchRequestLimit:  1000, // matches geth / libevm's node.DefaultConfig
+		// Support Foundry's cast and geth/libevm's bound contracts.
+		ResolvePendingToLastExecuted: true,
 	}
 }
 
@@ -202,6 +228,22 @@ func (c Config) SAEConfig(now func() time.Time) sae.Config {
 		},
 		Now: now,
 	}
+}
+
+var errParsingWarpMessage = errors.New("parsing warp message")
+
+// WarpMessages parses and returns the messages encoded in
+// [Config.WarpOffChainMessages].
+func (c Config) WarpMessages() ([]*warp.UnsignedMessage, error) {
+	msgs := make([]*warp.UnsignedMessage, len(c.WarpOffChainMessages))
+	for i, bytes := range c.WarpOffChainMessages {
+		msg, err := warp.ParseUnsignedMessage(bytes)
+		if err != nil {
+			return nil, fmt.Errorf("%w: at index %d: %w", errParsingWarpMessage, i, err)
+		}
+		msgs[i] = msg
+	}
+	return msgs, nil
 }
 
 func (c Config) NetworkOptions() []network.Option {

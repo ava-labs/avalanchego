@@ -15,29 +15,11 @@ type config struct {
 	vmconfig.Config
 
 	// Block building
-	// TODO(JonathanOppenheimer) move MinDelayTarget into [vmconfig.Config],
-	// and its docs into vmconfig/config.md, once wired.
-	//
-	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
-	// for; nil follows the parent.
-	// MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
 	// Needed for allowFeeRecipients. Keeping the camelCase key so existing
 	// configs don't break.
 	// FeeRecipient string `json:"feeRecipient"`
-
-	// State sync
-	// TODO(JonathanOppenheimer) move into [vmconfig.Config], and its docs into
-	// vmconfig/config.md, once wired.
-	//
-	// StateSyncEnabled bool `json:"state-sync-enabled"`
-
-	// Warp
-	// TODO(JonathanOppenheimer) move into [vmconfig.Config], and its docs into
-	// vmconfig/config.md, once wired.
-	//
-	// WarpOffChainMessages encodes messages that the node is willing to sign.
-	// These messages don't need to correspond to any on-chain events.
-	// WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
+	// The C-Chain's gas-target and min-price-target are left out until
+	// ACP-224 (#4717) decides whether L1s support them.
 
 	// Database
 	// UseStandaloneDatabase *PBool `json:"use-standalone-database"`

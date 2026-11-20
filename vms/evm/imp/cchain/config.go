@@ -4,10 +4,7 @@
 package cchain
 
 import (
-	"errors"
 	"fmt"
-
-	"github.com/ava-labs/libevm/common/hexutil"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -17,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 	"github.com/ava-labs/avalanchego/vms/evm/statesync"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 // config is the operator-supplied node configuration for the C-Chain, decoded
@@ -33,27 +29,14 @@ type config struct {
 	// GasTarget is the target gas per second this node votes for when building
 	// blocks under ACP-176. nil means follow the parent block.
 	GasTarget *gas.Gas `json:"gas-target,omitempty"`
-	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
-	// for; nil follows the parent.
-	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
-
-	// State sync
-	StateSyncEnabled bool `json:"state-sync-enabled"`
-
-	// Warp
-
-	// WarpOffChainMessages encodes messages that the node is willing to sign.
-	// These messages don't need to correspond to any on-chain events.
-	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
 }
 
 // defaultConfig returns the config used when an operator leaves a field unset.
 func defaultConfig() config {
 	c := config{
-		Config:           vmconfig.Default(),
-		StateSyncEnabled: true,
+		Config: vmconfig.Default(),
 	}
-	c.ResolvePendingToLastExecuted = true // support Foundry's cast and geth/libevm's bound contracts
+	c.StateSyncEnabled = true
 	return c
 }
 
@@ -93,22 +76,6 @@ func (c config) stateSyncConfig(networkID uint32) statesync.Config {
 		SummaryInterval: summaryInterval,
 		Enabled:         c.StateSyncEnabled,
 	}
-}
-
-var errParsingWarpMessage = errors.New("parsing warp message")
-
-// WarpMessages parses and returns the messages encoded in
-// [config.WarpOffChainMessages].
-func (c config) WarpMessages() ([]*warp.UnsignedMessage, error) {
-	msgs := make([]*warp.UnsignedMessage, len(c.WarpOffChainMessages))
-	for i, bytes := range c.WarpOffChainMessages {
-		msg, err := warp.ParseUnsignedMessage(bytes)
-		if err != nil {
-			return nil, fmt.Errorf("%w: at index %d: %w", errParsingWarpMessage, i, err)
-		}
-		msgs[i] = msg
-	}
-	return msgs, nil
 }
 
 // desiredParams bundles this node's votes for the dynamic consensus

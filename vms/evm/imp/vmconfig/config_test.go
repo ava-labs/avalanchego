@@ -10,15 +10,20 @@ import (
 	"time"
 
 	"github.com/arr4n/shed/testerr"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
 func errIsType[T error]() testerr.Want {
@@ -73,6 +78,13 @@ func TestParse(t *testing.T) {
 			name: "defaults/empty_object",
 			json: `{}`,
 			want: with(func(*testConfig) {}),
+		},
+
+		// Block building
+		{
+			name: "block_building/min_delay_target",
+			json: `{"min-delay-target":2000}`,
+			want: with(func(c *testConfig) { c.MinDelayTarget = new(uint64(2000)) }),
 		},
 
 		// State & trie
@@ -191,6 +203,22 @@ func TestParse(t *testing.T) {
 			want: with(func(c *testConfig) { c.ResolvePendingToLastExecuted = false }),
 		},
 
+		// State sync
+		{
+			name: "state_sync/enabled",
+			json: `{"state-sync-enabled":true}`,
+			want: with(func(c *testConfig) { c.StateSyncEnabled = true }),
+		},
+
+		// Warp
+		{
+			name: "warp/off_chain_messages",
+			json: `{"warp-off-chain-messages":["0x1234"]}`,
+			want: with(func(c *testConfig) {
+				c.WarpOffChainMessages = []hexutil.Bytes{{0x12, 0x34}}
+			}),
+		},
+
 		// Embedding config
 		{
 			name: "embedding/extra",
@@ -226,6 +254,7 @@ func TestParse(t *testing.T) {
 		{
 			name: "all_active_fields",
 			json: `{
+				"min-delay-target":3000,
 				"pruning-enabled":false,
 				"state-scheme":"firewood",
 				"commit-interval":256,
@@ -241,10 +270,13 @@ func TestParse(t *testing.T) {
 				"batch-request-limit":50,
 				"api-max-duration":"30s",
 				"api-resolve-pending-to-last-executed":true,
+				"state-sync-enabled":true,
+				"warp-off-chain-messages":["0x1234"],
 				"state-sync-ids":["` + nodeID.String() + `"],
 				"extra":"hello from the past"
 			}`,
 			want: testConfig{Config: Config{
+				MinDelayTarget:               new(uint64(3000)),
 				Pruning:                      false,
 				StateScheme:                  firewood.Scheme,
 				CommitInterval:               256,
@@ -260,6 +292,8 @@ func TestParse(t *testing.T) {
 				BatchRequestLimit:            50,
 				APIMaxDuration:               duration{30 * time.Second},
 				ResolvePendingToLastExecuted: true,
+				StateSyncEnabled:             true,
+				WarpOffChainMessages:         []hexutil.Bytes{{0x12, 0x34}},
 				internalConfig: internalConfig{
 					StateSyncIDs: set.Of(nodeID),
 				},
@@ -276,6 +310,55 @@ func TestParse(t *testing.T) {
 			}
 			require.Equal(t, test.want, got, "Parse(...)")
 			require.Equal(t, test.wantWarnings, log.Records, "Parse(...) logs")
+		})
+	}
+}
+
+func TestConfig_WarpMessages(t *testing.T) {
+	payload, err := payload.NewAddressedCall(
+		utils.RandomBytes(20),
+		[]byte("test"),
+	)
+	require.NoError(t, err, "payload.NewAddressedCall(...)")
+
+	msg, err := warp.NewUnsignedMessage(constants.UnitTestID, ids.GenerateTestID(), payload.Bytes())
+	require.NoError(t, err, "warp.NewUnsignedMessage(...)")
+
+	tests := []struct {
+		name    string
+		bytes   []hexutil.Bytes
+		want    []*warp.UnsignedMessage
+		wantErr error
+	}{
+		{
+			name: "empty",
+			want: []*warp.UnsignedMessage{},
+		},
+		{
+			name:  "single_message",
+			bytes: []hexutil.Bytes{msg.Bytes()},
+			want:  []*warp.UnsignedMessage{msg},
+		},
+		{
+			name:  "multiple_messages",
+			bytes: []hexutil.Bytes{msg.Bytes(), msg.Bytes()},
+			want:  []*warp.UnsignedMessage{msg, msg},
+		},
+		{
+			name:    "invalid_message",
+			bytes:   []hexutil.Bytes{{0xff}},
+			wantErr: errParsingWarpMessage,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			c := Config{
+				WarpOffChainMessages: test.bytes,
+			}
+
+			got, err := c.WarpMessages()
+			require.ErrorIsf(t, err, test.wantErr, "%T.WarpMessages()", c)
+			require.Equalf(t, test.want, got, "%T.WarpMessages()", c)
 		})
 	}
 }

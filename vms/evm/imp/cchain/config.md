@@ -32,9 +32,12 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 
 The C-Chain also accepts the options shared with L1s, described in the [shared configuration](../vmconfig/config.md):
 
+- [Block Building](../vmconfig/config.md#block-building)
 - [State and Trie](../vmconfig/config.md#state-and-trie)
 - [Transaction Pool](../vmconfig/config.md#transaction-pool)
 - [APIs](../vmconfig/config.md#apis)
+- [State Sync](../vmconfig/config.md#state-sync)
+- [Warp](../vmconfig/config.md#warp)
 
 ## Block Building
 
@@ -42,18 +45,3 @@ The C-Chain also accepts the options shared with L1s, described in the [shared c
 |--------|------|-------------|---------|
 | `min-price-target` | integer | The target minimum gas price, in wei (aAVAX), that this node will attempt to use when creating blocks. | Parent block's target |
 | `gas-target` | integer | The target gas per second that this node will attempt to use when creating blocks. | Parent block's target |
-| `min-delay-target` | integer | The minimum delay between blocks (in milliseconds) that this node will attempt to use when creating blocks. | Parent block's target |
-
-## State Sync
-
-> **Note:** If state sync is enabled, the peer will download chain state from peers up to a recent block near tip, then proceed with normal bootstrapping. If you need historical data, state sync isn't the right option; however, it is sufficient if you are just running a validator.
-
-| Option | Type | Description | Default |
-|--------|------|-------------|---------|
-| `state-sync-enabled` | bool | Enable state sync. | `true` |
-
-## Warp
-
-| Option | Type | Description | Default |
-|--------|------|-------------|---------|
-| `warp-off-chain-messages` | array of strings | Hex-encoded off-chain Warp messages the node should be willing to sign. These messages do not need to correspond to any on-chain event. | empty array |

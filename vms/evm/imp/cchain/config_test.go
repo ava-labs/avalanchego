@@ -15,17 +15,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -63,11 +59,6 @@ func TestParseConfig(t *testing.T) {
 			json: `{"gas-target":1000}`,
 			want: with(func(c *config) { c.GasTarget = new(gas.Gas(1000)) }),
 		},
-		{
-			name: "block_building/min_delay_target",
-			json: `{"min-delay-target":2000}`,
-			want: with(func(c *config) { c.MinDelayTarget = new(uint64(2000)) }),
-		},
 
 		// State & trie
 		{
@@ -84,22 +75,6 @@ func TestParseConfig(t *testing.T) {
 				c.StateScheme = firewood.Scheme
 				c.CommitInterval = 256
 			}),
-		},
-
-		// Warp
-		{
-			name: "warp/off_chain_messages",
-			json: `{"warp-off-chain-messages":["0x1234"]}`,
-			want: with(func(c *config) {
-				c.WarpOffChainMessages = []hexutil.Bytes{{0x12, 0x34}}
-			}),
-		},
-
-		// State sync
-		{
-			name: "state_sync_enabled",
-			json: `{"state-sync-enabled":false}`,
-			want: with(func(c *config) { c.StateSyncEnabled = false }),
 		},
 
 		// All active fields
@@ -182,55 +157,6 @@ func TestConfigStateSyncInterval(t *testing.T) {
 			got := c.stateSyncConfig(tt.networkID)
 			require.Equal(t, tt.want, got.SummaryInterval, "%T.stateSyncConfig(%d).SummaryInterval", c, tt.networkID)
 			require.Equal(t, tt.commitInterval, got.DBConfig.CommitInterval, "%T.stateSyncConfig(%d).DBConfig.CommitInterval", c, tt.networkID)
-		})
-	}
-}
-
-func TestConfig_WarpMessages(t *testing.T) {
-	payload, err := payload.NewAddressedCall(
-		utils.RandomBytes(20),
-		[]byte("test"),
-	)
-	require.NoError(t, err, "payload.NewAddressedCall(...)")
-
-	msg, err := warp.NewUnsignedMessage(constants.UnitTestID, ids.GenerateTestID(), payload.Bytes())
-	require.NoError(t, err, "warp.NewUnsignedMessage(...)")
-
-	tests := []struct {
-		name    string
-		bytes   []hexutil.Bytes
-		want    []*warp.UnsignedMessage
-		wantErr error
-	}{
-		{
-			name: "empty",
-			want: []*warp.UnsignedMessage{},
-		},
-		{
-			name:  "single_message",
-			bytes: []hexutil.Bytes{msg.Bytes()},
-			want:  []*warp.UnsignedMessage{msg},
-		},
-		{
-			name:  "multiple_messages",
-			bytes: []hexutil.Bytes{msg.Bytes(), msg.Bytes()},
-			want:  []*warp.UnsignedMessage{msg, msg},
-		},
-		{
-			name:    "invalid_message",
-			bytes:   []hexutil.Bytes{{0xff}},
-			wantErr: errParsingWarpMessage,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			c := config{
-				WarpOffChainMessages: test.bytes,
-			}
-
-			got, err := c.WarpMessages()
-			require.ErrorIsf(t, err, test.wantErr, "%T.WarpMessages()", c)
-			require.Equalf(t, test.want, got, "%T.WarpMessages()", c)
 		})
 	}
 }
