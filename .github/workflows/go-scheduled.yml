@@ -9,8 +9,7 @@ on:
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -21,21 +20,33 @@ jobs:
   # only for the setup job for its platform.
 
   setup-cache-darwin-arm64:
+    permissions:
+      contents: read
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-go-workflow-cache-producer
 
   setup-cache-linux-amd64:
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-go-workflow-cache-producer
 
   setup-cache-linux-arm64:
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-go-workflow-cache-producer
         with:
           # The Linux AMD64 setup job produces the Go module cache shared by all Linux
@@ -43,6 +54,8 @@ jobs:
           produce-go-module-cache: 'false'
 
   full-darwin-arm64:
+    permissions:
+      contents: read
     name: macos-26-arm64
     needs: setup-cache-darwin-arm64
     uses: ./.github/workflows/go-unit.yml
@@ -52,6 +65,8 @@ jobs:
     secrets: inherit
 
   full-linux-amd64:
+    permissions:
+      contents: read
     name: ${{ matrix.platform_name }}
     needs: setup-cache-linux-amd64
     strategy:
@@ -73,6 +88,8 @@ jobs:
     secrets: inherit
 
   full-linux-arm64:
+    permissions:
+      contents: read
     name: ${{ matrix.platform_name }}
     needs:
       - setup-cache-linux-amd64

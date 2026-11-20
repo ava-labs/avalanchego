@@ -95,7 +95,7 @@ runs:
       continue-on-error: true
       shell: bash
       # --impure ensures the env vars are accessible to the command
-      run: nix develop --impure --command bash -x ${{ inputs.run }}
+      run: nix develop --impure --command bash -x ${INPUTS_RUN}
       working-directory: ${{ inputs.working_directory }}
       env:
         # Always collect metrics locally even when nodes are running in kube to enable collection from the test workload
@@ -118,6 +118,7 @@ runs:
         GH_RUN_NUMBER: ${{ inputs.run_number }}
         GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
+        INPUTS_RUN: ${{ inputs.run }}
     - name: Log Bazel disk diagnostics
       if: ${{ steps.run-command.outcome == 'failure' && inputs.setup_bazel == 'true' }}
       shell: bash

@@ -27,7 +27,8 @@ runs:
       shell: bash
       env:
         CI_FORCE_FREE_GB: ${{ inputs.force-free-gb }}
-      run: ./scripts/check_ci_disk_space.sh --min-gb "${{ inputs.min-gb }}"
+        INPUTS_MIN_GB: ${{ inputs.min-gb }}
+      run: ./scripts/check_ci_disk_space.sh --min-gb "${INPUTS_MIN_GB}"
 
     - name: Log low-space diagnostics
       if: ${{ steps.initial-check.outputs.below_threshold == 'true' }}
@@ -57,4 +58,5 @@ runs:
       shell: bash
       env:
         CI_FORCE_FREE_GB: ${{ inputs.force-free-gb-after-cleanup || inputs.force-free-gb }}
-      run: ./scripts/check_ci_disk_space.sh --min-gb "${{ inputs.min-gb }}"
+        INPUTS_MIN_GB: ${{ inputs.min-gb }}
+      run: ./scripts/check_ci_disk_space.sh --min-gb "${INPUTS_MIN_GB}"

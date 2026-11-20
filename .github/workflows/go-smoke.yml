@@ -11,14 +11,17 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   unit-smoke:
+    permissions:
+      contents: read
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-go-for-project
       - name: Run unit-test smoke suite
         shell: bash

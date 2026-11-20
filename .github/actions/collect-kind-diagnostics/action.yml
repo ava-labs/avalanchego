@@ -14,7 +14,9 @@ runs:
   steps:
     - name: Collect diagnostics
       shell: nix develop --command bash -x {0}
-      run: ./scripts/collect_kind_diagnostics.sh "${{ inputs.diagnostics_dir }}"
+      env:
+        INPUTS_DIAGNOSTICS_DIR: ${{ inputs.diagnostics_dir }}
+      run: ./scripts/collect_kind_diagnostics.sh "${INPUTS_DIAGNOSTICS_DIR}"
     - name: Upload diagnostics
       uses: actions/upload-artifact@v6
       with:

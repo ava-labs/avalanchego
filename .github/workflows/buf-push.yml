@@ -10,11 +10,17 @@ on:
     paths:
       - "proto/**"
 
+permissions: {}
+
 jobs:
   push:
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: bufbuild/buf-action@fd21066df7214747548607aaa45548ba2b9bc1ff # v1.4.0
         with:
           input: "proto"

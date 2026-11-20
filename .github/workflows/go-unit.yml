@@ -17,11 +17,12 @@ on:
         type: boolean
         default: false
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   unit:
+    permissions:
+      contents: read
     runs-on: ${{ inputs.runner }}
     steps:
       - id: test-config
@@ -52,6 +53,8 @@ jobs:
             echo "clear-test-results=$clear_test_results"
           } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - id: setup-go
         uses: ./.github/actions/setup-go-for-project
       - id: cache-policy
@@ -70,9 +73,9 @@ jobs:
           set -euo pipefail
           # Separate scheduled build entries from entries whose test results
           # must be complete on an exact restore. Runner labels distinguish OS versions.
-          cache_mode=${{ steps.test-config.outputs.cache-mode }}
+          cache_mode=${STEPS_TEST_CONFIG_OUTPUTS_CACHE_MODE}
           go_build_cache_path="$(go env GOCACHE)"
-          cache_key_platform_prefix="go-unit-${{ inputs.runner }}-${{ runner.arch }}-"
+          cache_key_platform_prefix="go-unit-${INPUTS_RUNNER}-${{ runner.arch }}-"
           cache_key_prefix="${cache_key_platform_prefix}${cache_mode}-"
           cache_key="${cache_key_prefix}$(./scripts/workflow-hash-go-unit-inputs.sh)"
           {
@@ -81,6 +84,9 @@ jobs:
             echo "cache-key-prefix=${cache_key_prefix}"
             echo "cache-key-platform-prefix=${cache_key_platform_prefix}"
           } >> "$GITHUB_OUTPUT"
+        env:
+          STEPS_TEST_CONFIG_OUTPUTS_CACHE_MODE: ${{ steps.test-config.outputs.cache-mode }}
+          INPUTS_RUNNER: ${{ inputs.runner }}
       - id: unit-cache
         name: Restore Go unit-test cache
         uses: actions/cache/restore@v5
