@@ -4,71 +4,39 @@
 package message
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 const MaxCodeHashesPerRequest = 5
 
-var (
-	_ LeafsRequest = SubnetEVMLeafsRequest{}
-	_ LeafsRequest = CorethLeafsRequest{}
-)
+var _ Request = LeafsRequest{}
 
-// NodeType outlines the trie that a leaf node belongs to
-// handlers.LeafsRequestHandler uses this information to determine
-// which trie type to fetch the information from
-type NodeType uint8
+const StateTrieKeyLength = common.HashLength
 
-const (
-	StateTrieNode      = NodeType(1)
-	StateTrieKeyLength = common.HashLength
-)
-
-// LeafsRequest defines the interface for leaf sync requests.
-type LeafsRequest interface {
-	Request
-	RootHash() common.Hash
-	AccountHash() common.Hash
-	StartKey() []byte
-	EndKey() []byte
-	KeyLimit() uint16
-	LeafType() NodeType
+// LeafsRequest is a request for a range of leaves from the trie at Root.
+// Account selects a storage trie, or the account trie when empty.
+type LeafsRequest struct {
+	Root    common.Hash `serialize:"true"`
+	Account common.Hash `serialize:"true"`
+	Start   []byte      `serialize:"true"`
+	End     []byte      `serialize:"true"`
+	Limit   uint16      `serialize:"true"`
 }
 
-// LeafsRequestType selects which wire format to use when building leafs requests.
-type LeafsRequestType int
+func (l LeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
+	return handler.HandleLeafsRequest(ctx, nodeID, requestID, l)
+}
 
-const (
-	CorethLeafsRequestType LeafsRequestType = iota
-	SubnetEVMLeafsRequestType
-)
-
-// NewLeafsRequest builds a leafs request using the requested wire format.
-func NewLeafsRequest(leafReqType LeafsRequestType, root, account common.Hash, start, end []byte, limit uint16, nodeType NodeType) (LeafsRequest, error) {
-	switch leafReqType {
-	case SubnetEVMLeafsRequestType:
-		return SubnetEVMLeafsRequest{
-			Root:     root,
-			Account:  account,
-			Start:    start,
-			End:      end,
-			Limit:    limit,
-			NodeType: nodeType,
-		}, nil
-	case CorethLeafsRequestType:
-		return CorethLeafsRequest{
-			Root:     root,
-			Account:  account,
-			Start:    start,
-			End:      end,
-			Limit:    limit,
-			NodeType: nodeType,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported leafs request type: %d", leafReqType)
-	}
+func (l LeafsRequest) String() string {
+	return fmt.Sprintf(
+		"LeafsRequest(Root=%s, Account=%s, Start=%s, End=%s, Limit=%d)",
+		l.Root, l.Account, common.Bytes2Hex(l.Start), common.Bytes2Hex(l.End), l.Limit,
+	)
 }
 
 // LeafsResponse is a response to a LeafsRequest
