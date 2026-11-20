@@ -1,8 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package saeconfig holds the C-Chain operator config, which the other
-// SAE-based VMs extend.
+// Package saeconfig defines the operator config shared by SAE-based VMs.
 package saeconfig
 
 import (
@@ -62,8 +61,8 @@ func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.String())
 }
 
-// Config is the operator-supplied node configuration for the C-Chain. Other
-// SAE-based VMs embed it to extend it.
+// Config is the operator-supplied node configuration common to SAE-based VMs.
+// A VM needing more options embeds it.
 //
 // TODO(JonathanOppenheimer) enable and wire all remaining configs
 type Config struct {
@@ -237,9 +236,8 @@ func (c Config) SAEConfig(now func() time.Time) sae.Config {
 			BatchRequestLimit:   c.BatchRequestLimit,
 			CallTimeout:         c.APIMaxDuration.Duration,
 			MaxBlocksPerRequest: c.MaxBlocksPerRequest,
-			// GasCap and TxFeeCap are set to reasonable values for mainnet
-			// C-Chain. They are left unconfigurable to minimize the size of the
-			// user config.
+			// GasCap and TxFeeCap are fixed at reasonable values. They are left
+			// unconfigurable to minimize the size of the user config.
 			GasCap:                       50_000_000,
 			TxFeeCap:                     100,
 			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
