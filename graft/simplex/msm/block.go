@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 )
 
@@ -18,7 +17,7 @@ type BlockType uint8
 // A StateMachineBlock is a representation of a parsed OuterBlock, containing the inner block and the metadata.
 type StateMachineBlock struct {
 	// InnerBlock is the VM-level block, or nil if this is a block without an inner block (e.g., a Telock block).
-	InnerBlock avalanchego.VMBlock
+	InnerBlock common.VMBlock
 	// Metadata contains the state machine metadata associated with this block.
 	Metadata StateMachineMetadata
 }
@@ -121,7 +120,7 @@ func (smb *StateMachineBlock) SealingBlockInfo() *common.SealingBlockInfo {
 	for i := range bvd.AggregatedMembership.Members {
 		vdr := &bvd.AggregatedMembership.Members[i]
 		nodes = append(nodes, common.Node{
-			Id:     vdr.NodeID[:],
+			Id:     vdr.NodeID.ToNodeID(),
 			Weight: vdr.Weight,
 			PK:     vdr.BLSKey,
 		})

@@ -37,7 +37,7 @@ func CreateNetworkLogger(t *testing.T, config *FuzzConfig) *testutil.TestLogger 
 // CreateNodeLogger creates a logger for a node that writes to both console and {nodeID}.log
 func CreateNodeLogger(t *testing.T, config *FuzzConfig, nodeID common.NodeID) *testutil.TestLogger {
 	if config.LogDirectory == "" {
-		return testutil.MakeLogger(t, int(nodeID[0]))
+		return testutil.MakeLogger(t, int(nodeID.ShortID[0]))
 	}
 
 	filename := fmt.Sprintf("%s.log", nodeID.String())
@@ -48,7 +48,7 @@ func CreateNodeLogger(t *testing.T, config *FuzzConfig, nodeID common.NodeID) *t
 		t.Fatalf("Failed to setup file output for %s: %v", filename, err)
 	}
 
-	return testutil.MakeLoggerWithFile(t, fileWriter, false, int(nodeID[0]))
+	return testutil.MakeLoggerWithFile(t, fileWriter, false, int(nodeID.ShortID[0]))
 }
 
 // setupFileOutput creates a file for logging and returns a WriteSyncer.

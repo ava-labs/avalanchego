@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 
 	"github.com/stretchr/testify/require"
 )
@@ -261,11 +262,11 @@ func TestQuorumRoundMalformed(t *testing.T) {
 }
 
 func TestSizeMatchesBytes(t *testing.T) {
-	qc := testutil.TestQC{
-		{Signer: common.NodeID{1}, Value: []byte("signature1")},
-		{Signer: common.NodeID{2}, Value: []byte("signature2")},
-		{Signer: common.NodeID{3}, Value: []byte("signature3")},
-	}
+	qc := testutil.TestQC{Signatures: []testutil.Signature{
+		{Signer: testutil.NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Value: []byte("signature1")},
+		{Signer: testutil.NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Value: []byte("signature2")},
+		{Signer: testutil.NewNodeID(common.NodeID{ShortID: ids.ShortID{3}}), Value: []byte("signature3")},
+	}}
 
 	bh := common.BlockHeader{
 		ProtocolMetadata: common.ProtocolMetadata{

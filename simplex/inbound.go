@@ -197,7 +197,7 @@ func p2pSignatureToSimplexSignature(p2pSig *p2p.Signature) (common.Signature, er
 	}
 
 	return common.Signature{
-		Signer: nodeID[:],
+		Signer: common.NodeIDFromAvalancheID(nodeID),
 		Value:  p2pSig.Value,
 	}, nil
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,10 +54,10 @@ func TestNewEpochs(t *testing.T) {
 	var nonSimplexBlock = indexedBlock{seq: 0, round: 0, epoch: 0, sealingInfo: nil}
 
 	nodes := common.Nodes{
-		{Id: common.NodeID{1}},
-		{Id: common.NodeID{2}},
-		{Id: common.NodeID{3}},
-		{Id: common.NodeID{4}},
+		{Id: common.NodeID{ShortID: ids.ShortID{1}}},
+		{Id: common.NodeID{ShortID: ids.ShortID{2}}},
+		{Id: common.NodeID{ShortID: ids.ShortID{3}}},
+		{Id: common.NodeID{ShortID: ids.ShortID{4}}},
 	}
 
 	sigAggCreator := func(n []common.Node) common.SignatureAggregator {
@@ -147,7 +148,7 @@ func TestNewEpochs(t *testing.T) {
 			require.Equal(t, nodes, meta.nodes)
 			require.Len(t, meta.eligibleSigners, len(nodes))
 			for _, n := range nodes {
-				_, ok := meta.eligibleSigners[string(n.Id)]
+				_, ok := meta.eligibleSigners[n.Id]
 				require.True(t, ok)
 			}
 			require.NotNil(t, meta.signatureAggregator)
@@ -241,7 +242,7 @@ func TestCanValidate(t *testing.T) {
 func newSealingQuorumRound(epoch uint64, numValidators int) *common.QuorumRound {
 	validatorSet := make(common.Nodes, numValidators)
 	for i := range validatorSet {
-		validatorSet[i] = common.Node{Id: common.NodeID{byte(i + 1)}, Weight: 1}
+		validatorSet[i] = common.Node{Id: common.NodeID{ShortID: ids.ShortID{byte(i + 1)}}, Weight: 1}
 	}
 
 	return &common.QuorumRound{
@@ -328,7 +329,7 @@ func TestCollectedSealingBlockInfoIgnoresRemovedValidators(t *testing.T) {
 	require.False(t, e.maybeObserveThresholdResponses(info, bh, validators[0].Id))
 
 	// replace validators[0] so its old vote shouldn't make us reach a threshold of 2
-	latest = append(common.Nodes{{Id: common.NodeID{5}, Weight: 1}}, validators[1:]...)
+	latest = append(common.Nodes{{Id: common.NodeID{ShortID: ids.ShortID{5}}, Weight: 1}}, validators[1:]...)
 	require.False(t, e.maybeObserveThresholdResponses(info, bh, validators[1].Id))
 }
 
@@ -336,7 +337,7 @@ func TestCollectedSealingBlockInfoIgnoresRemovedValidators(t *testing.T) {
 func weightedNodes(weights ...uint64) common.Nodes {
 	nodes := make(common.Nodes, len(weights))
 	for i, weight := range weights {
-		nodes[i] = common.Node{Id: common.NodeID{byte(i + 1)}, Weight: weight}
+		nodes[i] = common.Node{Id: common.NodeID{ShortID: ids.ShortID{byte(i + 1)}}, Weight: weight}
 	}
 	return nodes
 }
@@ -401,7 +402,7 @@ func TestCollectedSealingBlockInfoWeightedByStake(t *testing.T) {
 			}, weightedSignatureAggregatorCreator)
 
 			for i, r := range tc.reports {
-				accepted := e.maybeObserveThresholdResponses(info, r.header, common.NodeID{r.from})
+				accepted := e.maybeObserveThresholdResponses(info, r.header, common.NodeID{ShortID: ids.ShortID{r.from}})
 				require.Equal(t, r.accepted, accepted, "report %d from node %d", i, r.from)
 			}
 		})
@@ -420,13 +421,13 @@ func TestCollectedSealingBlockInfoUsesLatestStake(t *testing.T) {
 	}, weightedSignatureAggregatorCreator)
 
 	// 100 of 400
-	require.False(t, e.maybeObserveThresholdResponses(info, bh, common.NodeID{1}))
+	require.False(t, e.maybeObserveThresholdResponses(info, bh, common.NodeID{ShortID: ids.ShortID{1}}))
 
 	// Node 1 moves most of its stake to node 4. Under the previous stake, node 2 would bring
 	// the reporters to 200 of 400, but under the latest stake they hold only 101 of 400.
 	latest = weightedNodes(1, 100, 100, 199)
-	require.False(t, e.maybeObserveThresholdResponses(info, bh, common.NodeID{2}))
+	require.False(t, e.maybeObserveThresholdResponses(info, bh, common.NodeID{ShortID: ids.ShortID{2}}))
 
 	// 201 of 400
-	require.True(t, e.maybeObserveThresholdResponses(info, bh, common.NodeID{3}))
+	require.True(t, e.maybeObserveThresholdResponses(info, bh, common.NodeID{ShortID: ids.ShortID{3}}))
 }
