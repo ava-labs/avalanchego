@@ -6,6 +6,7 @@ package firewood
 import (
 	"math"
 	"math/big"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -20,14 +21,16 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"pgregory.net/rapid"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/utils/rapidtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-func newDB(t *testing.T) state.Database {
+func newDB(t testing.TB) state.Database {
 	t.Helper()
 
 	cfg := DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug))
@@ -40,7 +43,7 @@ func newDB(t *testing.T) state.Database {
 	return db
 }
 
-func newStateDB(t *testing.T, db state.Database, root common.Hash) *state.StateDB {
+func newStateDB(t testing.TB, db state.Database, root common.Hash) *state.StateDB {
 	t.Helper()
 
 	sdb, err := state.New(root, db, nil)
@@ -58,7 +61,7 @@ type backend struct {
 	sdb *state.StateDB
 }
 
-func newBackend(t *testing.T, db state.Database) *backend {
+func newBackend(t testing.TB, db state.Database) *backend {
 	return &backend{
 		db:  db,
 		sdb: newStateDB(t, db, types.EmptyRootHash),
@@ -67,7 +70,7 @@ func newBackend(t *testing.T, db state.Database) *backend {
 
 // commit ends the current block, reopens a fresh StateDB at the new root and
 // returns that root.
-func (b *backend) commit(t *testing.T, blockNum uint64) common.Hash {
+func (b *backend) commit(t testing.TB, blockNum uint64) common.Hash {
 	t.Helper()
 	root, err := b.sdb.Commit(blockNum, true /* EIP-158 */)
 	require.NoErrorf(t, err, "%T.Commit()", b.sdb)
@@ -88,8 +91,6 @@ type account struct {
 }
 
 type SUT struct {
-	r *reader
-
 	want, got *backend
 
 	lastRoot common.Hash
@@ -104,9 +105,8 @@ type SUT struct {
 	destructedThisTx set.Set[common.Address] // eligible for resurrection
 }
 
-func newSUT(r *reader, want, got *backend) *SUT {
+func newSUT(want, got *backend) *SUT {
 	return &SUT{
-		r:                r,
 		want:             want,
 		got:              got,
 		lastRoot:         types.EmptyRootHash,
@@ -120,34 +120,26 @@ func hash(b byte) common.Hash {
 	return crypto.Keccak256Hash([]byte{b})
 }
 
-func (s *SUT) selectAddr(param byte) common.Address {
-	return s.addrs[int(param)%len(s.addrs)]
-}
-
 // createAccount creates an account, modelling an EVM contract deployment. When
 // an account has been destructed earlier in the current transaction, that
 // accound could be resurrected.
-//
-// Reads 1 byte from the reader.
 //
 // The created account is EIP-168 empty, to encourage collisions in journal
 // handling and set states of deleted accounts.
 // To guarantee an account is persisted, one must also call
 // [SUT.updateAccount] or [SUT.setStorage] on the account.
-func (s *SUT) createAccount(t *testing.T) {
-	param := s.r.byte()
-	addr := common.BytesToAddress(hash(param).Bytes())
+func (s *SUT) createAccount(tb testing.TB, addr common.Address) {
 	if _, ok := s.accounts[addr]; ok {
-		t.Logf("skipping account creation (addr=%s) because it already exists", addr)
+		tb.Logf("skipping account creation (addr=%s) because it already exists", addr)
 		return
 	}
 	if s.destructedThisTx.Contains(addr) {
 		// The account was destructed earlier this tx, so this is a
 		// resurrection.
-		t.Logf("resurrecting destructed account (addr=%s)", addr)
+		tb.Logf("resurrecting destructed account (addr=%s)", addr)
 		s.destructedThisTx.Remove(addr)
 	} else {
-		t.Logf("creating new account (addr=%s)", addr)
+		tb.Logf("creating new account (addr=%s)", addr)
 	}
 
 	s.accounts[addr] = &account{
@@ -161,15 +153,8 @@ func (s *SUT) createAccount(t *testing.T) {
 	s.got.sdb.CreateAccount(addr)
 }
 
-// Reads 1 byte from the reader
-func (s *SUT) updateAccount(t *testing.T) {
-	if len(s.addrs) == 0 {
-		return
-	}
-
-	param := s.r.byte()
-	addr := s.selectAddr(param)
-	t.Logf("updating account (addr=%s)", addr)
+func (s *SUT) updateAccount(tb testing.TB, addr common.Address) {
+	tb.Logf("updating account (addr=%s)", addr)
 	acc := s.accounts[addr]
 	acc.nonce++
 	acc.balance = new(uint256.Int).Add(acc.balance, uint256.NewInt(1))
@@ -182,21 +167,11 @@ func (s *SUT) updateAccount(t *testing.T) {
 
 // selfDestruct6780 models the SELFDESTRUCT opcode under EIP-6780.
 //
-// Reads 1 byte from the reader.
-//
 // The call is always issued to the StateDB (it is a legal operation on any
 // account), but it only actually destructs the account — and so only updates
 // the model — when the account was created in the current transaction. On a
 // pre-existing account it is a no-op and the account remains live.
-func (s *SUT) selfDestruct6780() {
-	if len(s.addrs) == 0 {
-		return
-	}
-
-	param := s.r.byte()
-	i := int(param) % len(s.addrs)
-	addr := s.addrs[i]
-
+func (s *SUT) selfDestruct6780(addr common.Address) {
 	s.want.sdb.Selfdestruct6780(addr)
 	s.got.sdb.Selfdestruct6780(addr)
 
@@ -207,20 +182,12 @@ func (s *SUT) selfDestruct6780() {
 	delete(s.accounts, addr)
 	s.createdThisTx.Remove(addr)
 	s.destructedThisTx.Add(addr)
-	s.addrs = utils.DeleteIndex(s.addrs, i)
+	s.addrs = utils.DeleteIndex(s.addrs, slices.Index(s.addrs, addr))
 }
 
-// Reads 1 byte from the reader to select account, key, and value
-func (s *SUT) setStorage(t *testing.T) {
-	if len(s.addrs) == 0 {
-		return
-	}
-
-	param := s.r.byte()
-	addr := s.selectAddr(param)
-	t.Logf("setting storage for %s", addr)
-	key := hash(s.r.byte())
-	val := hash(s.r.byte())
+func (s *SUT) setStorage(tb testing.TB, addr common.Address, k, v byte) {
+	tb.Logf("setting storage for %s", addr)
+	key, val := hash(k), hash(v)
 	acc := s.accounts[addr]
 	acc.activeSlots = append(acc.activeSlots, key)
 
@@ -232,20 +199,11 @@ func (s *SUT) setStorage(t *testing.T) {
 	s.got.sdb.SetNonce(addr, acc.nonce)
 }
 
-// Reads 1 byte from the reader to select account and key
-func (s *SUT) deleteStorage() {
-	if len(s.addrs) == 0 {
-		return
-	}
-
-	addr := s.selectAddr(s.r.byte())
+// deleteStorage zeroes accounts[addr].activeSlots[slot], which must be in range.
+func (s *SUT) deleteStorage(addr common.Address, slot int) {
 	acc := s.accounts[addr]
-	if len(acc.activeSlots) == 0 {
-		return
-	}
-	i := int(s.r.byte()) % len(acc.activeSlots)
-	key := acc.activeSlots[i]
-	acc.activeSlots = utils.DeleteIndex(acc.activeSlots, i)
+	key := acc.activeSlots[slot]
+	acc.activeSlots = utils.DeleteIndex(acc.activeSlots, slot)
 
 	// To prevent cyclical roots (A -> B -> A), update nonce
 	acc.nonce++
@@ -255,34 +213,28 @@ func (s *SUT) deleteStorage() {
 	s.got.sdb.SetNonce(addr, acc.nonce)
 }
 
-// Reads 2 bytes from the reader to select account and key
-func (s *SUT) read(t *testing.T) {
-	if len(s.addrs) == 0 {
-		return
-	}
-
-	addr := s.selectAddr(s.r.byte())
+// read compares account fields and, if slot >= 0, the storage slot
+// accounts[addr].activeSlots[slot].
+func (s *SUT) read(tb testing.TB, addr common.Address, slot int) {
 	want, got := s.want.sdb, s.got.sdb
-	require.Equal(t, want.GetNonce(addr), got.GetNonce(addr), "nonce mismatch for %s", addr)
-	require.Equal(t, want.Exist(addr), got.Exist(addr), "existence mismatch for %s", addr)
-	require.Equal(t, want.Empty(addr), got.Empty(addr), "emptiness mismatch for %s", addr)
-	require.Equal(t, want.GetBalance(addr), got.GetBalance(addr), "balance mismatch for %s", addr)
+	require.Equal(tb, want.GetNonce(addr), got.GetNonce(addr), "nonce mismatch for %s", addr)
+	require.Equal(tb, want.Exist(addr), got.Exist(addr), "existence mismatch for %s", addr)
+	require.Equal(tb, want.Empty(addr), got.Empty(addr), "emptiness mismatch for %s", addr)
+	require.Equal(tb, want.GetBalance(addr), got.GetBalance(addr), "balance mismatch for %s", addr)
 	// [state.StateDB.GetStorageRoot] is known not to produce compatible
 	// outputs.
-	require.Equal(t, want.GetCode(addr), got.GetCode(addr), "code mismatch for %s", addr)
-	require.Equal(t, want.GetCodeSize(addr), got.GetCodeSize(addr), "code size mismatch for %s", addr)
-	require.Equal(t, want.GetCodeHash(addr), got.GetCodeHash(addr), "code hash mismatch for %s", addr)
-	require.Equal(t, want.HasSelfDestructed(addr), got.HasSelfDestructed(addr), "self-destruct mismatch for %s", addr)
+	require.Equal(tb, want.GetCode(addr), got.GetCode(addr), "code mismatch for %s", addr)
+	require.Equal(tb, want.GetCodeSize(addr), got.GetCodeSize(addr), "code size mismatch for %s", addr)
+	require.Equal(tb, want.GetCodeHash(addr), got.GetCodeHash(addr), "code hash mismatch for %s", addr)
+	require.Equal(tb, want.HasSelfDestructed(addr), got.HasSelfDestructed(addr), "self-destruct mismatch for %s", addr)
 
-	storage := s.accounts[addr].activeSlots
-	if len(storage) == 0 {
+	if slot < 0 {
 		return
 	}
-	i := int(s.r.byte()) % len(storage)
-	key := storage[i]
+	key := s.accounts[addr].activeSlots[slot]
 
-	require.Equal(t, want.GetState(addr, key), got.GetState(addr, key), "storage mismatch for %s[%s]", addr, key)
-	require.Equal(t, want.GetCommittedState(addr, key), got.GetCommittedState(addr, key), "committed storage mismatch for %s[%s]", addr, key)
+	require.Equal(tb, want.GetState(addr, key), got.GetState(addr, key), "storage mismatch for %s[%s]", addr, key)
+	require.Equal(tb, want.GetCommittedState(addr, key), got.GetCommittedState(addr, key), "committed storage mismatch for %s[%s]", addr, key)
 }
 
 // finaliseTx resets the model's per-transaction tracking to mirror
@@ -300,14 +252,14 @@ func (s *SUT) finalise() {
 	s.finaliseTx()
 }
 
-func (s *SUT) intermediateRoot(t *testing.T) {
+func (s *SUT) intermediateRoot(t testing.TB) {
 	want := s.want.sdb.IntermediateRoot(true /* EIP-158 */)
 	got := s.got.sdb.IntermediateRoot(true /* EIP-158 */)
 	require.Equal(t, want, got, "root mismatch")
 	s.finaliseTx() // IntermediateRoot calls Finalise
 }
 
-func (s *SUT) stateDBCommit(t *testing.T) {
+func (s *SUT) stateDBCommit(t testing.TB) {
 	want := s.want.commit(t, s.blockNum)
 	got := s.got.commit(t, s.blockNum)
 	require.Equal(t, want, got, "root mismatch after commit")
@@ -317,7 +269,7 @@ func (s *SUT) stateDBCommit(t *testing.T) {
 	s.finaliseTx() // Commit calls Finalise
 }
 
-func (s *SUT) diskCommit(t *testing.T) {
+func (s *SUT) diskCommit(t testing.TB) {
 	want, got := s.want.db, s.got.db
 	require.NoErrorf(t, want.TrieDB().Commit(s.lastRoot, false), "%T.TrieDB().Commit(%s)", want, s.lastRoot)
 	require.NoErrorf(t, got.TrieDB().Commit(s.lastRoot, false), "%T.TrieDB().Commit(%s)", got, s.lastRoot)
@@ -333,148 +285,139 @@ func (s *SUT) copyStateDB() {
 	s.got.copy()
 }
 
-// TODO(#5539): support [*state.StateDB.SelfDestruct]
+// drawAddr draws an existing account.
+func (s *SUT) drawAddr(rt *rapid.T) common.Address {
+	if len(s.addrs) == 0 {
+		rt.Skip("no accounts")
+	}
+	return rapid.SampledFrom(s.addrs).Draw(rt, "addr")
+}
+
+// drawDestructed draws an account selfdestructed in the current transaction.
+func (s *SUT) drawDestructed(rt *rapid.T) common.Address {
+	if s.destructedThisTx.Len() == 0 {
+		rt.Skip("nothing destructed this tx")
+	}
+	destructed := s.destructedThisTx.List()
+	slices.SortFunc(destructed, common.Address.Cmp)
+	return rapid.SampledFrom(destructed).Draw(rt, "addr")
+}
+
+// drawAddrWithSlots draws an account with at least one active slot.
+func (s *SUT) drawAddrWithSlots(rt *rapid.T) common.Address {
+	var withSlots []common.Address
+	for _, a := range s.addrs {
+		if len(s.accounts[a].activeSlots) > 0 {
+			withSlots = append(withSlots, a)
+		}
+	}
+	if len(withSlots) == 0 {
+		rt.Skip("no slots")
+	}
+	return rapid.SampledFrom(withSlots).Draw(rt, "addr")
+}
+
+// drawSlot draws an index into addr's active slots, or -1 if it has none.
+func (s *SUT) drawSlot(rt *rapid.T, addr common.Address) int {
+	n := len(s.accounts[addr].activeSlots)
+	if n == 0 {
+		return -1
+	}
+	return rapid.IntRange(0, n-1).Draw(rt, "slot")
+}
+
+// Action names for [actions].
 const (
-	opCreateAccount    byte = iota // deploy an account; resurrects a same-tx destructed account when one exists
-	opUpdateAccount                // increment nonce and balance of an existing account
-	opSelfDestruct6780             // SELFDESTRUCT (EIP-6780) an account; no-op unless created this tx
-	opSetStorage                   // write a new storage slot on an existing account
-	opDeleteStorage                // zero out an existing storage slot on an existing account
-	opRead                         // read an existing account's nonce and a storage slot
-	opFinalise                     // end the current transaction without computing a root
-	opIntermediateRoot             // verify all account and storage hashes match the model
-	opStateDBCommit                // commit pending changes; root changes iff state changed
-	opDiskCommit                   // flush pending, then commit a clean StateDB; root must be unchanged
-	opCopyStateDB                  // copies statedb for future ops
-	maxOp
+	actCreateAccount    = "createAccount"
+	actResurrectAccount = "resurrectAccount"
+	actUpdateAccount    = "updateAccount"
+	actSelfDestruct6780 = "selfDestruct6780"
+	actSetStorage       = "setStorage"
+	actDeleteStorage    = "deleteStorage"
+	actRead             = "read"
+	actFinalise         = "finalise"
+	actIntermediateRoot = "intermediateRoot"
+	actStateDBCommit    = "stateDBCommit"
+	actDiskCommit       = "diskCommit"
+	actCopyStateDB      = "copyStateDB"
 )
 
-type reader struct {
-	stream []byte
-}
-
-func (r *reader) op() byte {
-	return r.byte() % maxOp
-}
-
-func (r *reader) byte() byte {
-	if len(r.stream) == 0 {
-		return 0
+// TODO(#5539): support [*state.StateDB.SelfDestruct]
+func actions(tb testing.TB, s *SUT) map[string]func(*rapid.T) {
+	// Small spaces so runs collide on the same accounts and slots.
+	const numAddrs, numKeys = 16, 16
+	addr := rapid.ByteMax(numAddrs - 1)
+	key := rapid.ByteMax(numKeys - 1)
+	return map[string]func(*rapid.T){
+		actCreateAccount:    func(rt *rapid.T) { s.createAccount(tb, common.Address{addr.Draw(rt, "addr")}) },
+		actResurrectAccount: func(rt *rapid.T) { s.createAccount(tb, s.drawDestructed(rt)) },
+		actUpdateAccount:    func(rt *rapid.T) { s.updateAccount(tb, s.drawAddr(rt)) },
+		actSelfDestruct6780: func(rt *rapid.T) { s.selfDestruct6780(s.drawAddr(rt)) },
+		actSetStorage: func(rt *rapid.T) {
+			s.setStorage(tb, s.drawAddr(rt), key.Draw(rt, "key"), key.Draw(rt, "val"))
+		},
+		actDeleteStorage: func(rt *rapid.T) {
+			a := s.drawAddrWithSlots(rt)
+			s.deleteStorage(a, s.drawSlot(rt, a))
+		},
+		actRead: func(rt *rapid.T) {
+			a := s.drawAddr(rt)
+			s.read(tb, a, s.drawSlot(rt, a))
+		},
+		actFinalise:         func(*rapid.T) { s.finalise() },
+		actIntermediateRoot: func(*rapid.T) { s.intermediateRoot(tb) },
+		actStateDBCommit:    func(*rapid.T) { s.stateDBCommit(tb) },
+		actDiskCommit:       func(*rapid.T) { s.diskCommit(tb) },
+		actCopyStateDB:      func(*rapid.T) { s.copyStateDB() },
 	}
-	b := r.stream[0]
-	r.stream = r.stream[1:]
-	return b
 }
 
-func (r *reader) empty() bool {
-	return len(r.stream) == 0
-}
-
-// FuzzStateRoot compares the state root of an arbitrary sequence of operations on
-// a Firewood-backed [state.StateDB] against a reference HashDB.
-func FuzzStateRoot(f *testing.F) {
-	tests := [][]byte{
-		{
-			opStateDBCommit,
-			opDiskCommit,
-		},
-		{
-			opCreateAccount, 0,
-			opStateDBCommit,
-			opDiskCommit,
-		},
-		{
-			opCreateAccount, 0,
-			opUpdateAccount, 0,
-			opStateDBCommit,
-			opDiskCommit,
-		},
-		{
-			opCreateAccount, 0,
-			opUpdateAccount, 0,
-			opSetStorage, 0, 1, 2,
-			opStateDBCommit,
-			opDiskCommit,
-		},
-		{
-			opCreateAccount, 0,
-			opSetStorage, 0, 1, 2,
-			opIntermediateRoot,
-			opDeleteStorage, 0 /*acct*/, 0, /*idx*/
-			opStateDBCommit,
-		},
-		{
-			opCreateAccount, 0,
-			opUpdateAccount, 0,
-			opFinalise,
-			opSelfDestruct6780, 0,
-			opStateDBCommit,
-		},
-		{
-			opCreateAccount, 0,
-			opSetStorage, 0, 1, 2,
-			opSelfDestruct6780, 0,
-			opCreateAccount, 1, // resurrects the just-destructed account
-			opSetStorage, 0, 1, 2,
-			opStateDBCommit,
-		},
-	}
-	for _, tt := range tests {
-		f.Add(tt)
-	}
-
-	f.Fuzz(func(t *testing.T, stream []byte) {
-		r := &reader{stream: stream}
-		sut := newSUT(r,
-			newBackend(t, state.NewDatabase(rawdb.NewMemoryDatabase())), // hashdb
-			newBackend(t, newDB(t)), // firewood
-		)
-		for !r.empty() {
-			switch r.op() {
-			case opCreateAccount:
-				t.Log("create account")
-				sut.createAccount(t)
-			case opUpdateAccount:
-				t.Log("update account")
-				sut.updateAccount(t)
-			case opSelfDestruct6780:
-				t.Log("delete account")
-				sut.selfDestruct6780()
-			case opSetStorage:
-				t.Log("set storage")
-				sut.setStorage(t)
-			case opDeleteStorage:
-				t.Log("delete storage")
-				sut.deleteStorage()
-			case opRead:
-				t.Log("read")
-				sut.read(t)
-			case opFinalise:
-				t.Log("finalise (end transaction)")
-				sut.finalise()
-			case opIntermediateRoot:
-				t.Log("intermediate root (end transaction)")
-				sut.intermediateRoot(t)
-			case opStateDBCommit:
-				t.Log("commit (end block)")
-				sut.stateDBCommit(t)
-			case opDiskCommit:
-				t.Log("disk commit (previous block)")
-				sut.diskCommit(t)
-			case opCopyStateDB:
-				t.Log("copy StateDB")
-				sut.copyStateDB()
-			}
+// stateRootProp compares the state root of arbitrary operation sequences on a
+// Firewood-backed [state.StateDB] against a reference: HashDB, or when
+// reconstructed, a Firewood StateDB opened past the tip.
+func stateRootProp(reconstructed bool) func(rapidtest.TB) {
+	return func(tb rapidtest.TB) {
+		var s *SUT
+		if reconstructed {
+			s = newSUT(newBackend(tb, newDB(tb)), newReconstructedBackend(tb))
+		} else {
+			s = newSUT(
+				newBackend(tb, state.NewDatabase(rawdb.NewMemoryDatabase())), // hashdb
+				newBackend(tb, newDB(tb)),                                    // firewood
+			)
 		}
-		sut.intermediateRoot(t) // final flush to tries and verify all pending state
-	})
+		acts := actions(tb, s)
+		if reconstructed {
+			// Commits are not valid on a reconstructed state.
+			delete(acts, actStateDBCommit)
+			delete(acts, actDiskCommit)
+		}
+		tb.Repeat(acts)
+		s.intermediateRoot(tb) // final flush to tries and verify all pending state
+	}
+}
+
+func TestStateRoot(t *testing.T) {
+	rapidtest.Check(t, stateRootProp(false))
+}
+
+func TestReconstructedRoot(t *testing.T) {
+	rapidtest.Check(t, stateRootProp(true))
+}
+
+func FuzzStateRoot(f *testing.F) {
+	f.Fuzz(rapidtest.MakeFuzz(stateRootProp(false)))
+}
+
+func FuzzReconstructedRoot(f *testing.F) {
+	f.Fuzz(rapidtest.MakeFuzz(stateRootProp(true)))
 }
 
 // newReconstructedBackend returns a Firewood backend whose StateDB is opened at
 // the empty root after the tip has moved past it. One MUST NOT call
 // [state.StateDB.Commit] or [triedb.Database.Commit] on it, as these are not
 // eligible operations.
-func newReconstructedBackend(t *testing.T) *backend {
+func newReconstructedBackend(t testing.TB) *backend {
 	db := newDB(t)
 
 	// The sdb address is never generated by the model
@@ -485,89 +428,6 @@ func newReconstructedBackend(t *testing.T) *backend {
 	require.NoErrorf(t, db.TrieDB().Commit(fillerRoot, false), "triedb.Commit(%s)", fillerRoot)
 
 	return newBackend(t, db)
-}
-
-func FuzzReconstructedRoot(f *testing.F) {
-	tests := [][]byte{
-		{
-			opCreateAccount, 0,
-			opUpdateAccount, 0,
-			opSetStorage, 0, 1, 2,
-			opRead, 0, 0,
-		},
-		{
-			opCreateAccount, 0,
-			opSetStorage, 0, 1, 2,
-			opIntermediateRoot,
-			opDeleteStorage, 0 /*acct*/, 0, /*idx*/
-			opRead, 0, 0,
-		},
-		{
-			opCreateAccount, 0,
-			opUpdateAccount, 0,
-			opFinalise,
-			opSelfDestruct6780, 0,
-		},
-		{
-			opCreateAccount, 0,
-			opSetStorage, 0, 1, 2,
-			opSelfDestruct6780, 0,
-			opCreateAccount, 1, // resurrects the just-destructed account
-			opSetStorage, 0, 3, 4,
-			opIntermediateRoot,
-			opRead, 0, 0,
-		},
-		{
-			opCreateAccount, 0,
-			opUpdateAccount, 0,
-			opIntermediateRoot,
-			opCopyStateDB,
-			opSetStorage, 0, 1, 2,
-			opIntermediateRoot,
-		},
-	}
-	for _, test := range tests {
-		f.Add(test)
-	}
-
-	f.Fuzz(func(t *testing.T, stream []byte) {
-		r := &reader{stream: stream}
-		sut := newSUT(r, newBackend(t, newDB(t)), newReconstructedBackend(t))
-		for !r.empty() {
-			// [state.StateDB.Commit] andn [triedb.Database.Commit] are not valid
-			// options for a reconstructed state, and aren't included below.
-			switch r.op() {
-			case opCreateAccount:
-				t.Log("create account")
-				sut.createAccount(t)
-			case opUpdateAccount:
-				t.Log("update account")
-				sut.updateAccount(t)
-			case opSelfDestruct6780:
-				t.Log("delete account")
-				sut.selfDestruct6780()
-			case opSetStorage:
-				t.Log("set storage")
-				sut.setStorage(t)
-			case opDeleteStorage:
-				t.Log("delete storage")
-				sut.deleteStorage()
-			case opRead:
-				t.Log("read")
-				sut.read(t)
-			case opFinalise:
-				t.Log("finalise (end transaction)")
-				sut.finalise()
-			case opIntermediateRoot:
-				t.Log("intermediate root (end transaction)")
-				sut.intermediateRoot(t)
-			case opCopyStateDB:
-				t.Log("copy StateDB")
-				sut.copyStateDB()
-			}
-		}
-		sut.intermediateRoot(t) // final flush to tries and verify all pending state
-	})
 }
 
 func TestGenesis(t *testing.T) {
@@ -1018,4 +878,80 @@ func TestHashAfterRevisionEviction(t *testing.T) {
 
 	_, err = sdb.Commit(2, true)
 	require.ErrorIs(t, err, errHistoricalNotCommittable, "Commit()")
+}
+
+func TestStateRootRegressions(t *testing.T) {
+	tests := []struct {
+		name  string
+		steps func(t *testing.T, s *SUT)
+	}{
+		{
+			// testdata/fuzz/FuzzStateRoot/test
+			name: "slot_rewritten_to_original_value_across_commits",
+			steps: func(t *testing.T, s *SUT) {
+				a := common.Address{50}
+				s.createAccount(t, a)
+				s.updateAccount(t, a)
+				s.createAccount(t, common.Address{48})
+				s.setStorage(t, a, 48, 48)
+				for _, p := range []byte{49, 57, 55, 65} {
+					s.createAccount(t, common.Address{p})
+				}
+				s.stateDBCommit(t)
+				s.setStorage(t, a, 48, 49)
+				s.createAccount(t, common.Address{56})
+				s.stateDBCommit(t)
+				s.setStorage(t, a, 48, 48)
+				s.stateDBCommit(t)
+			},
+		},
+		{
+			// testdata/fuzz/FuzzStateRoot/01b54cc9de2de993
+			name: "slot_deleted_restores_root_across_commits",
+			steps: func(t *testing.T, s *SUT) {
+				a := common.Address{50}
+				s.createAccount(t, a)
+				s.updateAccount(t, a)
+				s.stateDBCommit(t)
+				s.setStorage(t, a, 48, 48)
+				s.stateDBCommit(t)
+				s.deleteStorage(a, 0)
+				s.stateDBCommit(t)
+			},
+		},
+		{
+			name: "resurrect_in_same_tx",
+			steps: func(t *testing.T, s *SUT) {
+				a := common.Address{}
+				s.createAccount(t, a)
+				s.setStorage(t, a, 1, 2)
+				s.selfDestruct6780(a)
+				s.createAccount(t, a)
+				s.setStorage(t, a, 3, 4)
+			},
+		},
+		{
+			// testdata/fuzz/FuzzStateRoot/4b9a6df5b9d02d03
+			name: "copy_between_storage_writes",
+			steps: func(t *testing.T, s *SUT) {
+				a := common.Address{48}
+				s.createAccount(t, a)
+				s.finalise()
+				s.setStorage(t, a, 55, 48)
+				s.copyStateDB()
+				s.intermediateRoot(t)
+				s.setStorage(t, a, 50, 56)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newSUT(
+				newBackend(t, state.NewDatabase(rawdb.NewMemoryDatabase())), // hashdb
+				newBackend(t, newDB(t)), // firewood
+			)
+			tt.steps(t, s)
+			s.intermediateRoot(t)
+		})
+	}
 }
