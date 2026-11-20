@@ -472,14 +472,22 @@ func TestBootstrapperMarksChainAsExecuting(t *testing.T) {
 	require.NoError(err)
 	bs.TimeoutRegistrar = &enginetest.Timer{}
 
-	require.NoError(bs.Start(t.Context(), 0))
-
 	var requestID uint32
+	sender.SendGetAcceptedFrontierF = func(_ context.Context, _ set.Set[ids.NodeID], reqID uint32) {
+		requestID = reqID
+	}
+	sender.SendGetAcceptedF = func(_ context.Context, _ set.Set[ids.NodeID], reqID uint32, _ []ids.ID) {
+		requestID = reqID
+	}
 	sender.SendGetAncestorsF = func(_ context.Context, _ ids.NodeID, reqID uint32, _ ids.ID) {
 		requestID = reqID
 	}
 
-	require.NoError(bs.startSyncing(t.Context(), blocksToIDs(blks[3:4])))
+	// The peer reports the last block as its accepted frontier, so the
+	// bootstrapper fetches it and its ancestors.
+	require.NoError(bs.Start(t.Context(), 0))
+	require.NoError(bs.AcceptedFrontier(t.Context(), peerID, requestID, blks[3].ID()))
+	require.NoError(bs.Accepted(t.Context(), peerID, requestID, set.Of(blks[3].ID())))
 	require.False(config.Ctx.Executing.Get())
 
 	require.NoError(bs.Ancestors(t.Context(), peerID, requestID, blocksToBytes(blks)))
