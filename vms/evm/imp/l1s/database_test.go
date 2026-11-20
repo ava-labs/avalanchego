@@ -76,7 +76,7 @@ func TestStandaloneDatabase(t *testing.T) {
 	}
 
 	ctx, sut := newSUT(t, opts...)
-	sut.send(ctx, t, wallet, 0, transferTx(common.Address{1}, common.Big1))
+	sut.send(ctx, t, wallet.SetNonceAndSign(t, 0, transferTx(common.Address{1}, common.Big1)))
 	want := sut.RunConsensusLoop(ctx, t)
 	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
 

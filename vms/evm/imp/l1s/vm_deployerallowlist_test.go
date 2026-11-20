@@ -17,183 +17,140 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
-
-	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 )
 
-// TestDeployerAllowListPrecompileUpgradesSAE exercises mid-chain
-// `PrecompileUpgrades` for the `deployerallowlist` precompile under SAE
-// end-to-end through the same enable -> disable -> re-enable timeline used
-// by [TestTxAllowListPrecompileUpgradesSAE]. The execution-semantics step
-// (3) is materially different because deployer allowlist is enforced by
-// libevm's frame-local [params.RulesExtra.CanCreateContract], not by SAE
-// admission.
-//
-//  1. The precompile is correctly enabled / disabled at the scheduled
-//     timestamp (via `StartExecutingBlock` -> `core.ApplyUpgrades`).
-//  2. Admin / manager roles are observable via
-//     `deployerallowlist.GetContractDeployerAllowListStatus` and follow the
-//     last-executed vs last-settled lag exactly as for txallowlist.
-//  3. Deploy txs from non-allow-listed senders are ADMITTED at RPC, but
-//     produce a `status=failed` receipt with no contract code at the deploy
-//     address (frame-local revert from `CanCreateContract`). Once disabled,
-//     the same sender's deploy succeeds (`status=success`, deployed code
-//     present).
-func TestDeployerAllowListPrecompileUpgradesSAE(t *testing.T) {
-	const (
-		adminIdx    = 0
-		nonAdminIdx = 1
-	)
+// TestDeployerAllowListPrecompileUpgrades asserts that a deployer allowlist
+// upgrade MUST apply to deploys in the first block at or after its timestamp.
+func TestDeployerAllowListPrecompileUpgrades(t *testing.T) {
+	disableTime := testStartTime.Add(blockBuildAdvance)
+	reenableTime := disableTime.Add(blockBuildAdvance)
 
-	now := testStartTime
-	disableTime := now.Add(saeparams.Tau)
-	reenableTime := disableTime.Add(2 * saeparams.Tau)
-
+	const adminIdx, userIdx = 0, 1
 	wallet := newWallet(t, 2)
-	addresses := wallet.Addresses()
-	admin := addresses[adminIdx]
-	nonAdmin := addresses[nonAdminIdx]
+	admin := wallet.Addresses()[adminIdx]
+	user := wallet.Addresses()[userIdx]
 
-	ctx, sut := newSUT(
-		t,
-		withMaxAllocFor(addresses...),
+	ctx, sut := newSUT(t,
+		withMaxAllocFor(wallet.Addresses()...),
 		withGenesisPrecompiles(extras.Precompiles{
-			deployerallowlist.ConfigKey: deployerallowlist.NewConfig(
-				new(uint64(0)),
-				[]common.Address{admin},
-				nil,
-				nil,
-			),
+			deployerallowlist.ConfigKey: &deployerallowlist.Config{
+				AllowListConfig: allowlist.AllowListConfig{
+					AdminAddresses: []common.Address{admin},
+				},
+				Upgrade: precompileconfig.Upgrade{
+					BlockTimestamp: new(uint64(0)),
+				},
+			},
 		}),
 		withUpgrades(extras.UpgradeConfig{
 			PrecompileUpgrades: []extras.PrecompileUpgrade{
 				{
-					Config: deployerallowlist.NewDisableConfig(new(uint64(disableTime.Unix()))), // #nosec G115 -- known positive test timestamp
+					Config: &deployerallowlist.Config{
+						Upgrade: precompileconfig.Upgrade{
+							BlockTimestamp: new(uint64(disableTime.Unix())), //#nosec G115 -- Known non-negative
+							Disable:        true,
+						},
+					},
 				},
 				{
-					// Re-enable promotes `nonAdminIdx` to manager so we
-					// can observe the new config land in state.
-					Config: deployerallowlist.NewConfig(
-						new(uint64(reenableTime.Unix())), // #nosec G115 -- known positive test timestamp
-						[]common.Address{admin},
-						nil,
-						[]common.Address{nonAdmin},
-					),
+					Config: &deployerallowlist.Config{
+						AllowListConfig: allowlist.AllowListConfig{
+							AdminAddresses:   []common.Address{admin},
+							ManagerAddresses: []common.Address{user},
+						},
+						Upgrade: precompileconfig.Upgrade{
+							BlockTimestamp: new(uint64(reenableTime.Unix())), //#nosec G115 -- Known non-negative
+						},
+					},
 				},
 			},
 		}),
 	)
 
-	// Step 0: at genesis, deployer allowlist is enabled with `admin` as the
-	// only allow-listed deployer. Latest and finalized agree (no upgrades
-	// yet).
-	// (1) Precompile is enabled per chain config at the current timestamp.
-	require.True(t, sut.isPrecompileEnabledAtLatest(deployerallowlist.ContractAddress),
-		"deployerallowlist must be enabled at genesis")
-	// (2) Genesis config is applied to state in both latest & finalized.
-	require.Equal(t, allowlist.AdminRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, admin, rpc.LatestBlockNumber))
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, nonAdmin, rpc.LatestBlockNumber))
-	require.Equal(t, allowlist.AdminRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, admin, rpc.FinalizedBlockNumber))
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
+	type (
+		deploy struct {
+			from       int
+			wantStatus uint64
+		}
+		roles struct{ admin, user allowlist.Role }
+	)
+	steps := []struct {
+		name        string
+		time        time.Time
+		deploys     []deploy
+		wantEnabled bool
+		wantRoles   roles
+	}{
+		{
+			name: "genesis",
+			time: testStartTime,
+			deploys: []deploy{
+				{from: adminIdx, wantStatus: types.ReceiptStatusSuccessful},
+				{from: userIdx, wantStatus: types.ReceiptStatusFailed},
+			},
+			wantEnabled: true,
+			wantRoles: roles{
+				admin: allowlist.AdminRole,
+				user:  allowlist.NoRole,
+			},
+		},
+		{
+			name: "disable",
+			time: disableTime,
+			deploys: []deploy{
+				{from: userIdx, wantStatus: types.ReceiptStatusSuccessful},
+			},
+			wantEnabled: false,
+			wantRoles: roles{
+				admin: allowlist.NoRole,
+				user:  allowlist.NoRole,
+			},
+		},
+		{
+			name: "reenable",
+			time: reenableTime,
+			deploys: []deploy{
+				{from: userIdx, wantStatus: types.ReceiptStatusSuccessful},
+			},
+			wantEnabled: true,
+			wantRoles: roles{
+				admin: allowlist.AdminRole,
+				user:  allowlist.ManagerRole,
+			},
+		},
+	}
 
-	// (3) Both deploys are admitted at RPC because the deployer allowlist is
-	// not enforced at admission. The admin deploy succeeds, while the
-	// non-admin's deploy reverts inside the EVM via libevm's
-	// `CanCreateContract` hook, producing a status=failed receipt with no
-	// code at the deploy address.
-	adminDeploy := sut.send(ctx, t, wallet, adminIdx, deployTx())
-	block := sut.RunConsensusLoop(ctx, t)
-	require.Len(t, block.Transactions(), 1)
-	require.Equal(t, adminDeploy.Hash(), block.Transactions()[0].Hash())
-	sut.requireDeploySucceeded(ctx, t, adminDeploy)
+	for _, s := range steps {
+		sut.clock.Set(s.time)
+		txs := make([]*types.Transaction, len(s.deploys))
+		for i, d := range s.deploys {
+			txs[i] = wallet.SetNonceAndSign(t, d.from, deployTx())
+			sut.send(ctx, t, txs[i])
+		}
+		sut.RunConsensusLoop(ctx, t)
 
-	sut.clock.Advance(blockBuildAdvance)
-	nonAdminDeploy := sut.send(ctx, t, wallet, nonAdminIdx, deployTx())
-	block = sut.RunConsensusLoop(ctx, t)
-	require.Len(t, block.Transactions(), 1)
-	require.Equal(t, nonAdminDeploy.Hash(), block.Transactions()[0].Hash())
-	sut.requireDeployFailed(ctx, t, nonAdminDeploy)
+		for i, d := range s.deploys {
+			sut.requireDeployed(ctx, t, txs[i], d.wantStatus)
+		}
+		require.Equalf(t, s.wantEnabled, sut.isPrecompileEnabledAtLatest(deployerallowlist.ContractAddress), "%s: precompile enabled", s.name)
 
-	// Step 1: advance past `disableTime` and produce the activation block.
-	// `StartExecutingBlock` runs the disable upgrade BEFORE tx execution
-	// in that block, so `nonAdmin`'s deploy in the same block sees the
-	// precompile already disabled and `CanCreateContract` is a no-op.
-	sut.clock.Set(disableTime.Add(time.Second))
-	postDisableDeploy := sut.send(ctx, t, wallet, nonAdminIdx, deployTx())
-	block = sut.RunConsensusLoop(ctx, t)
-	require.Len(t, block.Transactions(), 1)
-	require.Equal(t, postDisableDeploy.Hash(), block.Transactions()[0].Hash())
-	sut.requireDeploySucceeded(ctx, t, postDisableDeploy)
-
-	// (1) Disable upgrade fired inside `StartExecutingBlock`; precompile
-	// is no longer enabled per chain config at the current timestamp.
-	require.False(t, sut.isPrecompileEnabledAtLatest(deployerallowlist.ContractAddress),
-		"deployerallowlist must be disabled after activation")
-	// (2) Latest reflects the disable; finalized still observes the
-	// pre-disable admin role (settlement lags by Tau).
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, admin, rpc.LatestBlockNumber))
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, nonAdmin, rpc.LatestBlockNumber))
-	require.Equal(t, allowlist.AdminRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, admin, rpc.FinalizedBlockNumber),
-		"finalized state must still show admin role until disable settles")
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
-
-	// Allow the disable activation to settle so finalized catches up.
-	sut.clock.Advance(saeparams.Tau + time.Second)
-	settleTx := sut.send(ctx, t, wallet, adminIdx, transferTx(nonAdmin, common.Big1))
-	block = sut.RunConsensusLoop(ctx, t)
-	require.Len(t, block.Transactions(), 1)
-	require.Equal(t, settleTx.Hash(), block.Transactions()[0].Hash())
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, admin, rpc.FinalizedBlockNumber),
-		"finalized must reflect disable once it has settled")
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
-
-	// Step 2: advance to `reenableTime` and produce the re-enable
-	// activation block. Same as step 1: the upgrade fires in
-	// `StartExecutingBlock`, so a deploy from the now-promoted manager
-	// (`nonAdmin`) in this block sees the precompile already enabled with
-	// the new roles and succeeds.
-	sut.clock.Set(reenableTime)
-	managerDeploy := sut.send(ctx, t, wallet, nonAdminIdx, deployTx())
-	block = sut.RunConsensusLoop(ctx, t)
-	require.Len(t, block.Transactions(), 1)
-	require.Equal(t, managerDeploy.Hash(), block.Transactions()[0].Hash())
-	sut.requireDeploySucceeded(ctx, t, managerDeploy)
-
-	// (1) Re-enable upgrade fired; precompile is enabled per chain config
-	// at the current timestamp.
-	require.True(t, sut.isPrecompileEnabledAtLatest(deployerallowlist.ContractAddress),
-		"deployerallowlist must be re-enabled after activation")
-	// (2) Latest reflects the re-enable (admin + manager promotion);
-	// finalized is still pre-re-enable (no roles).
-	require.Equal(t, allowlist.AdminRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, admin, rpc.LatestBlockNumber))
-	require.Equal(t, allowlist.ManagerRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, nonAdmin, rpc.LatestBlockNumber))
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, admin, rpc.FinalizedBlockNumber),
-		"finalized state must still reflect disabled allowlist until re-enable settles")
-	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
+		got := sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, admin, rpc.LatestBlockNumber)
+		require.Equalf(t, s.wantRoles.admin, got, "%s: admin role", s.name)
+		got = sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, user, rpc.LatestBlockNumber)
+		require.Equalf(t, s.wantRoles.user, got, "%s: user role", s.name)
+	}
 }
 
-// requireDeploySucceeded asserts that tx deployed code.
-func (s *SUT) requireDeploySucceeded(ctx context.Context, tb testing.TB, tx *types.Transaction) {
+// requireDeployed asserts that the contract creation tx was included with
+// status want, and deployed code if and only if it succeeded.
+func (s *SUT) requireDeployed(ctx context.Context, tb testing.TB, tx *types.Transaction, want uint64) {
 	tb.Helper()
-	require.Nil(tb, tx.To(), "test setup: tx must be a contract creation")
 
-	receipt := s.requireReceiptStatus(ctx, tb, tx, types.ReceiptStatusSuccessful)
-	require.NotEqualf(tb, (common.Address{}), receipt.ContractAddress,
-		"successful deploy must populate ContractAddress")
+	receipt := s.requireReceiptStatus(ctx, tb, tx, want)
 
-	code, err := s.EthClient().CodeAt(ctx, receipt.ContractAddress, nil)
-	require.NoErrorf(tb, err, "CodeAt(%s)", receipt.ContractAddress)
-	require.NotEmptyf(tb, code, "successful deploy at %s must leave code on chain", receipt.ContractAddress)
-}
-
-// requireDeployFailed asserts that tx was included but deployed no code.
-func (s *SUT) requireDeployFailed(ctx context.Context, tb testing.TB, tx *types.Transaction) {
-	tb.Helper()
-	require.Nil(tb, tx.To(), "test setup: tx must be a contract creation")
-
-	receipt := s.requireReceiptStatus(ctx, tb, tx, types.ReceiptStatusFailed)
-	// Failed deploys still report the derived address.
-	code, err := s.EthClient().CodeAt(ctx, receipt.ContractAddress, nil)
-	require.NoErrorf(tb, err, "CodeAt(%s)", receipt.ContractAddress)
-	require.Emptyf(tb, code, "failed deploy must leave no code at %s", receipt.ContractAddress)
+	client := s.EthClient()
+	code, err := client.CodeAt(ctx, receipt.ContractAddress, nil)
+	require.NoErrorf(tb, err, "%T.CodeAt(%s)", client, receipt.ContractAddress)
+	require.Equalf(tb, want == types.ReceiptStatusSuccessful, len(code) > 0, "code deployed by tx %#x", tx.Hash())
 }

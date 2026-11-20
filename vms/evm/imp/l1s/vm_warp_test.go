@@ -60,7 +60,7 @@ func TestSendWarpMessage(t *testing.T) {
 
 	warpSendMessageInput, err := warpcontract.PackSendWarpMessage(payloadData)
 	require.NoError(t, err)
-	sut.send(ctx, t, wallet, 0, warpTx(warpSendMessageInput, nil /*unsigned message*/))
+	sut.send(ctx, t, wallet.SetNonceAndSign(t, 0, warpTx(warpSendMessageInput, nil /*unsigned message*/)))
 
 	built := sut.BuildVerify(ctx, t, sut.LastAcceptedID(ctx, t))
 	require.Len(t, built.EthBlock().Transactions(), 1)
@@ -123,7 +123,7 @@ func TestInactiveWarpAddressLogsNotSigned(t *testing.T) {
 		}),
 	)
 
-	sut.send(ctx, t, wallet, 0, warpTx(nil /*txPayload*/, nil /*signedMessage*/))
+	sut.send(ctx, t, wallet.SetNonceAndSign(t, 0, warpTx(nil /*txPayload*/, nil /*signedMessage*/)))
 	built := sut.BuildVerify(ctx, t, sut.LastAcceptedID(ctx, t))
 	sut.AcceptAndExecute(ctx, t, built)
 
@@ -211,7 +211,8 @@ func TestPredicateVerification(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sut.clock.Advance(blockBuildAdvance)
-			validateTx := sut.send(ctx, t, wallet, 0, warpTx(tt.txPayload, tt.signedMsg))
+			validateTx := wallet.SetNonceAndSign(t, 0, warpTx(tt.txPayload, tt.signedMsg))
+			sut.send(ctx, t, validateTx)
 
 			built := sut.BuildVerify(ctx, t, sut.LastAcceptedID(ctx, t), vmtest.WithBlockContext(&block.Context{PChainHeight: 0}))
 			require.Len(t, built.EthBlock().Transactions(), 1)
@@ -304,7 +305,7 @@ func TestLegacyVMParsesIglooBlocks(t *testing.T) {
 	ctx, sut := newSUT(t, withMaxAllocFor(wallet.Addresses()...), withWarpEnabled())
 	// Without Warp transactions, the predicate results are shorter than the
 	// legacy fee window.
-	sut.send(ctx, t, wallet, 0, transferTx(wallet.Addresses()[0], big.NewInt(1)))
+	sut.send(ctx, t, wallet.SetNonceAndSign(t, 0, transferTx(wallet.Addresses()[0], big.NewInt(1))))
 	built := sut.BuildVerify(ctx, t, sut.LastAcceptedID(ctx, t))
 
 	legacyCtx := snowtest.Context(t, sut.snowCtx.ChainID)

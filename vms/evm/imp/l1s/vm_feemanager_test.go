@@ -70,7 +70,8 @@ func TestFeeManagerForceDisabledAtIglooActivation(t *testing.T) {
 
 	// Build a block past Igloo. Activator fires the synthetic Disable
 	// upgrade, SelfDestruct + Finalise wipe 0x02..03.
-	settleTx := sut.send(ctx, t, wallet, adminIdx, transferTx(wallet.Addresses()[1], common.Big1))
+	settleTx := wallet.SetNonceAndSign(t, adminIdx, transferTx(wallet.Addresses()[1], common.Big1))
+	sut.send(ctx, t, settleTx)
 	block := sut.RunConsensusLoop(ctx, t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, settleTx.Hash(), block.Transactions()[0].Hash())

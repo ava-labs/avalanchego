@@ -32,7 +32,7 @@ func (s *SUT) produceBlocks(ctx context.Context, tb testing.TB, w *saetest.Walle
 
 	var blk *blocks.Block
 	for range n {
-		s.send(ctx, tb, w, from, transferTx(common.Address{1}, common.Big1))
+		s.send(ctx, tb, w.SetNonceAndSign(tb, from, transferTx(common.Address{1}, common.Big1)))
 		blk = s.RunConsensusLoop(ctx, tb)
 		s.clock.AdvanceToSettle(ctx, tb, blk)
 	}

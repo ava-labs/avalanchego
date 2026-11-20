@@ -95,7 +95,8 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 	// (3) Mempool ingress (last-executed) rejects the non-admin sender at
 	// RPC; worst-case admission (last-settled) excludes it from blocks.
 	// Fund `nonAdmin` so it can pay fees later.
-	fundNonAdmin := sut.send(ctx, t, wallet, adminIdx, transferTx(nonAdmin, fundValue))
+	fundNonAdmin := wallet.SetNonceAndSign(t, adminIdx, transferTx(nonAdmin, fundValue))
+	sut.send(ctx, t, fundNonAdmin)
 	droppedTx := wallet.SetNonceAndSign(t, nonAdminIdx, transferTx(admin, common.Big1))
 	// JSON-RPC stringifies the error, so the sentinel chain is lost; match
 	// on its message instead. See e.g. txallowlist/simulated_test.go.
@@ -110,7 +111,8 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 
 	// Step 1: advance to `disableTime` and produce the activation block.
 	sut.clock.Set(disableTime)
-	disableActivationTx := sut.send(ctx, t, wallet, adminIdx, transferTx(nonAdmin, common.Big1))
+	disableActivationTx := wallet.SetNonceAndSign(t, adminIdx, transferTx(nonAdmin, common.Big1))
+	sut.send(ctx, t, disableActivationTx)
 	block = sut.RunConsensusLoop(ctx, t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, disableActivationTx.Hash(), block.Transactions()[0].Hash())
@@ -146,7 +148,8 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 	// Step 2: advance to `reenableTime` and produce the re-enable activation
 	// block.
 	sut.clock.Set(reenableTime)
-	reenableActivationTx := sut.send(ctx, t, wallet, adminIdx, transferTx(nonAdmin, common.Big1))
+	reenableActivationTx := wallet.SetNonceAndSign(t, adminIdx, transferTx(nonAdmin, common.Big1))
+	sut.send(ctx, t, reenableActivationTx)
 	block = sut.RunConsensusLoop(ctx, t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, reenableActivationTx.Hash(), block.Transactions()[0].Hash())
@@ -164,7 +167,8 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 
 	// (3) `nonAdmin` is now a manager and must be admissible
 	sut.clock.Advance(saeparams.Tau + time.Second)
-	managerTx := sut.send(ctx, t, wallet, nonAdminIdx, transferTx(admin, common.Big1))
+	managerTx := wallet.SetNonceAndSign(t, nonAdminIdx, transferTx(admin, common.Big1))
+	sut.send(ctx, t, managerTx)
 	block = sut.RunConsensusLoop(ctx, t)
 	require.Len(t, block.Transactions(), 1, "manager tx must be admitted after re-enable settles")
 	require.Equal(t, managerTx.Hash(), block.Transactions()[0].Hash())

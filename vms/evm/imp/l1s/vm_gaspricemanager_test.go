@@ -50,7 +50,7 @@ func settleGasPriceManagerMutation(ctx context.Context, t *testing.T, sut *SUT, 
 	t.Helper()
 	const fromIdx = 1
 	sut.clock.Advance(settleAdvance)
-	sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+	sut.send(ctx, t, wallet.SetNonceAndSign(t, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1)))
 	return sut.RunConsensusLoop(ctx, t)
 }
 
@@ -106,7 +106,7 @@ func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 	wantPinned := uint256.NewInt(pinnedMinPrice)
 	for i := range 3 {
 		sut.clock.Advance(blockBuildAdvance)
-		sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[toIdx], common.Big1))
+		sut.send(ctx, t, wallet.SetNonceAndSign(t, fromIdx, transferTx(wallet.Addresses()[toIdx], common.Big1)))
 		built := sut.RunConsensusLoop(ctx, t)
 		require.Equal(t, wantPinned, built.ExecutedBaseFee(),
 			"static-pricing block %d ExecutedBaseFee", i)
@@ -114,7 +114,7 @@ func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 
 	_ = settleGasPriceManagerMutation(ctx, t, sut, wallet)
 	sut.clock.Advance(blockBuildAdvance)
-	sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[toIdx], common.Big1))
+	sut.send(ctx, t, wallet.SetNonceAndSign(t, fromIdx, transferTx(wallet.Addresses()[toIdx], common.Big1)))
 	post := sut.RunConsensusLoop(ctx, t)
 	require.Equal(t, wantPinned, post.ExecutedBaseFee(),
 		"static-pricing ExecutedBaseFee must survive Tau settlement")
@@ -147,7 +147,8 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 	newCfg := staticPricingConfig(newMinPrice)
 	mutationCalldata, err := gaspricemanager.PackSetGasPriceConfig(newCfg)
 	require.NoError(t, err)
-	mutationTx := sut.send(ctx, t, wallet, adminIdx, callTx(gaspricemanager.ContractAddress, mutationCalldata, gasPriceManagerCallGas))
+	mutationTx := wallet.SetNonceAndSign(t, adminIdx, callTx(gaspricemanager.ContractAddress, mutationCalldata, gasPriceManagerCallGas))
+	sut.send(ctx, t, mutationTx)
 	mutationBlock := sut.RunConsensusLoop(ctx, t)
 	sut.requireReceiptStatus(ctx, t, mutationTx, types.ReceiptStatusSuccessful)
 	require.Equal(t, uint256.NewInt(oldMinPrice), mutationBlock.ExecutedBaseFee(),
@@ -162,7 +163,7 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 	// M+2's base fee comes from the clock after M+1, which M+1 built against
 	// M's settled state.
 	sut.clock.Advance(blockBuildAdvance)
-	sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+	sut.send(ctx, t, wallet.SetNonceAndSign(t, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1)))
 	delivery := sut.RunConsensusLoop(ctx, t)
 	require.Equal(t, uint256.NewInt(newMinPrice), delivery.ExecutedBaseFee(),
 		"delivery block ExecutedBaseFee must reflect post-settlement new floor")
@@ -200,7 +201,7 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 		built := make([]*blocks.Block, 0, numBlocks)
 		for range numBlocks {
 			sut.clock.Advance(blockBuildAdvance)
-			sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+			sut.send(ctx, t, wallet.SetNonceAndSign(t, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1)))
 			built = append(built, sut.RunConsensusLoop(ctx, t))
 		}
 		return built
@@ -299,14 +300,15 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 		t.Helper()
 		calldata, err := gaspricemanager.PackSetGasPriceConfig(config)
 		require.NoError(t, err, "gaspricemanager.PackSetGasPriceConfig(%+v)", config)
-		tx := sut.send(ctx, t, wallet, adminIdx, callTx(gaspricemanager.ContractAddress, calldata, gasPriceManagerCallGas))
+		tx := wallet.SetNonceAndSign(t, adminIdx, callTx(gaspricemanager.ContractAddress, calldata, gasPriceManagerCallGas))
+		sut.send(ctx, t, tx)
 		b := sut.RunConsensusLoop(ctx, t)
 		sut.requireReceiptStatus(ctx, t, tx, types.ReceiptStatusSuccessful)
 		return b
 	}
 
 	sut.clock.Advance(blockBuildAdvance)
-	sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+	sut.send(ctx, t, wallet.SetNonceAndSign(t, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1)))
 	baseline := sut.RunConsensusLoop(ctx, t)
 	initialPinnedExponent := dynamic.DesiredTargetExponent(gas.Gas(initialPinnedTarget))
 	require.Equal(t, initialPinnedExponent, blockTargetExponent(t, baseline),
@@ -445,21 +447,22 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 				require.True(t, tc.activationTime.After(now),
 					"test setup: pre-transition assertion requires activationTime > now")
 				sut.clock.Advance(blockBuildAdvance)
-				sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+				sut.send(ctx, t, wallet.SetNonceAndSign(t, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1)))
 				preTransition := sut.RunConsensusLoop(ctx, t)
 				check(t, "pre-transition", tc.preTransition, preTransition)
 			}
 
 			// Any tx triggers the activation block.
 			sut.clock.Set(tc.activationTime)
-			activationTx := sut.send(ctx, t, wallet, adminIdx, deployTx())
+			activationTx := wallet.SetNonceAndSign(t, adminIdx, deployTx())
+			sut.send(ctx, t, activationTx)
 			_ = sut.RunConsensusLoop(ctx, t)
 			sut.requireReceiptStatus(ctx, t, activationTx, types.ReceiptStatusSuccessful)
 
 			_ = settleGasPriceManagerMutation(ctx, t, sut, wallet)
 
 			sut.clock.Advance(blockBuildAdvance)
-			sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+			sut.send(ctx, t, wallet.SetNonceAndSign(t, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1)))
 			delivery := sut.RunConsensusLoop(ctx, t)
 			check(t, "delivery", tc.postTransition, delivery)
 		})
@@ -491,7 +494,7 @@ func TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE(t *testing.T) {
 	wantPinned := uint256.NewInt(pinnedMinPrice)
 
 	sut.clock.Advance(blockBuildAdvance)
-	sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+	sut.send(ctx, t, wallet.SetNonceAndSign(t, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1)))
 	preRestart := sut.RunConsensusLoop(ctx, t)
 	require.Equal(t, wantPinned, preRestart.ExecutedBaseFee(),
 		"pre-restart ExecutedBaseFee must reflect pinned MinGasPrice")
@@ -500,7 +503,7 @@ func TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE(t *testing.T) {
 	ctx, sut = newSUT(t, opts...)
 
 	sut.clock.Advance(blockBuildAdvance)
-	sut.send(ctx, t, wallet, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1))
+	sut.send(ctx, t, wallet.SetNonceAndSign(t, fromIdx, transferTx(wallet.Addresses()[fromIdx], common.Big1)))
 	postRestart := sut.RunConsensusLoop(ctx, t)
 	require.Equal(t, wantPinned, postRestart.ExecutedBaseFee(),
 		"post-restart ExecutedBaseFee must still reflect pinned MinGasPrice (header roundtrip)")

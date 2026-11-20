@@ -407,16 +407,13 @@ func deployTx() *types.DynamicFeeTx {
 	}
 }
 
-// send signs data as account from of w, sends it over RPC, and waits until it
-// is pending.
-func (s *SUT) send(ctx context.Context, tb testing.TB, w *saetest.Wallet, from int, data types.TxData) *types.Transaction {
+// send sends tx over RPC and waits until it is pending.
+func (s *SUT) send(ctx context.Context, tb testing.TB, tx *types.Transaction) {
 	tb.Helper()
 
-	tx := w.SetNonceAndSign(tb, from, data)
 	client := s.EthClient()
 	require.NoErrorf(tb, client.SendTransaction(ctx, tx), "%T.SendTransaction()", client)
 	txgossiptest.WaitUntilPending(tb, ctx, s.GethRPCBackends(), tx)
-	return tx
 }
 
 // requireReceiptStatus asserts that tx was included with status want, and
@@ -674,7 +671,7 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 
 	// Blocks are only built for pending txs.
 	sut.clock.Set(activationTime)
-	sut.send(ctx, t, wallet, 0, transferTx(common.Address{1}, common.Big1))
+	sut.send(ctx, t, wallet.SetNonceAndSign(t, 0, transferTx(common.Address{1}, common.Big1)))
 	sut.RunConsensusLoop(ctx, t)
 
 	postBalance, err := client.BalanceAt(ctx, target, nil)
@@ -709,7 +706,7 @@ func TestRestartRejectsActivatedNetworkUpgradeChange(t *testing.T) {
 	}
 
 	ctx, sut := newSUT(t, slices.Concat(shared, []sutOption{iglooAt(initialIgloo)})...)
-	sut.send(ctx, t, wallet, 0, transferTx(common.Address{1}, common.Big1))
+	sut.send(ctx, t, wallet.SetNonceAndSign(t, 0, transferTx(common.Address{1}, common.Big1)))
 	sut.RunConsensusLoop(ctx, t)
 	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
 

@@ -35,7 +35,9 @@ func sendMintTx(ctx context.Context, t *testing.T, sut *SUT, wallet *saetest.Wal
 
 	data, err := nativeminter.PackMintNativeCoin(target, amount)
 	require.NoError(t, err)
-	return sut.send(ctx, t, wallet, from, callTx(nativeminter.ContractAddress, data, nativeMinterCallGas))
+	tx := wallet.SetNonceAndSign(t, from, callTx(nativeminter.ContractAddress, data, nativeMinterCallGas))
+	sut.send(ctx, t, tx)
+	return tx
 }
 
 // TestNativeMinterPrecompileUpgradesSAE exercises mid-chain
@@ -191,7 +193,8 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 
 	// Allow the disable activation to settle so finalized catches up.
 	sut.clock.Advance(saeparams.Tau + time.Second)
-	settleTx := sut.send(ctx, t, wallet, adminIdx, transferTx(nonAdmin, common.Big1))
+	settleTx := wallet.SetNonceAndSign(t, adminIdx, transferTx(nonAdmin, common.Big1))
+	sut.send(ctx, t, settleTx)
 	block = sut.RunConsensusLoop(ctx, t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, settleTx.Hash(), block.Transactions()[0].Hash())

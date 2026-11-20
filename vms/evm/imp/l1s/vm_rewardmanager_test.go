@@ -65,7 +65,7 @@ func balanceOf(ctx context.Context, t *testing.T, sut *SUT, addr common.Address)
 func settleRewardManagerMutation(ctx context.Context, t *testing.T, sut *SUT, wallet *saetest.Wallet, fromIdx int) {
 	t.Helper()
 	sut.clock.Advance(settleAdvance)
-	sut.send(ctx, t, wallet, fromIdx, tippedTransferTx(dustSink, common.Big1))
+	sut.send(ctx, t, wallet.SetNonceAndSign(t, fromIdx, tippedTransferTx(dustSink, common.Big1)))
 	_ = sut.RunConsensusLoop(ctx, t)
 }
 
@@ -95,7 +95,8 @@ func TestRewardManagerDefaultBurnSAE(t *testing.T) {
 
 	preBurn := balanceOf(ctx, t, sut, blackhole.Address)
 
-	tx := sut.send(ctx, t, wallet, fromIdx, tippedTransferTx(dustSink, common.Big1))
+	tx := wallet.SetNonceAndSign(t, fromIdx, tippedTransferTx(dustSink, common.Big1))
+	sut.send(ctx, t, tx)
 	block := sut.RunConsensusLoop(ctx, t)
 	requireBlockContainsTxs(t, block, tx.Hash())
 	sut.requireReceiptStatus(ctx, t, tx, types.ReceiptStatusSuccessful)
@@ -125,7 +126,8 @@ func TestRewardManagerGenesisAllowFeeRecipientsSAE(t *testing.T) {
 	preValidator := balanceOf(ctx, t, sut, validator)
 	preBurn := balanceOf(ctx, t, sut, blackhole.Address)
 
-	tx := sut.send(ctx, t, wallet, fromIdx, tippedTransferTx(dustSink, common.Big1))
+	tx := wallet.SetNonceAndSign(t, fromIdx, tippedTransferTx(dustSink, common.Big1))
+	sut.send(ctx, t, tx)
 	block := sut.RunConsensusLoop(ctx, t)
 	requireBlockContainsTxs(t, block, tx.Hash())
 	sut.requireReceiptStatus(ctx, t, tx, types.ReceiptStatusSuccessful)
@@ -217,7 +219,8 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 			sut.clock.Advance(blockBuildAdvance)
 			mutation, err := s.mutationFn()
 			require.NoError(t, err)
-			mutationTx := sut.send(ctx, t, wallet, adminIdx, callTx(rewardmanager.ContractAddress, mutation, rewardManagerCallGas))
+			mutationTx := wallet.SetNonceAndSign(t, adminIdx, callTx(rewardmanager.ContractAddress, mutation, rewardManagerCallGas))
+			sut.send(ctx, t, mutationTx)
 			_ = sut.RunConsensusLoop(ctx, t)
 			sut.requireReceiptStatus(ctx, t, mutationTx, types.ReceiptStatusSuccessful)
 
@@ -229,7 +232,8 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 			}
 
 			sut.clock.Advance(blockBuildAdvance)
-			deliverTx := sut.send(ctx, t, wallet, adminIdx, tippedTransferTx(dustSink, common.Big1))
+			deliverTx := wallet.SetNonceAndSign(t, adminIdx, tippedTransferTx(dustSink, common.Big1))
+			sut.send(ctx, t, deliverTx)
 			_ = sut.RunConsensusLoop(ctx, t)
 			sut.requireReceiptStatus(ctx, t, deliverTx, types.ReceiptStatusSuccessful)
 
@@ -249,7 +253,8 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 		sut.clock.Advance(blockBuildAdvance)
 		data, err := rewardmanager.PackSetRewardAddress(common.HexToAddress("0xdead"))
 		require.NoError(t, err)
-		rejectTx := sut.send(ctx, t, wallet, nonAdminIdx, callTx(rewardmanager.ContractAddress, data, rewardManagerCallGas))
+		rejectTx := wallet.SetNonceAndSign(t, nonAdminIdx, callTx(rewardmanager.ContractAddress, data, rewardManagerCallGas))
+		sut.send(ctx, t, rejectTx)
 		_ = sut.RunConsensusLoop(ctx, t)
 		sut.requireReceiptStatus(ctx, t, rejectTx, types.ReceiptStatusFailed)
 	})
@@ -323,7 +328,7 @@ func TestRewardManagerCoinbaseVerifyBlock(t *testing.T) {
 			// admissible at the same height. [types.Block.WithSeal] keeps the
 			// body, so the twin differs only in its header.
 			sut.clock.Advance(blockBuildAdvance)
-			_ = sut.send(ctx, t, wallet, adminIdx, tippedTransferTx(dustSink, common.Big1))
+			sut.send(ctx, t, wallet.SetNonceAndSign(t, adminIdx, tippedTransferTx(dustSink, common.Big1)))
 			honest := sut.BuildVerify(ctx, t, sut.LastAcceptedID(ctx, t))
 
 			honestBlk := honest.EthBlock()
