@@ -12,10 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
-
-	. "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 )
 
 func TestVerify(t *testing.T) {
@@ -25,29 +24,29 @@ func TestVerify(t *testing.T) {
 	// Here we only test that Config.Verify delegates to InitialGasPriceConfig.Verify.
 	tests := map[string]precompiletest.ConfigVerifyTest{
 		"nil initialGasPriceConfig": {
-			Config: NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
+			Config: gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
 		},
 		"valid initialGasPriceConfig": {
-			Config: NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultGasPriceConfig())),
+			Config: gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultGasPriceConfig())),
 		},
 		"invalid initialGasPriceConfig": {
-			Config: NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.GasPriceConfig{
+			Config: gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &commontype.GasPriceConfig{
 				TargetGas:    commontype.MinTargetGas,
 				TimeToDouble: 60,
 			}),
 			ExpectedError: commontype.ErrMinGasPriceTooLow,
 		},
 		"activated before Igloo": {
-			Config: NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
+			Config: gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
 			ChainConfig: func() precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
 				config.EXPECT().IsIgloo(uint64(3)).Return(false)
 				return config
 			}(),
-			ExpectedError: ErrActivatedBeforeIgloo,
+			ExpectedError: gaspricemanager.ErrActivatedBeforeIgloo,
 		},
 	}
-	allowlisttest.VerifyPrecompileWithAllowListTests(t, Module, tests)
+	allowlisttest.VerifyPrecompileWithAllowListTests(t, gaspricemanager.Module, tests)
 }
 
 func TestEqual(t *testing.T) {
@@ -55,38 +54,38 @@ func TestEqual(t *testing.T) {
 	enableds := []common.Address{allowlisttest.TestEnabledAddr}
 	tests := map[string]precompiletest.ConfigEqualTest{
 		"non-nil config and nil other": {
-			Config:   NewConfig(utils.PointerTo[uint64](3), admins, enableds, nil, nil),
+			Config:   gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, enableds, nil, nil),
 			Other:    nil,
 			Expected: false,
 		},
 		"typed nil config and typed nil other": {
-			Config:   (*Config)(nil),
-			Other:    (*Config)(nil),
+			Config:   (*gaspricemanager.Config)(nil),
+			Other:    (*gaspricemanager.Config)(nil),
 			Expected: false,
 		},
 		"typed nil config and nil other": {
-			Config:   (*Config)(nil),
+			Config:   (*gaspricemanager.Config)(nil),
 			Other:    nil,
 			Expected: true,
 		},
 		"different type": {
-			Config:   NewConfig(utils.PointerTo[uint64](3), admins, enableds, nil, nil),
+			Config:   gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, enableds, nil, nil),
 			Other:    precompileconfig.NewMockConfig(gomock.NewController(t)),
 			Expected: false,
 		},
 		"different timestamp": {
-			Config:   NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
-			Other:    NewConfig(utils.PointerTo[uint64](4), admins, nil, nil, nil),
+			Config:   gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
+			Other:    gaspricemanager.NewConfig(utils.PointerTo[uint64](4), admins, nil, nil, nil),
 			Expected: false,
 		},
 		"non-nil initial config and nil initial config": {
-			Config:   NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultGasPriceConfig())),
-			Other:    NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
+			Config:   gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultGasPriceConfig())),
+			Other:    gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
 			Expected: false,
 		},
 		"different initial config": {
-			Config: NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultGasPriceConfig())),
-			Other: NewConfig(utils.PointerTo[uint64](3), admins, nil, nil,
+			Config: gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultGasPriceConfig())),
+			Other: gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil,
 				func() *commontype.GasPriceConfig {
 					c := commontype.DefaultGasPriceConfig()
 					c.TargetGas = 20_000_000
@@ -95,10 +94,10 @@ func TestEqual(t *testing.T) {
 			Expected: false,
 		},
 		"same config": {
-			Config:   NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultGasPriceConfig())),
-			Other:    NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultGasPriceConfig())),
+			Config:   gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultGasPriceConfig())),
+			Other:    gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, utils.PointerTo(commontype.DefaultGasPriceConfig())),
 			Expected: true,
 		},
 	}
-	allowlisttest.EqualPrecompileWithAllowListTests(t, Module, tests)
+	allowlisttest.EqualPrecompileWithAllowListTests(t, gaspricemanager.Module, tests)
 }
