@@ -162,9 +162,12 @@ type testVM struct {
 	config       testVMConfig
 }
 
+// latestFork is the last upgrade whose blocks this VM executes.
+const latestFork = upgrade.Helicon
+
 func newVM(t *testing.T, config testVMConfig) *testVM {
 	ctx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
-	fork := upgrade.Latest
+	fork := latestFork
 	if config.fork != nil {
 		fork = *config.fork
 	}
@@ -1931,7 +1934,7 @@ func TestVerifyManagerConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	vm = &VM{}
-	ctx, dbManager, _ = setupGenesis(t, upgrade.Latest)
+	ctx, dbManager, _ = setupGenesis(t, latestFork)
 	err = vm.Initialize(
 		t.Context(),
 		ctx,
@@ -1950,7 +1953,7 @@ func TestVerifyManagerConfig(t *testing.T) {
 func TestTxAllowListDisablePrecompile(t *testing.T) {
 	// Setup chain params
 	genesis := &core.Genesis{}
-	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Latest]))))
+	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[latestFork]))))
 	enableAllowListTimestamp := upgrade.InitiallyActiveTime // enable at initially active time
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 		txallowlist.ConfigKey: txallowlist.NewConfig(utils.TimeToNewUint64(enableAllowListTimestamp), testEthAddrs[0:1], nil, nil),
@@ -2042,6 +2045,8 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 
 // Test that the fee manager changes fee configuration
 func TestFeeManagerChangeFee(t *testing.T) {
+	heliconFork := upgrade.Helicon
+
 	// Setup chain params
 	genesis := &core.Genesis{}
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
@@ -2068,6 +2073,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 	tvm := newVM(t, testVMConfig{
+		fork:        &heliconFork,
 		genesisJSON: string(genesisJSON),
 	})
 
@@ -2682,6 +2688,7 @@ func TestParentBeaconRootBlock(t *testing.T) {
 func TestStandaloneDB(t *testing.T) {
 	vm := &VM{}
 	ctx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
+	ctx.NetworkUpgrades = upgradetest.GetConfig(latestFork)
 	baseDB := memdb.New()
 	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
 	ctx.SharedMemory = atomicMemory.NewSharedMemory(ctx.ChainID)
@@ -2705,7 +2712,7 @@ func TestStandaloneDB(t *testing.T) {
 		t.Context(),
 		ctx,
 		sharedDB,
-		[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Latest])),
+		[]byte(toGenesisJSON(paramstest.ForkToChainConfig[latestFork])),
 		nil,
 		[]byte(configJSON),
 		[]*commonEng.Fx{},
@@ -2740,6 +2747,10 @@ func TestStandaloneDB(t *testing.T) {
 }
 
 func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
+	// The legacy feeManager precompile is rejected when scheduled at
+	// or after Igloo (see retirement.ReconcileForIgloo)
+	heliconFork := upgrade.Helicon
+
 	// Setup chain params
 	genesis := &core.Genesis{}
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
@@ -2767,6 +2778,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 	tvm := newVM(t, testVMConfig{
+		fork:        &heliconFork,
 		genesisJSON: string(genesisJSON),
 	})
 
@@ -2790,6 +2802,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 
 	// restart vm and try again
 	restartedTVM, err := restartVM(tvm, testVMConfig{
+		fork:        &heliconFork,
 		genesisJSON: string(genesisJSON),
 	})
 	require.NoError(t, err)
@@ -3105,7 +3118,7 @@ func TestWaitForEvent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			fork := upgrade.Latest
+			fork := latestFork
 			if testCase.Fork != nil {
 				fork = *testCase.Fork
 			}
@@ -3660,7 +3673,7 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			fork := upgrade.Latest
+			fork := latestFork
 
 			tvm := newVM(t, testVMConfig{
 				fork:       &fork,

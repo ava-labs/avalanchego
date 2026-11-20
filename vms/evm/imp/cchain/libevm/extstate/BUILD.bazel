@@ -16,7 +16,7 @@ go_library(
         "//graft/evm/predicate",
         "//upgrade",
         "//vms/evm/imp/cchain/cparams",
-        "//vms/evm/imp/cchain/warp",
+        "//vms/evm/imp/warp",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",

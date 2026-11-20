@@ -232,6 +232,20 @@ func (mr *MockChainConfigMockRecorder) IsDurango(time any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsDurango", reflect.TypeOf((*MockChainConfig)(nil).IsDurango), time)
 }
 
+// IsIgloo mocks base method.
+func (m *MockChainConfig) IsIgloo(time uint64) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsIgloo", time)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsIgloo indicates an expected call of IsIgloo.
+func (mr *MockChainConfigMockRecorder) IsIgloo(time any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsIgloo", reflect.TypeOf((*MockChainConfig)(nil).IsIgloo), time)
+}
+
 // MockAccepter is a mock of Accepter interface.
 type MockAccepter struct {
 	ctrl     *gomock.Controller

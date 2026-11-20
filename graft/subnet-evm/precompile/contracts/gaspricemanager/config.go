@@ -4,6 +4,9 @@
 package gaspricemanager
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
@@ -67,10 +70,17 @@ func (c *Config) Equal(cfg precompileconfig.Config) bool {
 	return c.InitialGasPriceConfig.Equal(other.InitialGasPriceConfig)
 }
 
-// Verify validates the allow list config and, if set, the initial gas price config.
+var errActivatedBeforeIgloo = errors.New("cannot activate before Igloo")
+
+// Verify validates the allow list config, that the upgrade is scheduled at or
+// after Igloo, and, if set, the initial gas price config.
 func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
 	if err := c.AllowListConfig.Verify(chainConfig, c.Upgrade); err != nil {
 		return err
+	}
+	// The gas price config is only read from Igloo onward.
+	if ts := c.Timestamp(); ts != nil && !chainConfig.IsIgloo(*ts) {
+		return fmt.Errorf("%w: scheduled at %d", errActivatedBeforeIgloo, *ts)
 	}
 	if c.InitialGasPriceConfig == nil {
 		return nil

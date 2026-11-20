@@ -213,6 +213,16 @@ func (n *NetworkUpgrades) IsIgloo(time uint64) bool {
 	return isTimestampForked(n.IglooTimestamp, time)
 }
 
+// ScheduledIglooTimestamp returns the Igloo activation timestamp
+// when the chain has actually scheduled it (treats both nil and the
+// `unscheduledActivation` sentinel as "not scheduled").
+func (n *NetworkUpgrades) ScheduledIglooTimestamp() (uint64, bool) {
+	if n.IglooTimestamp == nil || *n.IglooTimestamp >= unscheduledActivation {
+		return 0, false
+	}
+	return *n.IglooTimestamp, true
+}
+
 func (n *NetworkUpgrades) Description() string {
 	var banner string
 	banner += fmt.Sprintf(" - SubnetEVM Timestamp:          @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(n.SubnetEVMTimestamp))

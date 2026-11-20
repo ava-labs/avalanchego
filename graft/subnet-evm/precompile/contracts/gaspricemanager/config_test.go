@@ -36,6 +36,15 @@ func TestVerify(t *testing.T) {
 			}),
 			ExpectedError: commontype.ErrMinGasPriceTooLow,
 		},
+		"activated before Igloo": {
+			Config: gaspricemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
+			ChainConfig: func() precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+				config.EXPECT().IsIgloo(uint64(3)).Return(false)
+				return config
+			}(),
+			ExpectedError: gaspricemanager.ErrActivatedBeforeIgloo,
+		},
 	}
 	allowlisttest.VerifyPrecompileWithAllowListTests(t, gaspricemanager.Module, tests)
 }

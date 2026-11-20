@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//graft/subnet-evm/precompile/contracts/deployerallowlist",
         "//graft/subnet-evm/precompile/contracts/feemanager",
+        "//graft/subnet-evm/precompile/contracts/gaspricemanager",
         "//graft/subnet-evm/precompile/contracts/nativeminter",
         "//graft/subnet-evm/precompile/contracts/rewardmanager",
         "//graft/subnet-evm/precompile/contracts/txallowlist",

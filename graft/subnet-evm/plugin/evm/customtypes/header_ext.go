@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -48,6 +49,10 @@ type HeaderExtra struct {
 	SettledGasUnix      *uint64
 	SettledGasNumerator *uint64
 	SettledExcess       *uint64
+
+	TargetExponent        *dynamic.TargetExponent
+	TargetToExcessScaling *uint64 // 0 for static pricing
+	MinPrice              *uint64
 
 	predicateResults atomic.Pointer[predicate.BlockResults]
 }
@@ -162,6 +167,18 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		v := *h.SettledExcess
 		cp.SettledExcess = &v
 	}
+	if h.TargetExponent != nil {
+		v := *h.TargetExponent
+		cp.TargetExponent = &v
+	}
+	if h.TargetToExcessScaling != nil {
+		v := *h.TargetToExcessScaling
+		cp.TargetToExcessScaling = &v
+	}
+	if h.MinPrice != nil {
+		v := *h.MinPrice
+		cp.MinPrice = &v
+	}
 	SetHeaderExtra(dst, cp)
 }
 
@@ -186,6 +203,15 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	}
 	if h.SettledExcess != nil {
 		m["settledExcess"] = hexutil.Uint64(*h.SettledExcess)
+	}
+	if h.TargetExponent != nil {
+		m["targetExponent"] = hexutil.Uint64(*h.TargetExponent)
+	}
+	if h.TargetToExcessScaling != nil {
+		m["targetToExcessScaling"] = hexutil.Uint64(*h.TargetToExcessScaling)
+	}
+	if h.MinPrice != nil {
+		m["minPrice"] = hexutil.Uint64(*h.MinPrice)
 	}
 }
 
@@ -241,6 +267,9 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.SettledGasUnix = extras.SettledGasUnix
 	h.SettledGasNumerator = extras.SettledGasNumerator
 	h.SettledExcess = extras.SettledExcess
+	h.TargetExponent = (*uint64)(extras.TargetExponent)
+	h.TargetToExcessScaling = extras.TargetToExcessScaling
+	h.MinPrice = extras.MinPrice
 }
 
 func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
@@ -251,6 +280,9 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.SettledGasUnix = h.SettledGasUnix
 	extras.SettledGasNumerator = h.SettledGasNumerator
 	extras.SettledExcess = h.SettledExcess
+	extras.TargetExponent = (*dynamic.TargetExponent)(h.TargetExponent)
+	extras.TargetToExcessScaling = h.TargetToExcessScaling
+	extras.MinPrice = h.MinPrice
 }
 
 // NOTE: both generators currently do not support type aliases.
@@ -304,31 +336,39 @@ type HeaderSerializable struct {
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
 	MinDelayExcess *uint64 `json:"minDelayExcess" rlp:"optional"`
 
-	SettledHeight       *uint64 `json:"settledHeight"       rlp:"optional"`
-	SettledGasUnix      *uint64 `json:"settledGasUnix"      rlp:"optional"`
-	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
-	SettledExcess       *uint64 `json:"settledExcess"       rlp:"optional"`
+	// The Settled* fields, TargetExponent, TargetToExcessScaling and MinPrice
+	// were added by Igloo (SAE) and are ignored in legacy headers.
+	SettledHeight         *uint64 `json:"settledHeight"         rlp:"optional"`
+	SettledGasUnix        *uint64 `json:"settledGasUnix"        rlp:"optional"`
+	SettledGasNumerator   *uint64 `json:"settledGasNumerator"   rlp:"optional"`
+	SettledExcess         *uint64 `json:"settledExcess"         rlp:"optional"`
+	TargetExponent        *uint64 `json:"targetExponent"        rlp:"optional"`
+	TargetToExcessScaling *uint64 `json:"targetToExcessScaling" rlp:"optional"`
+	MinPrice              *uint64 `json:"minPrice"              rlp:"optional"`
 }
 
 // field type overrides for gencodec
 type headerMarshaling struct {
-	Difficulty          *hexutil.Big
-	Number              *hexutil.Big
-	GasLimit            hexutil.Uint64
-	GasUsed             hexutil.Uint64
-	Time                hexutil.Uint64
-	Extra               hexutil.Bytes
-	BaseFee             *hexutil.Big
-	BlockGasCost        *hexutil.Big
-	Hash                common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
-	BlobGasUsed         *hexutil.Uint64
-	ExcessBlobGas       *hexutil.Uint64
-	TimeMilliseconds    *hexutil.Uint64
-	MinDelayExcess      *hexutil.Uint64
-	SettledHeight       *hexutil.Uint64
-	SettledGasUnix      *hexutil.Uint64
-	SettledGasNumerator *hexutil.Uint64
-	SettledExcess       *hexutil.Uint64
+	Difficulty            *hexutil.Big
+	Number                *hexutil.Big
+	GasLimit              hexutil.Uint64
+	GasUsed               hexutil.Uint64
+	Time                  hexutil.Uint64
+	Extra                 hexutil.Bytes
+	BaseFee               *hexutil.Big
+	BlockGasCost          *hexutil.Big
+	Hash                  common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
+	BlobGasUsed           *hexutil.Uint64
+	ExcessBlobGas         *hexutil.Uint64
+	TimeMilliseconds      *hexutil.Uint64
+	MinDelayExcess        *hexutil.Uint64
+	SettledHeight         *hexutil.Uint64
+	SettledGasUnix        *hexutil.Uint64
+	SettledGasNumerator   *hexutil.Uint64
+	SettledExcess         *hexutil.Uint64
+	TargetExponent        *hexutil.Uint64
+	TargetToExcessScaling *hexutil.Uint64
+	MinPrice              *hexutil.Uint64
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its

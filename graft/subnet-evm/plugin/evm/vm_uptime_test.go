@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/version"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -49,7 +48,7 @@ func TestUptimeTracker(t *testing.T) {
 	}
 
 	require := require.New(t)
-	ctx, dbManager, genesisBytes := setupGenesis(t, upgrade.Latest)
+	ctx, dbManager, genesisBytes := setupGenesis(t, latestFork)
 	ctx.ValidatorState = makeValidatorState()
 	appSender := &enginetest.Sender{T: t}
 

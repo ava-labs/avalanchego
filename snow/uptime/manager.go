@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var _ Manager = (*manager)(nil)
@@ -18,6 +17,11 @@ var (
 	errAlreadyStartedTracking = errors.New("already started tracking")
 	errNotStartedTracking     = errors.New("not started tracking")
 )
+
+// A Clock reports the current time, truncated to the second.
+type Clock interface {
+	UnixTime() time.Time
+}
 
 type Manager interface {
 	Tracker
@@ -43,7 +47,7 @@ type Calculator interface {
 
 type manager struct {
 	// Used to get time. Useful for faking time during tests.
-	clock *mockable.Clock
+	clock Clock
 
 	state       State
 	connections map[ids.NodeID]time.Time // nodeID  -> connected at
@@ -52,7 +56,7 @@ type manager struct {
 	startedTracking bool
 }
 
-func NewManager(state State, clk *mockable.Clock) Manager {
+func NewManager(state State, clk Clock) Manager {
 	return &manager{
 		clock:       clk,
 		state:       state,
