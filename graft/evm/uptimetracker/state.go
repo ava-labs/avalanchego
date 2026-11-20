@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -128,6 +129,43 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	return time.Unix(int64(v.LastUpdated), 0), nil
 }
 
+// updateSet updates the [state]'s validator set with the provided current set
+// of validators at time unix.
+func (s *state) updateSet(
+	currentSet map[ids.ID]*validators.GetCurrentValidatorOutput,
+	unix uint64,
+) {
+	for valID := range s.validators {
+		if _, ok := currentSet[valID]; !ok {
+			s.deleteValidator(valID)
+		}
+	}
+
+	for valID, vdr := range currentSet {
+		if s.hasValidationID(valID) {
+			s.updateValidator(valID, vdr.IsActive)
+			continue
+		}
+
+		// An inactive validator could not have earned uptime before now,
+		// even if it was previously connected.
+		lastUpdated := vdr.StartTime
+		if !vdr.IsActive {
+			lastUpdated = unix
+		}
+		s.addNewValidator(&validator{
+			NodeID:        vdr.NodeID,
+			validationID:  valID,
+			IsActive:      vdr.IsActive,
+			StartTime:     vdr.StartTime,
+			UpDuration:    0,
+			LastUpdated:   lastUpdated,
+			IsL1Validator: vdr.IsL1Validator,
+			Weight:        vdr.Weight,
+		})
+	}
+}
+
 // addNewValidator adds a new validator to the state and marks it for
 // persistence to the database. This should be used when adding validators
 // during runtime operations.
@@ -139,16 +177,14 @@ func (s *state) addNewValidator(vdr *validator) {
 // updateValidator sets the isActive state of the validator with the given
 // validationID -- this function assumes that a validator with the given
 // validationID exists.
-func (s *state) updateValidator(validationID ids.ID, isActive bool) bool {
+func (s *state) updateValidator(validationID ids.ID, isActive bool) {
 	v := s.validators[validationID]
-
 	if v.IsActive == isActive {
-		return false
+		return
 	}
 
 	v.IsActive = isActive
 	s.dirtyValidationIDs.Add(validationID)
-	return true
 }
 
 // deleteValidator deletes the validator with the given validationID -- this
@@ -160,6 +196,16 @@ func (s *state) deleteValidator(validationID ids.ID) {
 	delete(s.nodeIDsToValidationIDs, v.NodeID)
 
 	s.dirtyValidationIDs.Add(v.validationID)
+}
+
+func (s *state) getActiveNodeIDs() []ids.NodeID {
+	activeNodes := make([]ids.NodeID, 0, len(s.validators))
+	for _, v := range s.validators {
+		if v.IsActive {
+			activeNodes = append(activeNodes, v.NodeID)
+		}
+	}
+	return activeNodes
 }
 
 func (s *state) writeModifications() error {
