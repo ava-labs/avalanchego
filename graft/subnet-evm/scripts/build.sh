@@ -26,7 +26,7 @@ fi
 echo "Building Subnet EVM @ GitCommit: $git_commit at $BINARY_PATH"
 cd "$SUBNET_EVM_PATH"
 # shellcheck disable=SC2154
-go build -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" -o "$BINARY_PATH" "plugin/"*.go
+go build -ldflags "$go_ldflags" -o "$BINARY_PATH" "plugin/"*.go
 
 # Symlink to both global and local plugin directories to simplify
 # usage for testing. The local directory should be preferred but the
