@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -80,10 +81,23 @@ type testTimeoutMessageFilter struct {
 	t *testing.T
 
 	replicationResponses chan struct{}
+
+	// highestReplicated is the highest round/sequence already replicated
+	// before the filter was set. Requests for anything above it are allowed,
+	// since normal consensus may legitimately trigger new requests.
+	highestReplicated uint64
 }
 
+// failOnReplicationRequest fails the test if a replication request is sent for
+// a round or sequence at or below [highestReplicated].
 func (m *testTimeoutMessageFilter) failOnReplicationRequest(msg *common.Message, _, _ common.NodeID) bool {
-	require.Nil(m.t, msg.ReplicationRequest)
+	if req := msg.ReplicationRequest; req != nil {
+		seqsOrRounds := slices.Clone(req.Seqs)
+		seqsOrRounds = append(seqsOrRounds, req.Rounds...)
+		for _, seqOrRound := range seqsOrRounds {
+			require.Greater(m.t, seqOrRound, m.highestReplicated, "resent a replication request for an already replicated round/seq")
+		}
+	}
 	return true
 }
 
@@ -126,15 +140,19 @@ func TestReplicationRequestTimeoutCancels(t *testing.T) {
 	// this asserts that the lagging node catches up to the latest round
 	for _, n := range net.Instances {
 		n.Storage.WaitForBlockCommit(startSeq)
+		// allow the replication state to cancel the request before setting filter
+		// calling Metadata grabs the epoch lock which means the replication state
+		// should be done processing.
+		n.E.Metadata()
 	}
 
-	// ensure lagging node doesn't resend requests
 	mf := &testTimeoutMessageFilter{
 		t: t,
+		// We may receive a notarization for round 9 before the block, causing us to
+		// send a replication request for that round
+		highestReplicated: startSeq,
 	}
 
-	// allow the replication state to cancel the request before setting filter
-	time.Sleep(100 * time.Millisecond)
 	laggingNode.E.Comm.(*testutil.TestComm).SetFilter(mf.failOnReplicationRequest)
 	laggingNode.E.AdvanceTime(laggingNode.E.StartTime.Add(simplex.DefaultReplicationRequestTimeout * 2))
 
