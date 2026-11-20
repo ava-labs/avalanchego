@@ -498,7 +498,7 @@ func (nodeID NodeID) Compare(other NodeID) int {
 }
 
 // Clone returns a copy of the NodeID without the cached serialization data.
-func (nodeID NodeID) Clone() NodeID {
+func (nodeID *NodeID) Clone() NodeID {
 	return NodeID{
 		ShortID: nodeID.ShortID,
 		LongID:  nodeID.LongID,
