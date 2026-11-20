@@ -1,0 +1,44 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "vmconfig",
+    srcs = ["config.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/vmconfig",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/logging",
+        "//utils/set",
+        "//vms/evm/network",
+        "//vms/evm/sae",
+        "//vms/evm/sae/rpc",
+        "//vms/evm/saedb",
+        "//vms/platformvm/warp",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/txpool/legacypool",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "vmconfig_test",
+    srcs = ["config_test.go"],
+    embed = [":vmconfig"],
+    deps = [
+        "//ids",
+        "//utils",
+        "//utils/constants",
+        "//utils/logging",
+        "//utils/logging/loggingtest",
+        "//utils/set",
+        "//vms/evm/firewood",
+        "//vms/evm/sae/rpc",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "@com_github_arr4n_shed//testerr",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+    ],
+)
