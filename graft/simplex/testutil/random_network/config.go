@@ -4,6 +4,10 @@
 package random_network
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
@@ -42,7 +46,22 @@ type FuzzConfig struct {
 	LogDirectory string
 }
 
-func DefaultFuzzConfig() *FuzzConfig {
+func DefaultFuzzConfig(t *testing.T) *FuzzConfig {
+	return DefaultFuzzConfigWithDir(t, t.TempDir())
+}
+
+func DefaultFuzzConfigWithDir(t *testing.T, tempDir string, nodeIndexs ...int) *FuzzConfig {
+	nodeDir := tempDir
+	if len(nodeIndexs) > 0 {
+		nodeDir = filepath.Join(tempDir, fmt.Sprintf("node%d", nodeIndexs[0]))
+		if err := os.Mkdir(nodeDir, 0700); err != nil {
+			t.Fatalf("could not create node dir: %v", err)
+		}
+		if len(nodeIndexs) > 1 {
+			t.Fatalf("too many node indexes, expected only a single one but got %d: %v", len(nodeIndexs), nodeIndexs)
+		}
+	}
+
 	return &FuzzConfig{
 		MinNodes:               3,
 		MaxNodes:               10,
@@ -54,6 +73,6 @@ func DefaultFuzzConfig() *FuzzConfig {
 		NodeCrashProbability:   0.1,
 		NodeRecoverProbability: 0.5,
 		AdvanceTimeTickAmount:  simplex.DefaultMaxProposalWaitTime / 5,
-		LogDirectory:           "tmp",
+		LogDirectory:           nodeDir,
 	}
 }

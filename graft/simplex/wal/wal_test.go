@@ -179,18 +179,14 @@ func TestDelete(t *testing.T) {
 
 	r := []byte{3, 4, 5}
 
-	dir, err := os.MkdirTemp("", t.Name())
-	require.NoError(err)
-
-	fileName := filepath.Join(dir, "simplex.wal")
+	fileName := filepath.Join(t.TempDir(), "simplex.wal")
 	wal := New(fileName)
-	require.NoError(err)
 
 	require.NoError(wal.Append(r))
 
 	require.NoError(wal.Delete())
 
-	_, err = os.Stat(fileName)
+	_, err := os.Stat(fileName)
 	require.ErrorIs(err, os.ErrNotExist)
 }
 
