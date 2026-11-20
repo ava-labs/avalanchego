@@ -53,8 +53,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/evm/txgossip/txgossiptest"
 
-	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
 	saerpc "github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 	ethparams "github.com/ava-labs/libevm/params"

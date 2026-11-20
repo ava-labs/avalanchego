@@ -20,11 +20,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 )
 
 // TestFeeManagerDisabledAtIgloo asserts that a fee manager enabled before Igloo
 // MUST be disabled, and its state cleared, in the first block at or after
-// Igloo.
+// Igloo. Without a gas price manager, that block MUST use the default gas price
+// config.
 func TestFeeManagerDisabledAtIgloo(t *testing.T) {
 	wallet := newWallet(t, 1)
 	admin := wallet.Addresses()[0]
@@ -64,9 +66,11 @@ func TestFeeManagerDisabledAtIgloo(t *testing.T) {
 
 	// Blocks are only built for pending txs.
 	sut.send(ctx, t, wallet.SetNonceAndSign(t, 0, transferTx(common.Address{1}, common.Big1)))
-	sut.RunConsensusLoop(ctx, t)
+	blk := sut.RunConsensusLoop(ctx, t)
 
 	require.False(t, sut.isPrecompileEnabledAtLatest(feemanager.ContractAddress), "precompile enabled after Igloo")
+	_, gotGasConfig := new(hooks).GasConfigAfter(blk.Header())
+	require.Equal(t, gastime.DefaultGasPriceConfig(), gotGasConfig, "gas price config after Igloo")
 	gotRole = sut.fetchAllowListRole(ctx, t, feemanager.ContractAddress, admin, rpc.LatestBlockNumber)
 	require.Equal(t, allowlist.NoRole, gotRole, "admin role after Igloo")
 	wantFeeConfig := commontype.FeeConfig{
