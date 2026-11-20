@@ -114,6 +114,7 @@ go_test(
         "//graft/evm/predicate",
         "//graft/evm/uptimetracker",
         "//graft/subnet-evm/commontype",
+        "//graft/subnet-evm/consensus/dummy",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/params",
         "//graft/subnet-evm/params/extras",

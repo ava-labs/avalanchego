@@ -2,11 +2,13 @@
 
 `l1s` is the EVM for Avalanche L1s. It is a chain-specific harness around the [EVM framework](../../README.md), which implements [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution). The framework handles block execution, settlement, gas accounting, and EVM gossip. `l1s` adds what lets an L1 owner shape their chain, precompiles that gate transactions and deployment, route rewards, mint the native token, and set gas pricing. It also adds Warp messaging and validator uptime attestations.
 
-`l1s` builds blocks only from the Igloo network upgrade onward. Earlier blocks remain parseable, so an existing L1 keeps its history.
+`l1s` builds blocks only from the Igloo network upgrade onward. It must still parse and execute earlier blocks with their original rules, so an existing L1 keeps its history.
 
 ## Table of contents
 
 - [Scope](#scope)
+- [Architecture](#architecture)
+  - [Hooks](#hooks)
 - [Precompiles](#precompiles)
   - [Allow lists](#allow-lists)
 - [Genesis format](#genesis-format)
@@ -15,7 +17,6 @@
   - [Precompile config fields](#precompile-config-fields)
 - [Upgrade format](#upgrade-format)
 - [How it works](#how-it-works)
-  - [Hooks](#hooks)
   - [Which state each decision reads](#which-state-each-decision-reads)
   - [Header extensions](#header-extensions)
   - [Precompile enforcement](#precompile-enforcement)
@@ -28,6 +29,72 @@
 `l1s` shares the EVM framework with the [C-Chain VM](../cchain/README.md) but none of its C-Chain-only behavior. There are no cross-chain transactions, no Primary Network shared memory, no `/avax` API, and no extra block body fields.
 
 Like the C-Chain, validators vote on the [ACP-176](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates) gas target and the [ACP-226](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/226-dynamic-minimum-block-times) minimum block delay. Unlike the C-Chain, an L1 owner can pin gas pricing with the gas price manager precompile, as specified by [ACP-224](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/224-dynamic-gas-limit-in-subnet-evm).
+
+## Architecture
+
+An L1 chain is composed of three major components.
+
+1. **AvalancheGo.** [Networking](../../../../network), [consensus](../../../../snow), validator-set management, and the external API surface.
+2. **EVM.** The generic EVM implementation, [`vms/evm`](../../).
+3. **L1.** This package, which adds L1-specific behavior.
+
+The EVM and L1 always run together as a separate plugin process. AvalancheGo talks to it over gRPC through [`rpcchainvm`](../../../rpcchainvm), so every arrow from AvalancheGo below crosses a process boundary.
+
+```mermaid
+flowchart TB
+    subgraph avago["AvalancheGo"]
+        consensus["Consensus"]
+        network["Network"]
+        apiserver["API Server"]
+    end
+
+    subgraph plugin["Plugin process, via rpcchainvm"]
+        subgraph evm["EVM"]
+            execution["Execution"]
+            p2pn["P2P Network"]
+            rpc["/rpc"]
+            ws["/ws"]
+        end
+
+        subgraph l1["L1VM"]
+            hook["Hooks"]
+            precompiles["Precompiles"]
+            warp["Warp"]
+            uptime["Uptime Tracker"]
+            validator["validator API"]
+            db[("Database")]
+        end
+    end
+
+    network <--> consensus
+    network --> p2pn
+    network --> uptime
+    consensus --> execution
+    apiserver --> rpc
+    apiserver --> ws
+    rpc --> validator
+    execution --> hook
+    execution --> precompiles
+
+    hook --> warp
+    p2pn --> warp
+    warp --> uptime
+    validator --> uptime
+
+    warp --> db
+    uptime --> db
+```
+
+The uptime tracker records when each validator of this L1 is connected. Warp uses it to sign validator uptime attestations, and the `validator` API serves it.
+
+### Hooks
+
+Hooks are the seam through which the EVM calls into L1-specific code at each stage of a block's life.
+
+- **Build.** Construct the header, choose the fee recipient, stamp gas pricing, and record Warp predicate results.
+- **Admit.** Reject transactions from senders the transaction allow list excludes.
+- **Execute.** Apply precompile activations and state upgrades scheduled since the parent block.
+- **After execution.** Store emitted Warp messages so validators can sign them.
 
 ## Precompiles
 
@@ -55,7 +122,7 @@ For the two allow-list precompiles, calling means deploying a contract or sendin
 
 ## Genesis format
 
-Genesis is a JSON object. This section covers chains whose genesis timestamp is at or after Igloo.
+Genesis is a JSON object. This section covers chains whose genesis timestamp is at or after Igloo. The example activates every precompile except the retired fee manager.
 
 ```json
 {
@@ -63,9 +130,30 @@ Genesis is a JSON object. This section covers chains whose genesis timestamp is 
     "chainId": 99999,
     "allowFeeRecipients": true,
     "initialMinDelayMS": 1000,
+    "contractDeployerAllowListConfig": {
+      "blockTimestamp": 1778384896,
+      "adminAddresses": ["0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"],
+      "enabledAddresses": ["0x1111111111111111111111111111111111111111"]
+    },
+    "contractNativeMinterConfig": {
+      "blockTimestamp": 1778384896,
+      "adminAddresses": ["0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"],
+      "initialMint": {
+        "0x2222222222222222222222222222222222222222": "0xDE0B6B3A7640000"
+      }
+    },
     "txAllowListConfig": {
       "blockTimestamp": 1778384896,
-      "adminAddresses": ["0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"]
+      "adminAddresses": ["0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"],
+      "managerAddresses": ["0x1111111111111111111111111111111111111111"]
+    },
+    "rewardManagerConfig": {
+      "blockTimestamp": 1778384896,
+      "adminAddresses": ["0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"],
+      "initialRewardConfig": {
+        "allowFeeRecipients": false,
+        "rewardAddress": "0x3333333333333333333333333333333333333333"
+      }
     },
     "gasPriceManagerConfig": {
       "blockTimestamp": 1778384896,
@@ -106,7 +194,6 @@ Genesis is a JSON object. This section covers chains whose genesis timestamp is 
 | `coinbase`, `difficulty`, `extraData`, `mixHash`, `nonce` | Copied into the genesis header. They affect only its hash. |
 | `number`, `gasUsed`, `parentHash` | Must be zero or omitted. |
 | `excessBlobGas`, `blobGasUsed` | Must be omitted. |
-| `baseFeePerGas` | Ignored. |
 
 ### Chain config fields
 
@@ -137,26 +224,47 @@ Every precompile except Warp also has allow list fields. An address may appear i
 | `managerAddresses` | Addresses granted the Manager role at activation. |
 | `enabledAddresses` | Addresses granted the Enabled role at activation. |
 
-Precompile-specific fields follow.
+The deployer and transaction allow lists have no other fields. The rest follow.
 
-| Config key | Field | Meaning |
+#### `contractNativeMinterConfig`
+
+| Field | Meaning |
+| --- | --- |
+| `initialMint` | Map from address to amount, in wei, minted at activation. Amounts must be positive. |
+
+#### `rewardManagerConfig`
+
+`initialRewardConfig` sets where tips go at activation. If omitted, the chain's `allowFeeRecipients` applies.
+
+| Field | Meaning |
+| --- | --- |
+| `allowFeeRecipients` | If true, tips go to each block builder's configured `fee-recipient`. |
+| `rewardAddress` | If set, tips go to this address. |
+
+Setting both is rejected. Setting neither burns tips.
+
+#### `gasPriceManagerConfig`
+
+`initialGasPriceConfig` sets ACP-224 pricing at activation. The defaults apply when it is omitted, and on chains without the gas price manager.
+
+| Field | Meaning | Default |
 | --- | --- | --- |
-| `contractNativeMinterConfig` | `initialMint` | Map from address to a positive amount, in wei, minted at activation. |
-| `rewardManagerConfig` | `initialRewardConfig.allowFeeRecipients` | If true, tips go to each block builder's configured `fee-recipient`. |
-| `rewardManagerConfig` | `initialRewardConfig.rewardAddress` | If set, tips go to this address. Cannot be combined with `allowFeeRecipients`. If neither is set, tips are burned. If `initialRewardConfig` is omitted, the chain's `allowFeeRecipients` applies. |
-| `gasPriceManagerConfig` | `initialGasPriceConfig.validatorTargetGas` | If true, validators vote on the gas target, and `targetGas` must be zero. |
-| `gasPriceManagerConfig` | `initialGasPriceConfig.targetGas` | Gas target per second. At least 1,000,000 when validators do not vote. |
-| `gasPriceManagerConfig` | `initialGasPriceConfig.staticPricing` | If true, the gas price is fixed at `minGasPrice`, and `timeToDouble` must be zero. |
-| `gasPriceManagerConfig` | `initialGasPriceConfig.minGasPrice` | Minimum gas price in wei. Must be positive. |
-| `gasPriceManagerConfig` | `initialGasPriceConfig.timeToDouble` | Seconds for the gas price to double under sustained full blocks. Must be positive unless pricing is static. |
-| `warpConfig` | `quorumNumerator` | Percentage of stake that must sign an inbound message. Zero means 67. Otherwise between 33 and 100. |
-| `warpConfig` | `requirePrimaryNetworkSigners` | If true, messages from Primary Network chains other than the P-Chain must be signed by Primary Network validators. If false, this L1's validators suffice. |
+| `validatorTargetGas` | If true, validators vote on the gas target. | `true` |
+| `targetGas` | Gas target per second. Zero when validators vote, otherwise at least 1,000,000. | `0` |
+| `staticPricing` | If true, the gas price is fixed at `minGasPrice`. | `false` |
+| `minGasPrice` | Minimum gas price in wei. Must be positive. | `1` |
+| `timeToDouble` | Seconds for the gas price to double under sustained full blocks. Zero when pricing is static, otherwise positive. | `60` |
 
-Without the gas price manager, or when `initialGasPriceConfig` is omitted, validators vote on the gas target, `minGasPrice` is 1 wei, and `timeToDouble` is 60 seconds.
+#### `warpConfig`
+
+| Field | Meaning |
+| --- | --- |
+| `quorumNumerator` | Percentage of stake that must sign an inbound message. Zero means 67. Otherwise between 33 and 100. |
+| `requirePrimaryNetworkSigners` | If true, messages from Primary Network chains other than the P-Chain must be signed by Primary Network validators. If false, this L1's validators suffice. |
 
 ## Upgrade format
 
-Upgrade bytes are a JSON object that changes the chain after genesis. Every key is optional.
+Upgrade bytes are a JSON object that changes the chain after genesis.
 
 ```json
 {
@@ -165,15 +273,15 @@ Upgrade bytes are a JSON object that changes the chain after genesis. Every key 
   },
   "precompileUpgrades": [
     {
-      "contractNativeMinterConfig": {
+      "txAllowListConfig": {
         "blockTimestamp": 1780000000,
-        "adminAddresses": ["0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"]
+        "disable": true
       }
     },
     {
       "txAllowListConfig": {
         "blockTimestamp": 1781000000,
-        "disable": true
+        "adminAddresses": ["0x1111111111111111111111111111111111111111"]
       }
     }
   ],
@@ -194,21 +302,12 @@ Upgrade bytes are a JSON object that changes the chain after genesis. Every key 
 ```
 
 - **`networkUpgradeOverrides`.** Network upgrade times that replace those in genesis. The same rules apply.
-- **`precompileUpgrades`.** A list of objects, each with exactly one precompile config key. Times must not decrease across the list and must strictly increase for a single precompile. Each precompile must alternate between enabling and disabling, starting from its genesis state. Disabling wipes the precompile's storage, so re-enabling starts from the new config.
-- **`stateUpgrades`.** A list of `{blockTimestamp, accounts}` objects with strictly increasing, non-zero times. For each account, `code` replaces its code, `storage` sets the given slots, and `balanceChange` is added to its balance.
+- **`precompileUpgrades`.** A list of objects, each with exactly one precompile config key. Every config requires `blockTimestamp`. Times must not decrease across the list and must strictly increase for a single precompile. Each precompile must alternate between enabling and disabling, starting from its genesis state. Disabling wipes the precompile's storage, so re-enabling starts from the new config.
+- **`stateUpgrades`.** A list of `{blockTimestamp, accounts}` objects. Every object requires `blockTimestamp`, and times must be non-zero and strictly increasing. For each account, `code` replaces its code, `storage` sets the given slots, and `balanceChange` is added to its balance.
 
 An upgrade applies when the first block at or past its time executes. Once a node has accepted such a block, the upgrade can no longer be changed or removed. A node given incompatible upgrade bytes refuses to start.
 
 ## How it works
-
-### Hooks
-
-The EVM framework calls into `l1s` through hooks at each stage of a block's life.
-
-- **Build.** Construct the header, choose the fee recipient, stamp gas pricing, and record Warp predicate results.
-- **Admit.** Reject transactions from senders the transaction allow list excludes.
-- **Execute.** Apply precompile activations and state upgrades scheduled since the parent block.
-- **After execution.** Store emitted Warp messages so validators can sign them.
 
 ### Which state each decision reads
 
@@ -246,6 +345,7 @@ Existing L1s see the following changes when they reach Igloo.
 - [config.md](config.md). Node operator configuration.
 - [EVM framework](../../README.md). Execution, settlement, and the hook interface.
 - [C-Chain VM](../cchain/README.md). The other chain built on the framework.
+- [`rpcchainvm`](../../../rpcchainvm). The gRPC plugin boundary between AvalancheGo and this VM.
 - [`dynamic`](../dynamic). ACP-176 and ACP-226 math shared with the C-Chain.
 - [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution). Continuous execution.
 - [ACP-176](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates). Dynamic gas target.

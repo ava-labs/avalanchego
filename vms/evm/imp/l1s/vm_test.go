@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
@@ -45,12 +47,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/evm/txgossip/txgossiptest"
 
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
 	saerpc "github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -470,6 +474,39 @@ func TestTransfer(t *testing.T) {
 		require.NotNilf(t, settled, "%T.LastSettled()", b)
 		assert.Equal(t, first.Height(), settled.Height(), "%T.LastSettled().Height()", b)
 	}
+}
+
+// TestExecutePreIglooBlock checks that a block built before Igloo by the legacy
+// VM MUST execute to the state root its header commits to.
+func TestExecutePreIglooBlock(t *testing.T) {
+	wallet := newWallet(t, 1)
+	ctx, sut := newSUT(
+		t,
+		withMaxAllocFor(wallet.Addresses()...),
+		withIglooTime(upgrade.InitiallyActiveTime.Add(time.Hour)),
+	)
+
+	var genesis legacy.Genesis
+	require.NoError(t, json.Unmarshal(sut.genesis, &genesis), "json.Unmarshal()")
+	l1params.GetExtra(genesis.Config).NetworkUpgrades.SetDefaults(sut.snowCtx.NetworkUpgrades)
+	require.NoError(t, l1params.SetEthUpgrades(genesis.Config), "l1params.SetEthUpgrades()")
+
+	tx := wallet.SetNonceAndSign(t, 0, transferTx(common.Address{1}, common.Big1))
+	_, chain, _, err := legacy.GenerateChainWithGenesis(&genesis, dummy.NewFaker(), 1, 1, func(_ int, b *legacy.BlockGen) {
+		b.SetCoinbase(blackhole.Address)
+		b.AddTx(tx)
+	})
+	require.NoError(t, err, "legacy.GenerateChainWithGenesis()")
+	want := chain[0]
+
+	require.NoErrorf(t, sut.VM.SetState(ctx, snow.Bootstrapping), "%T.SetState(Bootstrapping)", sut.VM)
+	wantBytes, err := rlp.EncodeToBytes(want)
+	require.NoError(t, err, "rlp.EncodeToBytes()")
+	blk, err := sut.VM.ParseBlock(ctx, wantBytes)
+	require.NoErrorf(t, err, "%T.ParseBlock()", sut.VM)
+	got := sut.ParseVerifyAccept(ctx, t, blk)
+	require.NoErrorf(t, got.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", got)
+	require.Equalf(t, want.Root(), got.PostExecutionStateRoot(), "%T.PostExecutionStateRoot()", got)
 }
 
 // TestMinGasConsumptionFloor asserts that the L1 VM charges the ACP-194 gas
