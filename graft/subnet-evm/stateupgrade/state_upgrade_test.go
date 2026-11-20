@@ -5,8 +5,16 @@ package stateupgrade
 
 import (
 	"encoding/json"
+	"math/big"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/params"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 )
 
@@ -95,6 +103,126 @@ func TestEqual(t *testing.T) {
 
 			require.Equal(t, tt.want, a.Equal(&b), "a.Equal(&b)")
 			require.Equal(t, tt.want, b.Equal(&a), "b.Equal(&a)")
+		})
+	}
+}
+
+func TestApply(t *testing.T) {
+	var (
+		addr     = common.Address{'a', 'd', 'd', 'r'}
+		oldCode  = []byte{0x01, 0x02}
+		newCode  = []byte{0x03, 0x04, 0x05}
+		key1     = common.Hash{1}
+		key2     = common.Hash{2}
+		oldValue = common.Hash{'o', 'l', 'd'}
+		newValue = common.Hash{'n', 'e', 'w'}
+	)
+
+	tests := []struct {
+		name    string
+		eip158  bool
+		before  *types.Account // nil if the account doesn't exist
+		upgrade Account
+		want    types.Account
+	}{
+		{
+			name:   "new_account",
+			eip158: true,
+			upgrade: Account{
+				Code:          newCode,
+				Storage:       map[common.Hash]common.Hash{key1: newValue},
+				BalanceChange: (*math.HexOrDecimal256)(big.NewInt(50)),
+			},
+			want: types.Account{
+				Balance: big.NewInt(50),
+				Nonce:   1,
+				Code:    newCode,
+				Storage: map[common.Hash]common.Hash{key1: newValue},
+			},
+		},
+		{
+			name:    "new_account_pre_eip158",
+			upgrade: Account{Code: newCode},
+			want: types.Account{
+				Balance: big.NewInt(0),
+				Nonce:   0,
+				Code:    newCode,
+			},
+		},
+		{
+			name:   "existing_account",
+			eip158: true,
+			before: &types.Account{
+				Balance: big.NewInt(100),
+				Nonce:   5,
+				Code:    oldCode,
+				Storage: map[common.Hash]common.Hash{key1: oldValue, key2: oldValue},
+			},
+			upgrade: Account{
+				Code:          newCode,
+				Storage:       map[common.Hash]common.Hash{key1: newValue},
+				BalanceChange: (*math.HexOrDecimal256)(big.NewInt(50)),
+			},
+			want: types.Account{
+				Balance: big.NewInt(150),
+				Nonce:   5,
+				Code:    newCode,
+				Storage: map[common.Hash]common.Hash{key1: newValue, key2: oldValue},
+			},
+		},
+		{
+			name:   "no_code_leaves_code_and_nonce",
+			eip158: true,
+			before: &types.Account{
+				Balance: big.NewInt(0),
+				Code:    oldCode,
+				Storage: map[common.Hash]common.Hash{key1: oldValue},
+			},
+			upgrade: Account{
+				BalanceChange: (*math.HexOrDecimal256)(big.NewInt(50)),
+			},
+			want: types.Account{
+				Balance: big.NewInt(50),
+				Code:    oldCode,
+				Storage: map[common.Hash]common.Hash{key1: oldValue},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sdb, err := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+			require.NoError(t, err, "state.New()")
+			if b := tt.before; b != nil {
+				sdb.CreateAccount(addr)
+				sdb.SetBalance(addr, uint256.MustFromBig(b.Balance))
+				sdb.SetNonce(addr, b.Nonce)
+				sdb.SetCode(addr, b.Code)
+				for k, v := range b.Storage {
+					sdb.SetState(addr, k, v)
+				}
+			}
+
+			config := &params.ChainConfig{EIP158Block: big.NewInt(1)}
+			blockNum := big.NewInt(0)
+			if tt.eip158 {
+				blockNum = big.NewInt(1)
+			}
+			require.Equalf(t, tt.eip158, config.IsEIP158(blockNum), "%T.IsEIP158(%d)", config, blockNum)
+
+			upgrade := &Block{
+				Timestamp: new(uint64(1)),
+				Accounts:  map[common.Address]Account{addr: tt.upgrade},
+			}
+			upgrade.Apply(config, sdb, blockNum)
+
+			require.True(t, sdb.Exist(addr), "Exist()")
+			require.Equal(t, uint256.MustFromBig(tt.want.Balance), sdb.GetBalance(addr), "GetBalance()")
+			require.Equal(t, tt.want.Nonce, sdb.GetNonce(addr), "GetNonce()")
+			require.Equal(t, tt.want.Code, sdb.GetCode(addr), "GetCode()")
+			for _, k := range []common.Hash{key1, key2} {
+				require.Equalf(t, tt.want.Storage[k], sdb.GetState(addr, k), "GetState(%v)", k)
+			}
 		})
 	}
 }
