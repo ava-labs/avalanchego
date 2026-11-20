@@ -47,6 +47,7 @@ type (
 	// entirely through hand-populated storage, with no VM.
 	SUT struct {
 		*Handler
+		*Acceptor
 		state *state.State
 	}
 
@@ -125,12 +126,14 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		st,
 	)
 	require.NoError(t, err, "New()")
+	acceptor := handler.NewAcceptor()
 	t.Cleanup(func() {
-		require.NoErrorf(t, handler.Shutdown(context.WithoutCancel(t.Context())), "%T.Shutdown()", handler)
+		require.NoErrorf(t, acceptor.Shutdown(context.WithoutCancel(t.Context())), "%T.Shutdown()", acceptor)
 	})
 	return &SUT{
-		Handler: handler,
-		state:   st,
+		Handler:  handler,
+		Acceptor: acceptor,
+		state:    st,
 	}
 }
 
@@ -245,7 +248,7 @@ func TestAcceptSummary(t *testing.T) {
 }
 
 // TestStateSyncEnabled checks that the configured value is reported back by
-// [Handler.StateSyncEnabled].
+// [Acceptor.StateSyncEnabled].
 func TestStateSyncEnabled(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -267,8 +270,8 @@ func TestStateSyncEnabled(t *testing.T) {
 			sut := newSUT(t, withEnabled(tt.enabled))
 
 			gotEnabled, err := sut.StateSyncEnabled(t.Context())
-			require.NoErrorf(t, err, "%T.StateSyncEnabled()", sut.Handler)
-			assert.Equalf(t, tt.enabled, gotEnabled, "%T.StateSyncEnabled()", sut.Handler)
+			require.NoErrorf(t, err, "%T.StateSyncEnabled()", sut.Acceptor)
+			assert.Equalf(t, tt.enabled, gotEnabled, "%T.StateSyncEnabled()", sut.Acceptor)
 		})
 	}
 }

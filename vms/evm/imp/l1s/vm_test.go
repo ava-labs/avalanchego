@@ -58,12 +58,30 @@ type SUT struct {
 
 type (
 	sutConfig struct {
-		genesis  core.Genesis
-		upgrades extras.UpgradeConfig
-		clock    *saetest.Clock
+		genesis        core.Genesis
+		upgrades       extras.UpgradeConfig
+		clock          *saetest.Clock
+		state          snow.State
+		commitInterval uint64
 	}
 	sutOption = options.Option[sutConfig]
 )
+
+// withState controls the consensus state the SUT's VM is left in after
+// initialization. Defaults to [snow.NormalOp]. Note that any RPCs will not be
+// available until the node is bootstrapping.
+func withState(state snow.State) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.state = state
+	})
+}
+
+// withCommitInterval sets the interval at which trie roots are persisted.
+func withCommitInterval(n uint64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.commitInterval = n
+	})
+}
 
 func withMaxAllocFor(addrs ...common.Address) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -84,21 +102,24 @@ func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	return opt, c
 }
 
-// newSUT returns a new SUT in [snow.NormalOp]. The returned context is
-// cancelled if the VM logs an error.
+// newSUT returns a new SUT in the configured [snow.State], which defaults to
+// [snow.NormalOp]. The returned context is cancelled if the VM logs an error.
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
 	cfg := options.ApplyTo(&sutConfig{
 		genesis: *testGenesis(),
 		clock:   saetest.NewClock(testStartTime, time.Millisecond),
+		state:   snow.NormalOp,
 	}, opts...)
 	vm := &VM{
-		now: cfg.clock.Now,
+		now:            cfg.clock.Now,
+		commitInterval: cfg.commitInterval,
 	}
 
 	snowCtx := snowtest.Context(tb, ids.GenerateTestID())
 	snowCtx.ChainDataDir = tb.TempDir()
+	snowCtx.NodeID = ids.GenerateTestNodeID() // peers MUST be distinguishable
 	snowCtx.NetworkUpgrades = upgradetest.GetConfig(upgrade.Latest)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
@@ -116,7 +137,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		Genesis:  genesisBytes,
 		Upgrades: upgradeBytes,
 		Sender:   appSender,
-		State:    snow.NormalOp,
+		State:    cfg.state,
 	})
 	require.NoError(tb, err, "vmtest.New()")
 	sut := &SUT{

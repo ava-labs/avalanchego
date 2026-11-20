@@ -50,9 +50,10 @@ var _ adaptor.ChainVM[*blocks.Block] = (*VM)(nil)
 
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
 type VM struct {
-	*sae.VM            // created by [VM.SetState] as bootstrapping or normal op
-	*network.Network   // created by [VM.Initialize]
-	*statesync.Handler // created by [VM.Initialize]
+	*sae.VM             // created by [VM.SetState] as bootstrapping or normal op
+	*network.Network    // created by [VM.Initialize]
+	*statesync.Handler  // created by [VM.Initialize]
+	*statesync.Acceptor // created by [VM.Initialize]
 
 	// gossip frequencies are configurable to speed up testing.
 	pullGossipPeriod time.Duration
@@ -182,7 +183,8 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("creating statesync handler: %w", err)
 	}
-	vm.onClose = append(vm.onClose, vm.Handler.Shutdown)
+	vm.Acceptor = vm.Handler.NewAcceptor()
+	vm.onClose = append(vm.onClose, vm.Acceptor.Shutdown)
 
 	vm.handlers = api.NewMutableHTTPHandlers(handlerPaths...)
 
@@ -342,7 +344,7 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	if state >= snow.Bootstrapping {
 		var err error
 		vm.finishInitializeOnce.Do(func() {
-			if err = vm.Handler.SyncError(); err != nil {
+			if err = vm.Acceptor.SyncError(); err != nil {
 				return
 			}
 			err = vm.finishInitialize(ctx)
@@ -367,7 +369,6 @@ var (
 )
 
 type stateDependent interface {
-	HealthCheck(context.Context) (any, error)
 	ParseBlock(context.Context, []byte) (*blocks.Block, error)
 	GetBlock(context.Context, ids.ID) (*blocks.Block, error)
 	GetBlockIDAtHeight(context.Context, uint64) (ids.ID, error)
@@ -383,7 +384,10 @@ func (vm *VM) activeHandler() stateDependent {
 
 // HealthCheck returns the current health status of the VM.
 func (vm *VM) HealthCheck(ctx context.Context) (any, error) {
-	return vm.activeHandler().HealthCheck(ctx)
+	if vm.mode.Get() >= snow.Bootstrapping {
+		return vm.VM.HealthCheck(ctx)
+	}
+	return vm.Acceptor.HealthCheck(ctx)
 }
 
 // ParseBlock parses a block from bytes.
@@ -423,7 +427,7 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 		<-ctx.Done()
 		return 0, context.Cause(ctx)
 	case snow.StateSyncing:
-		return vm.Handler.WaitForEvent(ctx)
+		return vm.Acceptor.WaitForEvent(ctx)
 	}
 
 	// Pace block building on the ACP-226 minimum block delay so that the event
