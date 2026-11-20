@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
@@ -39,6 +40,42 @@ func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 		default:
 			return nil, fmt.Errorf("couldn't get current subnet validator of %q: %w", subnetID, err)
 		}
+
+		if err := vm.updateLocalL1ValidatorMetrics(subnetID); err != nil {
+			return nil, err
+		}
 	}
 	return nil, nil
+}
+
+// updateLocalL1ValidatorMetrics reports whether this node is an active L1
+// validator of subnetID and the remaining balance of that validator. The
+// balance is not reported if this node is not an L1 validator of subnetID.
+func (vm *VM) updateLocalL1ValidatorMetrics(subnetID ids.ID) error {
+	isL1Validator, err := vm.state.HasL1Validator(subnetID, vm.ctx.NodeID)
+	if err != nil {
+		return fmt.Errorf("checking for L1 validator of %s: %w", subnetID, err)
+	}
+	if !isL1Validator {
+		vm.metrics.SetLocalL1ValidatorActive(subnetID, false)
+		vm.metrics.DeleteLocalL1ValidatorBalance(subnetID)
+		return nil
+	}
+
+	// Inactive L1 validators are not in the validator manager under their
+	// nodeID.
+	vdr, ok := vm.Validators.GetValidator(subnetID, vm.ctx.NodeID)
+	vm.metrics.SetLocalL1ValidatorActive(subnetID, ok)
+	if !ok {
+		vm.metrics.SetLocalL1ValidatorBalance(subnetID, 0)
+		return nil
+	}
+
+	// The TxID of an active L1 validator is its validationID.
+	l1Validator, err := vm.state.GetL1Validator(vdr.TxID)
+	if err != nil {
+		return fmt.Errorf("getting L1 validator %s: %w", vdr.TxID, err)
+	}
+	vm.metrics.SetLocalL1ValidatorBalance(subnetID, l1Validator.EndAccumulatedFee-vm.state.GetAccruedFees())
+	return nil
 }
