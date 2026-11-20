@@ -1,0 +1,48 @@
+name: Publish Docker Image with custom Firewood
+
+on:
+  workflow_dispatch:
+    inputs:
+      firewood-ref:
+        description: 'Firewood branch, tag or commit to build from source'
+        required: true
+
+jobs:
+  publish_firewood_docker_image:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/install-nix
+        with:
+          # The Firewood ref can require modules that are not in the repository cache.
+          disable_go_proxy: 'false'
+      - name: Build Firewood
+        shell: nix develop --command bash -x {0}
+        run: ./scripts/run_task.sh run-polyrepo
+        env:
+          FIREWOOD_REF: ${{ inputs.firewood-ref }}
+      - name: Copy the Firewood build into the Docker context
+        # The nix result is a symlink into /nix/store, which Docker won't follow.
+        run: |
+          cp -rL firewood/ffi/result firewood/ffi/result.copy
+          rm firewood/ffi/result
+          mv firewood/ffi/result.copy firewood/ffi/result
+          chmod -R u+w firewood/ffi/result
+      - name: Build and publish the Docker image
+        uses: ./.github/actions/run-docker-with-disk-space
+        with:
+          docker-username: ${{ secrets.DOCKER_USERNAME }}
+          docker-password: ${{ secrets.DOCKER_PASS }}
+          run: |
+            docker buildx create --use
+            IMAGE_TAG_SUFFIX="-firewood-$(printf '%s' "$FIREWOOD_REF" | tr -c 'A-Za-z0-9_.-' '-')"
+            export IMAGE_TAG_SUFFIX
+            scripts/run_task.sh build-image
+        env:
+          FIREWOOD_REF: ${{ inputs.firewood-ref }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+          DOCKER_IMAGE: ${{ secrets.DOCKER_REPO }}
+          # Firewood's own dependencies may be missing from the restored module cache.
+          GOPROXY: https://proxy.golang.org,direct
+          SKIP_BUILD_RACE: 1
