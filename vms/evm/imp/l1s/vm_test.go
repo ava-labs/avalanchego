@@ -416,6 +416,15 @@ func (s *SUT) send(ctx context.Context, tb testing.TB, tx *types.Transaction) {
 	txgossiptest.WaitUntilPending(tb, ctx, s.GethRPCBackends(), tx)
 }
 
+// buildBlock advances the clock by advance and builds a block holding tx.
+func (s *SUT) buildBlock(ctx context.Context, tb testing.TB, advance time.Duration, tx *types.Transaction) *blocks.Block {
+	tb.Helper()
+
+	s.clock.Advance(advance)
+	s.send(ctx, tb, tx)
+	return s.RunConsensusLoop(ctx, tb)
+}
+
 // requireReceiptStatus asserts that tx was included with status want, and
 // returns its receipt.
 func (s *SUT) requireReceiptStatus(ctx context.Context, tb testing.TB, tx *types.Transaction, want uint64) *types.Receipt {

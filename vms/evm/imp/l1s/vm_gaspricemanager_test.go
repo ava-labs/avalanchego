@@ -5,8 +5,8 @@
 package l1s
 
 import (
-	"context"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -20,10 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
+	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
-	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 )
 
 const (
@@ -52,47 +51,18 @@ func withGasPriceManager(admin common.Address, cfg commontype.GasPriceConfig) su
 func staticPricingConfig(minPrice uint64) commontype.GasPriceConfig {
 	return commontype.GasPriceConfig{
 		ValidatorTargetGas: true,
-		TargetGas:          0,
 		StaticPricing:      true,
 		MinGasPrice:        minPrice,
-		TimeToDouble:       0,
 	}
 }
 
-// buildBlock advances the clock by [blockBuildAdvance] and builds a block
-// holding one transfer from account 0 of w.
-func (s *SUT) buildBlock(ctx context.Context, tb testing.TB, w *saetest.Wallet) *blocks.Block {
-	tb.Helper()
-
-	s.clock.Advance(blockBuildAdvance)
-	s.send(ctx, tb, w.SetNonceAndSign(tb, 0, transferTx(common.Address{1}, common.Big1)))
-	return s.RunConsensusLoop(ctx, tb)
-}
-
-// buildSettlingBlock advances the clock by [settleAdvance] and builds a block,
-// holding one transfer from account 0 of w, that settles its parent.
-func (s *SUT) buildSettlingBlock(ctx context.Context, tb testing.TB, w *saetest.Wallet) *blocks.Block {
-	tb.Helper()
-
-	s.clock.Advance(settleAdvance)
-	s.send(ctx, tb, w.SetNonceAndSign(tb, 0, transferTx(common.Address{1}, common.Big1)))
-	return s.RunConsensusLoop(ctx, tb)
-}
-
-// setGasPriceConfig advances the clock by [blockBuildAdvance] and builds a
-// block in which account 0 of w, a gas price manager admin, sets cfg.
-func (s *SUT) setGasPriceConfig(ctx context.Context, tb testing.TB, w *saetest.Wallet, cfg commontype.GasPriceConfig) *blocks.Block {
+// setGasPriceConfigTx returns a tx calling setGasPriceConfig with cfg.
+func setGasPriceConfigTx(tb testing.TB, cfg commontype.GasPriceConfig) *types.DynamicFeeTx {
 	tb.Helper()
 
 	data, err := gaspricemanager.PackSetGasPriceConfig(cfg)
 	require.NoErrorf(tb, err, "gaspricemanager.PackSetGasPriceConfig(%+v)", cfg)
-	tx := w.SetNonceAndSign(tb, 0, callTx(gaspricemanager.ContractAddress, data, gasPriceManagerCallGas))
-
-	s.clock.Advance(blockBuildAdvance)
-	s.send(ctx, tb, tx)
-	b := s.RunConsensusLoop(ctx, tb)
-	s.requireReceiptStatus(ctx, tb, tx, types.ReceiptStatusSuccessful)
-	return b
+	return callTx(gaspricemanager.ContractAddress, data, gasPriceManagerCallGas)
 }
 
 // headerTargetExponent returns the target exponent in b's header, which MUST
@@ -105,33 +75,12 @@ func headerTargetExponent(tb testing.TB, b *blocks.Block) dynamic.TargetExponent
 	return *q
 }
 
-// TestGasPriceManagerStaticPricing asserts that a static pricing config enabled
-// at genesis MUST pin every block's base fee, before and after settlement.
-func TestGasPriceManagerStaticPricing(t *testing.T) {
-	const minPrice = 25_000_000_000
-	wallet := newWallet(t, 1)
-	admin := wallet.Addresses()[0]
-	ctx, sut := newSUT(t,
-		withMaxAllocFor(admin),
-		withGasPriceManager(admin, staticPricingConfig(minPrice)),
-	)
-
-	blks := []*blocks.Block{
-		sut.buildBlock(ctx, t, wallet),
-		sut.buildSettlingBlock(ctx, t, wallet),
-		sut.buildBlock(ctx, t, wallet),
-	}
-	for _, b := range blks {
-		require.Equalf(t, uint256.NewInt(minPrice), b.ExecutedBaseFee(), "block %d base fee", b.Height())
-	}
-}
-
 // TestGasPriceManagerSetGasPriceConfigSettlementLag asserts that a
 // setGasPriceConfig call MUST NOT change the base fee before its block
 // settles.
 func TestGasPriceManagerSetGasPriceConfigSettlementLag(t *testing.T) {
 	const (
-		oldMinPrice = 1
+		oldMinPrice = 25_000_000_000
 		newMinPrice = 100_000_000_000
 	)
 	wallet := newWallet(t, 1)
@@ -141,81 +90,99 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLag(t *testing.T) {
 		withGasPriceManager(admin, staticPricingConfig(oldMinPrice)),
 	)
 
-	setting := sut.setGasPriceConfig(ctx, t, wallet, staticPricingConfig(newMinPrice))
-	require.Equal(t, uint256.NewInt(oldMinPrice), setting.ExecutedBaseFee(), "base fee of the setting block")
-
-	// The settling block's base fee comes from the gas clock after its parent,
-	// which was built before anything settled.
-	settling := sut.buildSettlingBlock(ctx, t, wallet)
-	require.Equal(t, uint256.NewInt(oldMinPrice), settling.ExecutedBaseFee(), "base fee of the settling block")
-
-	next := sut.buildBlock(ctx, t, wallet)
-	require.Equal(t, uint256.NewInt(newMinPrice), next.ExecutedBaseFee(), "base fee after settlement")
+	newConfig := staticPricingConfig(newMinPrice)
+	steps := []struct {
+		name        string
+		advance     time.Duration
+		setConfig   *commontype.GasPriceConfig
+		wantBaseFee uint64
+	}{
+		{
+			name:        "setting_block",
+			advance:     blockBuildAdvance,
+			setConfig:   &newConfig,
+			wantBaseFee: oldMinPrice,
+		},
+		{
+			// A block's base fee comes from the gas config in its parent's
+			// header, which was built before anything settled.
+			name:        "settling_block",
+			advance:     settleAdvance,
+			wantBaseFee: oldMinPrice,
+		},
+		{
+			name:        "next_block",
+			advance:     blockBuildAdvance,
+			wantBaseFee: newMinPrice,
+		},
+	}
+	for _, step := range steps {
+		unsigned := transferTx(common.Address{1}, common.Big1)
+		if step.setConfig != nil {
+			unsigned = setGasPriceConfigTx(t, *step.setConfig)
+		}
+		blk := sut.buildBlock(ctx, t, step.advance, wallet.SetNonceAndSign(t, 0, unsigned))
+		require.Equalf(t, uint256.NewInt(step.wantBaseFee), blk.ExecutedBaseFee(), "%s base fee", step.name)
+	}
 }
 
 // TestGasPriceManagerValidatorTargetGas asserts that a stored TargetGas MUST
-// pin the target when ValidatorTargetGas is false, and that the target MUST
-// converge to the validators' preference at the ACP-176 rate when it is true.
+// pin the target exponent when ValidatorTargetGas is false, and that the
+// exponent MUST follow the validators' preference when it is true.
 func TestGasPriceManagerValidatorTargetGas(t *testing.T) {
-	// numBlocks MUST cover the rate-limited climb to the desired target plus 2
-	// plateau blocks.
-	const numBlocks = 8
-	// desiredTarget is below pinnedTarget, so the pinned case visibly ignores
-	// validators.
 	const pinnedTarget = 2 * dynamic.MinTarget
+	// desiredTarget is more than 2 steps from the initial exponent, so neither
+	// validator step is clamped by it.
 	desiredTarget := dynamic.TargetExponent(5 * maxTargetExponentDiff).Target()
+	pinnedExponent := dynamic.DesiredTargetExponent(pinnedTarget)
 
-	t.Run("pinned", func(t *testing.T) {
-		blks := buildChainWithGasPriceManager(t, desiredTarget, numBlocks, commontype.GasPriceConfig{
-			ValidatorTargetGas: false,
-			TargetGas:          pinnedTarget,
-			MinGasPrice:        1,
-			TimeToDouble:       60,
-		})
-
-		want := dynamic.DesiredTargetExponent(pinnedTarget)
-		for _, b := range blks {
-			require.Equalf(t, want, headerTargetExponent(t, b), "block %d target exponent", b.Height())
-		}
-		last := blks[len(blks)-1]
-		require.Equal(t, gas.Gas(pinnedTarget), last.ExecutedByGasTime().Target(), "target after execution")
-	})
-
-	t.Run("validators", func(t *testing.T) {
-		blks := buildChainWithGasPriceManager(t, desiredTarget, numBlocks, commontype.GasPriceConfig{
-			ValidatorTargetGas: true,
-			MinGasPrice:        1,
-			TimeToDouble:       60,
-		})
-
-		desired := dynamic.DesiredTargetExponent(desiredTarget)
-		for i, b := range blks {
-			want := min(dynamic.TargetExponent(i+1)*maxTargetExponentDiff, desired)
-			require.Equalf(t, want, headerTargetExponent(t, b), "block %d target exponent", b.Height())
-		}
-		last := blks[len(blks)-1]
-		require.Equal(t, desiredTarget, last.ExecutedByGasTime().Target(), "target after execution")
-	})
-}
-
-// buildChainWithGasPriceManager returns n blocks built on a new SUT whose node
-// prefers gasTarget, and whose gas price manager stores cfg from genesis.
-func buildChainWithGasPriceManager(t *testing.T, gasTarget gas.Gas, n int, cfg commontype.GasPriceConfig) []*blocks.Block {
-	t.Helper()
-
-	wallet := newWallet(t, 1)
-	admin := wallet.Addresses()[0]
-	ctx, sut := newSUT(t,
-		withMaxAllocFor(admin),
-		withGasTarget(gasTarget),
-		withGasPriceManager(admin, cfg),
-	)
-
-	blks := make([]*blocks.Block, n)
-	for i := range blks {
-		blks[i] = sut.buildBlock(ctx, t, wallet)
+	tests := []struct {
+		name   string
+		config commontype.GasPriceConfig
+		want   []dynamic.TargetExponent
+	}{
+		{
+			name: "pinned",
+			config: commontype.GasPriceConfig{
+				ValidatorTargetGas: false,
+				TargetGas:          pinnedTarget,
+				MinGasPrice:        1,
+				TimeToDouble:       60,
+			},
+			want: []dynamic.TargetExponent{
+				pinnedExponent,
+				pinnedExponent,
+			},
+		},
+		{
+			name: "validators",
+			config: commontype.GasPriceConfig{
+				ValidatorTargetGas: true,
+				MinGasPrice:        1,
+				TimeToDouble:       60,
+			},
+			want: []dynamic.TargetExponent{
+				maxTargetExponentDiff,
+				2 * maxTargetExponentDiff,
+			},
+		},
 	}
-	return blks
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wallet := newWallet(t, 1)
+			admin := wallet.Addresses()[0]
+			ctx, sut := newSUT(t,
+				withMaxAllocFor(admin),
+				withGasTarget(desiredTarget),
+				withGasPriceManager(admin, tt.config),
+			)
+
+			for _, want := range tt.want {
+				blk := sut.buildBlock(ctx, t, blockBuildAdvance, wallet.SetNonceAndSign(t, 0, transferTx(common.Address{1}, common.Big1)))
+				require.Equalf(t, want, headerTargetExponent(t, blk), "block %d target exponent", blk.Height())
+			}
+		})
+	}
 }
 
 // TestGasPriceManagerTargetAuthorityTransitions asserts that a change of target
@@ -240,127 +207,146 @@ func TestGasPriceManagerTargetAuthorityTransitions(t *testing.T) {
 		}),
 	)
 
-	initialExponent := dynamic.DesiredTargetExponent(initialPinnedTarget)
-	initial := sut.buildBlock(ctx, t, wallet)
-	require.Equal(t, initialExponent, headerTargetExponent(t, initial), "target exponent under the initial pin")
-
-	toValidators := sut.setGasPriceConfig(ctx, t, wallet, commontype.GasPriceConfig{
+	validatorConfig := commontype.GasPriceConfig{
 		ValidatorTargetGas: true,
 		MinGasPrice:        1,
 		TimeToDouble:       60,
-	})
-	require.Equal(t, initialExponent, headerTargetExponent(t, toValidators), "target exponent before validator authority settles")
-
-	validatorExponent := initialExponent - maxTargetExponentDiff
-	validators := sut.buildSettlingBlock(ctx, t, wallet)
-	require.Equal(t, validatorExponent, headerTargetExponent(t, validators), "target exponent once validator authority settles")
-
-	toPinned := sut.setGasPriceConfig(ctx, t, wallet, commontype.GasPriceConfig{
+	}
+	finalPinConfig := commontype.GasPriceConfig{
 		TargetGas:    finalPinnedTarget,
 		MinGasPrice:  1,
 		TimeToDouble: 60,
-	})
-	require.Equal(t, validatorExponent-maxTargetExponentDiff, headerTargetExponent(t, toPinned), "target exponent before the final pin settles")
-
-	pinned := sut.buildSettlingBlock(ctx, t, wallet)
-	require.Equal(t, dynamic.DesiredTargetExponent(finalPinnedTarget), headerTargetExponent(t, pinned), "target exponent once the final pin settles")
+	}
+	initialPin := dynamic.DesiredTargetExponent(initialPinnedTarget)
+	steps := []struct {
+		name               string
+		advance            time.Duration
+		setConfig          *commontype.GasPriceConfig
+		wantTargetExponent dynamic.TargetExponent
+	}{
+		{
+			name:               "set_validator_authority",
+			advance:            blockBuildAdvance,
+			setConfig:          &validatorConfig,
+			wantTargetExponent: initialPin,
+		},
+		{
+			name:               "validator_authority_settled",
+			advance:            settleAdvance,
+			wantTargetExponent: initialPin - maxTargetExponentDiff,
+		},
+		{
+			name:               "set_final_pin",
+			advance:            blockBuildAdvance,
+			setConfig:          &finalPinConfig,
+			wantTargetExponent: initialPin - 2*maxTargetExponentDiff,
+		},
+		{
+			name:               "final_pin_settled",
+			advance:            settleAdvance,
+			wantTargetExponent: dynamic.DesiredTargetExponent(finalPinnedTarget),
+		},
+	}
+	for _, step := range steps {
+		unsigned := transferTx(common.Address{1}, common.Big1)
+		if step.setConfig != nil {
+			unsigned = setGasPriceConfigTx(t, *step.setConfig)
+		}
+		blk := sut.buildBlock(ctx, t, step.advance, wallet.SetNonceAndSign(t, 0, unsigned))
+		require.Equalf(t, step.wantTargetExponent, headerTargetExponent(t, blk), "%s target exponent", step.name)
+	}
 }
 
 // TestGasPriceManagerActivationTransitions asserts that enabling or disabling
-// the gas price manager MUST change the base fee once the change settles.
+// the gas price manager MUST change the gas price config once the change
+// settles.
 func TestGasPriceManagerActivationTransitions(t *testing.T) {
-	// pinnedMinPrice exceeds the genesis base fee, from which the unpinned base
-	// fee decays.
 	const pinnedMinPrice = 100_000_000_000
-	pinnedCfg := staticPricingConfig(pinnedMinPrice)
+	pinnedConfig := staticPricingConfig(pinnedMinPrice)
+	wantPinnedConfig := gastime.GasPriceConfig{
+		TargetToExcessScaling: gastime.DefaultTargetToExcessScaling,
+		MinPrice:              pinnedMinPrice,
+		StaticPricing:         true,
+	}
 	// The admin never sends a tx.
 	admin := common.Address{'a', 'd', 'm', 'i', 'n'}
-	midChain := testStartTime.Add(2 * blockBuildAdvance)
+	midChain := uint64(testStartTime.Add(2 * blockBuildAdvance).Unix()) //#nosec G115 -- Known non-negative
 
 	tests := []struct {
-		name             string
-		pinnedAtGenesis  bool
-		upgrade          extras.PrecompileUpgrade
-		wantPinnedBefore bool
-		wantPinnedAfter  bool
+		name               string
+		genesisPrecompiles extras.Precompiles
+		upgrade            extras.PrecompileUpgrade
+		wantConfigBefore   gastime.GasPriceConfig
+		wantConfigAfter    gastime.GasPriceConfig
 	}{
 		{
-			name: "enable_at_first_block",
+			name: "enable",
 			upgrade: extras.PrecompileUpgrade{
 				Config: &gaspricemanager.Config{
 					AllowListConfig: allowlist.AllowListConfig{
 						AdminAddresses: []common.Address{admin},
 					},
-					Upgrade:               precompileconfig.Upgrade{BlockTimestamp: new(uint64(testStartTime.Unix()))}, //#nosec G115 -- Known non-negative
-					InitialGasPriceConfig: &pinnedCfg,
+					Upgrade:               precompileconfig.Upgrade{BlockTimestamp: &midChain},
+					InitialGasPriceConfig: &pinnedConfig,
 				},
 			},
-			wantPinnedAfter: true,
+			wantConfigBefore: gastime.DefaultGasPriceConfig(),
+			wantConfigAfter:  wantPinnedConfig,
 		},
 		{
-			name: "enable_mid_chain",
-			upgrade: extras.PrecompileUpgrade{
-				Config: &gaspricemanager.Config{
+			name: "disable",
+			genesisPrecompiles: extras.Precompiles{
+				gaspricemanager.ConfigKey: &gaspricemanager.Config{
 					AllowListConfig: allowlist.AllowListConfig{
 						AdminAddresses: []common.Address{admin},
 					},
-					Upgrade:               precompileconfig.Upgrade{BlockTimestamp: new(uint64(midChain.Unix()))}, //#nosec G115 -- Known non-negative
-					InitialGasPriceConfig: &pinnedCfg,
+					Upgrade:               precompileconfig.Upgrade{BlockTimestamp: new(testGenesisTime)},
+					InitialGasPriceConfig: &pinnedConfig,
 				},
 			},
-			wantPinnedBefore: false,
-			wantPinnedAfter:  true,
-		},
-		{
-			name:            "disable_mid_chain",
-			pinnedAtGenesis: true,
 			upgrade: extras.PrecompileUpgrade{
 				Config: &gaspricemanager.Config{
 					Upgrade: precompileconfig.Upgrade{
-						BlockTimestamp: new(uint64(midChain.Unix())), //#nosec G115 -- Known non-negative
+						BlockTimestamp: &midChain,
 						Disable:        true,
 					},
 				},
 			},
-			wantPinnedBefore: true,
-			wantPinnedAfter:  false,
+			wantConfigBefore: wantPinnedConfig,
+			wantConfigAfter:  gastime.DefaultGasPriceConfig(),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			wallet := newWallet(t, 1)
-			opts := []sutOption{
+			ctx, sut := newSUT(t,
 				withMaxAllocFor(wallet.Addresses()...),
+				withGenesisPrecompiles(tt.genesisPrecompiles),
 				withUpgrades(extras.UpgradeConfig{
 					PrecompileUpgrades: []extras.PrecompileUpgrade{tt.upgrade},
 				}),
-			}
-			if tt.pinnedAtGenesis {
-				opts = append(opts, withGasPriceManager(admin, pinnedCfg))
-			}
-			ctx, sut := newSUT(t, opts...)
+			)
 
-			pinnedBaseFee := uint256.NewInt(pinnedMinPrice)
-			// No block precedes an upgrade at the first block.
-			if *tt.upgrade.Timestamp() > uint64(testStartTime.Unix()) { //#nosec G115 -- Known non-negative
-				before := sut.buildBlock(ctx, t, wallet)
-				require.Equalf(t, tt.wantPinnedBefore, before.ExecutedBaseFee().Eq(pinnedBaseFee), "base fee %s pinned before the upgrade", before.ExecutedBaseFee())
-			}
+			before := sut.buildBlock(ctx, t, blockBuildAdvance, wallet.SetNonceAndSign(t, 0, transferTx(common.Address{1}, common.Big1)))
+			_, gotBefore := new(hooks).GasConfigAfter(before.Header())
+			require.Equal(t, tt.wantConfigBefore, gotBefore, "gas price config before the upgrade")
 
-			sut.buildBlock(ctx, t, wallet) // activates the upgrade
-			sut.buildSettlingBlock(ctx, t, wallet)
-			after := sut.buildBlock(ctx, t, wallet)
-			require.Equalf(t, tt.wantPinnedAfter, after.ExecutedBaseFee().Eq(pinnedBaseFee), "base fee %s pinned after the upgrade settles", after.ExecutedBaseFee())
+			sut.buildBlock(ctx, t, blockBuildAdvance, wallet.SetNonceAndSign(t, 0, transferTx(common.Address{1}, common.Big1))) // activates the upgrade
+			settling := sut.buildBlock(ctx, t, settleAdvance, wallet.SetNonceAndSign(t, 0, transferTx(common.Address{1}, common.Big1)))
+			_, gotAfter := new(hooks).GasConfigAfter(settling.Header())
+			require.Equal(t, tt.wantConfigAfter, gotAfter, "gas price config once the upgrade settles")
 		})
 	}
 }
 
 // TestGasPriceManagerPinnedConfigPersistsAcrossRestart asserts that the gas
-// config MUST survive a restart, since it is read only from headers.
+// price config MUST survive a restart.
 func TestGasPriceManagerPinnedConfigPersistsAcrossRestart(t *testing.T) {
 	const minPrice = 25_000_000_000
 	wallet := newWallet(t, 1)
 	admin := wallet.Addresses()[0]
+	// A shared clock keeps the restarted VM's blocks after its last accepted
+	// block.
 	timeOpt, _ := withVMTime(testStartTime)
 	opts := []sutOption{
 		withMaxAllocFor(admin),
@@ -371,11 +357,10 @@ func TestGasPriceManagerPinnedConfigPersistsAcrossRestart(t *testing.T) {
 	}
 
 	ctx, sut := newSUT(t, opts...)
-	before := sut.buildBlock(ctx, t, wallet)
-	require.Equal(t, uint256.NewInt(minPrice), before.ExecutedBaseFee(), "base fee before restart")
-
+	sut.buildBlock(ctx, t, blockBuildAdvance, wallet.SetNonceAndSign(t, 0, transferTx(common.Address{1}, common.Big1)))
 	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
+
 	ctx, sut = newSUT(t, opts...)
-	after := sut.buildBlock(ctx, t, wallet)
-	require.Equal(t, uint256.NewInt(minPrice), after.ExecutedBaseFee(), "base fee after restart")
+	blk := sut.buildBlock(ctx, t, blockBuildAdvance, wallet.SetNonceAndSign(t, 0, transferTx(common.Address{1}, common.Big1)))
+	require.Equal(t, uint256.NewInt(minPrice), blk.ExecutedBaseFee(), "base fee after restart")
 }
