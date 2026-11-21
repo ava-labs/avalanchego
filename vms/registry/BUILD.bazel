@@ -13,6 +13,7 @@ go_library(
         "//api/metrics",
         "//ids",
         "//utils/filesystem",
+        "//utils/logging",
         "//utils/resource",
         "//vms",
         "//vms/rpcchainvm",
