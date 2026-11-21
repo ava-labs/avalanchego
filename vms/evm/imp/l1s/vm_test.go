@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
@@ -394,16 +395,10 @@ func deployTx() *types.DynamicFeeTx {
 		Gas:       100_000,
 		GasTipCap: big.NewInt(1),
 		GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
-		Data: []byte{
-			// mem[0] = 0x01
-			byte(vm.PUSH1), 0x01,
-			byte(vm.PUSH1), 0x00,
-			byte(vm.MSTORE8),
-			// return mem[0..1]
-			byte(vm.PUSH1), 0x01,
-			byte(vm.PUSH1), 0x00,
-			byte(vm.RETURN),
-		},
+		Data: saetest.Ops(
+			vm.PUSH1, 1, vm.PUSH0, vm.MSTORE8, // mem[0] = 1
+			vm.PUSH1, 1, vm.PUSH0, vm.RETURN, // return mem[0:1]
+		),
 	}
 }
 
@@ -423,6 +418,15 @@ func (s *SUT) buildBlock(ctx context.Context, tb testing.TB, advance time.Durati
 	s.clock.Advance(advance)
 	s.send(ctx, tb, tx)
 	return s.RunConsensusLoop(ctx, tb)
+}
+
+// headerMinPrice returns the min price in b's header, which MUST be set.
+func headerMinPrice(tb testing.TB, b *blocks.Block) uint64 {
+	tb.Helper()
+
+	p := customtypes.GetHeaderExtra(b.Header()).MinPrice
+	require.NotNilf(tb, p, "block %d MinPrice", b.Height())
+	return *p
 }
 
 // requireReceiptStatus asserts that tx was included with status want, and

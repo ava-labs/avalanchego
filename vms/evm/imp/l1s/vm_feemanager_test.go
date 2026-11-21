@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 )
 
 // TestFeeManagerDisabledAtIgloo asserts that the first Igloo block MUST disable
@@ -116,8 +115,7 @@ func TestFeeManagerDisabledAtIgloo(t *testing.T) {
 			blk := sut.RunConsensusLoop(ctx, t)
 
 			require.False(t, sut.isPrecompileEnabledAtLatest(feemanager.ContractAddress), "precompile enabled after Igloo")
-			_, gotGasConfig := new(hooks).GasConfigAfter(blk.Header())
-			require.Equal(t, gastime.DefaultGasPriceConfig(), gotGasConfig, "gas price config after Igloo")
+			require.Equal(t, commontype.DefaultGasPriceConfig().MinGasPrice, headerMinPrice(t, blk), "min price after Igloo")
 			gotRole = sut.fetchAllowListRole(ctx, t, feemanager.ContractAddress, admin, rpc.LatestBlockNumber)
 			require.Equal(t, allowlist.NoRole, gotRole, "admin role after Igloo")
 			require.Equal(t, zeroFeeConfig, sut.getStoredFeeConfig(ctx, t), "stored fee config after Igloo")

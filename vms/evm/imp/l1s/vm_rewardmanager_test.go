@@ -29,30 +29,27 @@ func TestCoinbaseWithoutRewardManager(t *testing.T) {
 	feeRecipient := common.Address{'f', 'e', 'e'}
 
 	tests := []struct {
-		name               string
-		allowFeeRecipients bool
-		wantCoinbase       common.Address
+		name         string
+		opts         []sutOption
+		wantCoinbase common.Address
 	}{
 		{
 			name:         "burn_by_default",
 			wantCoinbase: blackhole.Address,
 		},
 		{
-			name:               "allow_fee_recipients",
-			allowFeeRecipients: true,
-			wantCoinbase:       feeRecipient,
+			name:         "allow_fee_recipients",
+			opts:         []sutOption{withAllowFeeRecipients()},
+			wantCoinbase: feeRecipient,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			wallet := newWallet(t, 1)
-			opts := []sutOption{
+			opts := append([]sutOption{
 				withMaxAllocFor(wallet.Addresses()...),
 				withFeeRecipient(feeRecipient),
-			}
-			if tt.allowFeeRecipients {
-				opts = append(opts, withAllowFeeRecipients())
-			}
+			}, tt.opts...)
 			ctx, sut := newSUT(t, opts...)
 
 			blk := sut.buildBlock(ctx, t, blockBuildAdvance, wallet.SetNonceAndSign(t, 0, transferTx(common.Address{1}, common.Big1)))
@@ -127,10 +124,9 @@ func TestRewardManagerCoinbaseVerifyBlock(t *testing.T) {
 	receivedCoinbase := common.Address{'r', 'e', 'c', 'e', 'i', 'v', 'e', 'd'}
 
 	tests := []struct {
-		name               string
-		genesisPrecompiles extras.Precompiles
-		allowFeeRecipients bool
-		wantErr            error
+		name    string
+		opts    []sutOption
+		wantErr error
 	}{
 		{
 			name:    "burn_by_default",
@@ -138,39 +134,37 @@ func TestRewardManagerCoinbaseVerifyBlock(t *testing.T) {
 		},
 		{
 			name: "stored_reward_address",
-			genesisPrecompiles: extras.Precompiles{
-				rewardmanager.ConfigKey: &rewardmanager.Config{
-					AllowListConfig: allowlist.AllowListConfig{
-						AdminAddresses: []common.Address{admin},
+			opts: []sutOption{
+				withGenesisPrecompiles(extras.Precompiles{
+					rewardmanager.ConfigKey: &rewardmanager.Config{
+						AllowListConfig: allowlist.AllowListConfig{
+							AdminAddresses: []common.Address{admin},
+						},
+						Upgrade: precompileconfig.Upgrade{
+							BlockTimestamp: new(uint64(0)),
+						},
+						InitialRewardConfig: &rewardmanager.InitialRewardConfig{
+							RewardAddress: common.Address{'r', 'e', 'w', 'a', 'r', 'd'},
+						},
 					},
-					Upgrade: precompileconfig.Upgrade{
-						BlockTimestamp: new(uint64(0)),
-					},
-					InitialRewardConfig: &rewardmanager.InitialRewardConfig{
-						RewardAddress: common.Address{'r', 'e', 'w', 'a', 'r', 'd'},
-					},
-				},
+				}),
 			},
 			wantErr: sae.ErrHashMismatch,
 		},
 		{
-			name:               "allow_fee_recipients",
-			allowFeeRecipients: true,
+			name: "allow_fee_recipients",
+			opts: []sutOption{withAllowFeeRecipients()},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			wallet := newWallet(t, 1)
-			opts := []sutOption{
+			opts := append([]sutOption{
 				withMaxAllocFor(wallet.Addresses()...),
 				// Building with the blackhole fee recipient logs a warning,
 				// which fails the test.
 				withFeeRecipient(common.Address{'f', 'e', 'e'}),
-				withGenesisPrecompiles(tt.genesisPrecompiles),
-			}
-			if tt.allowFeeRecipients {
-				opts = append(opts, withAllowFeeRecipients())
-			}
+			}, tt.opts...)
 			ctx, sut := newSUT(t, opts...)
 
 			// Verify but don't accept the honest block, so its twin is
