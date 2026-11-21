@@ -54,6 +54,8 @@ jobs:
       - uses: actions/checkout@v5
       - id: setup-go
         uses: ./.github/actions/setup-go-for-project
+        # Fail fast on slow cache restores; see docs/ci.md#cache-restore-timeouts.
+        timeout-minutes: 3
       - id: cache-policy
         uses: ./.github/actions/cache-policy
         with:
@@ -84,6 +86,8 @@ jobs:
       - id: unit-cache
         name: Restore Go unit-test cache
         uses: actions/cache/restore@v5
+        # Fail fast on slow cache restores; see docs/ci.md#cache-restore-timeouts.
+        timeout-minutes: 3
         with:
           path: ${{ steps.cache-key.outputs.go-build-cache-path }}
           key: ${{ steps.cache-key.outputs.cache-key }}

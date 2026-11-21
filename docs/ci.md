@@ -23,6 +23,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [Provision CI job dependencies](#provision-ci-job-dependencies)
 - [CI cache policy](#ci-cache-policy)
   - [Cache policy overview](#cache-policy-overview)
+  - [Cache restore timeouts](#cache-restore-timeouts)
   - [Archive caches and content-addressable caches](#archive-caches-and-content-addressable-caches)
   - [Cache lifecycle](#cache-lifecycle)
     - [Validate cache saves before merge](#validate-cache-saves-before-merge)
@@ -443,6 +444,36 @@ can download a release on a miss, and the Nix store cache can fetch missing
 flake store paths. Those caches do not use the dependency-download completeness
 check. These restrictions do not isolate the workload from the network; see
 [download restrictions](./go-toolchains-and-caches.md#download-restrictions).
+
+### Cache restore timeouts
+
+Slow cache restores can delay pull request checks for many minutes. These step
+timeouts fail the job instead of waiting. They prioritize fast feedback on pull
+requests and do not cover every cache restore, especially in scheduled jobs
+where developers are not waiting for results:
+
+| Step in the Go pull request workflow | Observed time  | Timeout   |
+|--------------------------------------|----------------|-----------|
+| Restore the Go unit cache            | 48–81 seconds  | 3 minutes |
+| Set up Bazel for lint                | 10–17 seconds  | 1 minute  |
+| Set up Go on Linux                   | 35–110 seconds | 3 minutes |
+| Set up Go on macOS                   | 56–134 seconds | 4 minutes |
+| Set up Nix                           | 80–124 seconds | 4 minutes |
+
+The observed times are from eight successful pull request runs. Each timeout
+allows at least 50% more time than the observed maximum, rounded up to whole
+minutes. This small sample does not cover every cache miss or runner.
+
+A setup step's timeout covers all its work, including downloads on a cache miss,
+not just the restore. A timeout therefore does not necessarily indicate a
+network problem. When changing a limit, check both cache hits and misses on
+each affected runner.
+
+GitHub Actions does not support [step timeouts inside composite
+actions](https://github.com/actions/runner/issues/1979).  Some restores are part
+of composite actions that also build or test, so the limits above do not cover
+them. Do not apply a short timeout to an entire build or test step just to limit
+its cache restore.
 
 ### Archive caches and content-addressable caches
 

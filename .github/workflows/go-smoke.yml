@@ -20,6 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
+        # Fail fast on slow cache restores; see docs/ci.md#cache-restore-timeouts.
+        timeout-minutes: 4
       - name: Run unit-test smoke suite
         shell: bash
         run: ./scripts/run_task.sh test-unit-smoke
