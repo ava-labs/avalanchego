@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -639,6 +640,61 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		err = childBlk.Verify(t.Context())
 		require.ErrorIs(err, errPChainHeightNotReached)
 	}
+}
+
+// An isolated L1 produces signed blocks that reference a P-chain height at
+// which the real P-chain has no validators for the L1. After the L1 rejoins
+// the P-chain, nodes can only sync those blocks because the proposer check is
+// skipped while bootstrapping.
+func TestBlockVerify_PostForkBlock_BootstrappingSkipsProposerCheck(t *testing.T) {
+	require := require.New(t)
+
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgrade.Latest, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(t.Context()))
+	}()
+
+	// The P-chain has no validators for this chain at any height.
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		return map[ids.NodeID]*validators.GetValidatorOutput{}, nil
+	}
+
+	parentCoreBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return parentCoreBlk, nil
+	}
+	parentBlk, err := proVM.BuildBlock(t.Context())
+	require.NoError(err)
+	require.NoError(parentBlk.Verify(t.Context()))
+
+	childCoreBlk := snowmantest.BuildChild(parentCoreBlk)
+	parentPChainHeight := parentBlk.(*postForkBlock).PChainHeight()
+	childSlb, err := block.Build(
+		parentBlk.ID(),
+		proVM.Time(),
+		parentPChainHeight,
+		acp181.NewEpoch(proVM.Upgrades, parentPChainHeight, block.Epoch{}, parentBlk.Timestamp(), proVM.Time()),
+		proVM.StakingCertLeaf,
+		childCoreBlk.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.StakingLeafSigner,
+	)
+	require.NoError(err)
+	childBlk := postForkBlock{
+		SignedBlock: childSlb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: childCoreBlk,
+		},
+	}
+
+	// With no validators, a synced node expects an unsigned block.
+	err = childBlk.Verify(t.Context())
+	require.ErrorIs(err, errProposerMismatch)
+
+	// A bootstrapping node accepts it.
+	require.NoError(proVM.SetState(t.Context(), snow.Bootstrapping))
+	require.NoError(childBlk.Verify(t.Context()))
 }
 
 func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T) {

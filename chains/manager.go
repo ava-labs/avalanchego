@@ -245,6 +245,9 @@ type ManagerConfig struct {
 	ChainDataDir string
 
 	Subnets *Subnets
+
+	// If set, the P-chain is not started and only this chain is created.
+	IsolatedL1 *IsolatedL1
 }
 
 type manager struct {
@@ -1515,6 +1518,16 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 
 // Starts chain creation loop to process queued chains
 func (m *manager) StartChainCreator(platformParams ChainParameters) error {
+	if m.IsolatedL1 != nil {
+		m.startIsolatedL1()
+		m.Log.Info("starting chain creator for isolated L1",
+			zap.Stringer("chainID", m.IsolatedL1.Chain.ID),
+		)
+		m.chainCreatorExited.Add(1)
+		go m.dispatchChainCreator()
+		return m.registerBootstrappedHealthChecks()
+	}
+
 	// Add the P-Chain to the Primary Network
 	sb, _ := m.Subnets.GetOrCreate(constants.PrimaryNetworkID)
 	sb.AddChain(platformParams.ID)
@@ -1529,6 +1542,14 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	m.chainCreatorExited.Add(1)
 	go m.dispatchChainCreator()
 	return nil
+}
+
+// startIsolatedL1 uses the isolated L1 in place of the P-chain and queues the
+// L1 as the only chain to create.
+func (m *manager) startIsolatedL1() {
+	m.validatorState = m.IsolatedL1
+	m.QueueChainCreation(m.IsolatedL1.Chain)
+	close(m.unblockChainCreatorCh)
 }
 
 func (m *manager) dispatchChainCreator() {

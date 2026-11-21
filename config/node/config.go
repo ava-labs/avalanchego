@@ -177,6 +177,8 @@ type Config struct {
 
 	TrackedSubnets set.Set[ids.ID] `json:"trackedSubnets"`
 
+	IsolatedL1 *chains.IsolatedL1 `json:"isolatedL1"`
+
 	// ProposerMinBlockDelay is the minimum delay this node will enforce when
 	// building a snowman++ block on the P-chain and the X-chain. All other
 	// chains are expected to perform their own block production throttling.

@@ -148,6 +148,7 @@ const (
 	SnowMaxTimeProcessingKey                             = "snow-max-time-processing"
 	PartialSyncPrimaryNetworkKey                         = "partial-sync-primary-network"
 	TrackSubnetsKey                                      = "track-subnets"
+	IsolatedL1ConfigFileKey                              = "isolated-l1-config-file"
 	AdminAPIEnabledKey                                   = "api-admin-enabled"
 	InfoAPIEnabledKey                                    = "api-info-enabled"
 	MetricsAPIEnabledKey                                 = "api-metrics-enabled"
