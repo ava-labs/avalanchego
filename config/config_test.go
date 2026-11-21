@@ -1393,3 +1393,36 @@ func TestGetUpgradeConfigRejectsOutOfOrderUpgrades(t *testing.T) {
 	_, err = getUpgradeConfig(v, constants.UnitTestID)
 	require.ErrorIs(t, err, upgrade.ErrInvalidUpgradeTimes, "getUpgradeConfig()")
 }
+
+func TestRedactSensitiveFlags(t *testing.T) {
+	require := require.New(t)
+
+	flags := map[string]interface{}{
+		HTTPSKeyContentKey:         "httpsKey",
+		StakingTLSKeyContentKey:    "stakingTLSKey",
+		StakingSignerKeyContentKey: "signerKey",
+		TracingHeadersKey:          "tracingApi",
+		ConfigContentKey:           "ConfigContent",
+		NetworkNameKey:             "fuji",
+	}
+
+	redacted := RedactSensitiveFlags(flags)
+	require.Equal(
+		map[string]interface{}{
+			HTTPSKeyContentKey:         redactedFlagValue,
+			StakingTLSKeyContentKey:    redactedFlagValue,
+			StakingSignerKeyContentKey: redactedFlagValue,
+			ConfigContentKey:           redactedFlagValue,
+			TracingHeadersKey:          redactedFlagValue,
+			NetworkNameKey:             "fuji",
+		},
+		redacted,
+	)
+
+	// The input must not be modified.
+	require.Equal("httpsKey", flags[HTTPSKeyContentKey])
+	require.Equal("stakingTLSKey", flags[StakingTLSKeyContentKey])
+	require.Equal("signerKey", flags[StakingSignerKeyContentKey])
+	require.Equal("ConfigContent", flags[ConfigContentKey])
+	require.Equal("tracingApi", flags[TracingHeadersKey])
+}

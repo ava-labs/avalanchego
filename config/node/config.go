@@ -83,7 +83,7 @@ type StakingConfig struct {
 
 type StakingSignerConfig struct {
 	EphemeralSignerEnabled bool   `json:"ephemeralSignerEnabled"`
-	KeyContent             string `json:"signerKeyContent"`
+	KeyContent             string `json:"-"`
 	KeyPath                string `json:"keyPath"`
 	RPCEndpoint            string `json:"RPCEndpoint"`
 	KeyPathIsSet           bool   `json:"keyPathIsSet"`
