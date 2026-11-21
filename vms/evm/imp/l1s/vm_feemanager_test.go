@@ -23,14 +23,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 )
 
-// TestFeeManagerDisabledAtIgloo asserts that the fee manager MUST be disabled,
-// with its state cleared, in the first block at or after Igloo, however it was
-// enabled before Igloo. Without a gas price manager, that block MUST use the
-// default gas price config.
+// TestFeeManagerDisabledAtIgloo asserts that the first Igloo block MUST disable
+// the fee manager and clear its state.
 func TestFeeManagerDisabledAtIgloo(t *testing.T) {
-	// The genesis predates Igloo, which activates at the first block.
+	// A post-Igloo genesis can't enable the fee manager. The clock starts at
+	// Igloo, so the first block activates it.
 	iglooTime := upgrade.InitiallyActiveTime.Add(time.Minute)
-	// The admin never sends a tx.
 	admin := common.Address{'a', 'd', 'm', 'i', 'n'}
 	initialFeeConfig := commontype.FeeConfig{
 		GasLimit:                 big.NewInt(8_000_000),
