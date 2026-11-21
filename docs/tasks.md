@@ -91,7 +91,10 @@ In practice, tasks should usually:
 
 Most non-trivial shell logic should usually live under [`scripts/`](../scripts/). The
 main exception is code under [`.github/`](../.github/) when it is specific to GitHub
-Actions or packaging.
+Actions or packaging. For example, `lint-links` runs
+[`scripts/lint_links.sh`](../scripts/lint_links.sh). CI includes this network-dependent
+check in `lint-all-ci`; run `task lint-links` locally when network access is available.
+The deterministic fixture test runs in both lint aggregates.
 
 This makes the real behavior easier to check, test, reuse, and review.
 

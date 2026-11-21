@@ -67,6 +67,8 @@
             # Linters
             shellcheck
             buildifier
+            curl
+            lychee
             yamlfmt
 
             # Protobuf

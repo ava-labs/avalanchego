@@ -1102,8 +1102,9 @@ needed.
 ## Validation
 
 After changing GitHub Actions configuration, run `task lint-action`. The `lint-all`
-and `lint-all-ci` tasks also run `lint-action`. In addition to `actionlint`,
-[`scripts/actionlint.sh`](../scripts/actionlint.sh) checks:
+and `lint-all-ci` tasks also run `lint-action`. The CI aggregate `lint-all-ci` also
+runs `lint-links`, which checks external URLs and therefore needs network access. In
+addition to `actionlint`, [`scripts/actionlint.sh`](../scripts/actionlint.sh) checks:
 
 - direct calls from workflows to `scripts/`, except `run_task.sh` and `workflow-*.sh`
   helpers

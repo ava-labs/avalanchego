@@ -235,7 +235,7 @@ Anyone can deploy their own instance of the XSVM as an L1 on Avalanche. All you 
 
 You can do this by following the [L1 tutorial].
 
-[interchain messaging]: https://github.com/ava-labs/avalanchego/tree/master/vms/platformvm/warp/README.md
+[interchain messaging]: https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/README.md
 [L1 tutorial]: https://build.avax.network/docs/tooling/create-avalanche-l1
 [EVM]: https://github.com/ava-labs/avalanchego/tree/master/vms/evm
 [C-Chain]: https://build.avax.network/docs/quick-start/primary-network#c-chain
