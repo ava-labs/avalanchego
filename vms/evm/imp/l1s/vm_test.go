@@ -49,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api/l1sclient"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
@@ -95,6 +96,7 @@ type SUT struct {
 	clock      *saetest.Clock
 	validators *warptest.Validators
 	p2pclient  *saetest.CapturingPeer
+	l1sClient  *l1sclient.Client
 }
 
 type (
@@ -337,6 +339,10 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT, error) 
 	if err != nil {
 		return nil, nil, err
 	}
+	l1sClient, err := l1sclient.Dial(ctx, vmSUT.URL+"/rpc")
+	require.NoError(tb, err, "l1sclient.Dial()")
+	tb.Cleanup(l1sClient.Close)
+
 	sut := &SUT{
 		VM:         vm,
 		SUT:        vmSUT,
@@ -345,6 +351,7 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT, error) 
 		clock:      cfg.clock,
 		validators: vdrs,
 		p2pclient:  saetest.NewCapturingPeer(tb, validatorIDs),
+		l1sClient:  l1sClient,
 	}
 
 	appSender.Start(tb, sut)
