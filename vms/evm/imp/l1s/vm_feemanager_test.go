@@ -24,10 +24,12 @@ import (
 )
 
 // TestFeeManagerDisabledAtIgloo asserts that the fee manager MUST be disabled,
-// with its state cleared, in the first block at or after Igloo, whether or not
-// genesis enabled it. Without a gas price manager, that block MUST use the
+// with its state cleared, in the first block at or after Igloo, however it was
+// enabled before Igloo. Without a gas price manager, that block MUST use the
 // default gas price config.
 func TestFeeManagerDisabledAtIgloo(t *testing.T) {
+	// The genesis predates Igloo, which activates at the first block.
+	iglooTime := upgrade.InitiallyActiveTime.Add(time.Minute)
 	// The admin never sends a tx.
 	admin := common.Address{'a', 'd', 'm', 'i', 'n'}
 	initialFeeConfig := commontype.FeeConfig{
@@ -53,9 +55,15 @@ func TestFeeManagerDisabledAtIgloo(t *testing.T) {
 	tests := []struct {
 		name                string
 		genesisPrecompiles  extras.Precompiles
+		upgrades            []extras.PrecompileUpgrade
 		wantRoleBefore      allowlist.Role
 		wantFeeConfigBefore commontype.FeeConfig
 	}{
+		{
+			name:                "not_in_genesis",
+			wantRoleBefore:      allowlist.NoRole,
+			wantFeeConfigBefore: zeroFeeConfig,
+		},
 		{
 			name: "enabled_at_genesis",
 			genesisPrecompiles: extras.Precompiles{
@@ -71,7 +79,20 @@ func TestFeeManagerDisabledAtIgloo(t *testing.T) {
 			wantFeeConfigBefore: initialFeeConfig,
 		},
 		{
-			name:                "not_in_genesis",
+			name: "enabled_between_genesis_and_igloo",
+			upgrades: []extras.PrecompileUpgrade{
+				{
+					Config: &feemanager.Config{
+						AllowListConfig: allowlist.AllowListConfig{
+							AdminAddresses: []common.Address{admin},
+						},
+						Upgrade: precompileconfig.Upgrade{
+							BlockTimestamp: new(uint64(iglooTime.Add(-30 * time.Second).Unix())), //#nosec G115 -- Known non-negative
+						},
+						InitialFeeConfig: &initialFeeConfig,
+					},
+				},
+			},
 			wantRoleBefore:      allowlist.NoRole,
 			wantFeeConfigBefore: zeroFeeConfig,
 		},
@@ -79,14 +100,13 @@ func TestFeeManagerDisabledAtIgloo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			wallet := newWallet(t, 1)
-			// The genesis predates Igloo, which activates at the first block.
-			iglooTime := upgrade.InitiallyActiveTime.Add(time.Minute)
 			timeOpt, _ := withVMTime(iglooTime)
 			ctx, sut := newSUT(t,
 				withMaxAllocFor(wallet.Addresses()...),
 				withIglooTime(iglooTime),
 				timeOpt,
 				withGenesisPrecompiles(tt.genesisPrecompiles),
+				withUpgrades(extras.UpgradeConfig{PrecompileUpgrades: tt.upgrades}),
 			)
 
 			gotRole := sut.fetchAllowListRole(ctx, t, feemanager.ContractAddress, admin, rpc.LatestBlockNumber)
