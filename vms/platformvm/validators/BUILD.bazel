@@ -39,6 +39,7 @@ go_test(
         "//utils/crypto/bls",
         "//utils/crypto/bls/signer/localsigner",
         "//utils/logging",
+        "//utils/set",
         "//utils/timer/mockable",
         "//utils/units",
         "//vms/platformvm/config",

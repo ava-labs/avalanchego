@@ -62,6 +62,18 @@ type State interface {
 		ctx context.Context,
 		subnetID ids.ID,
 	) (map[ids.ID]*GetCurrentValidatorOutput, uint64, error)
+
+	// GetL1ValidatorSet returns every L1 validator of the provided subnet,
+	// active or inactive, at the requested P-chain height. Unlike
+	// [State.GetValidatorSet], inactive validators are returned with their own NodeID
+	// and public key rather than merged under [ids.EmptyNodeID], and legacy
+	// subnet validators are not included.
+	// The returned map should not be modified.
+	GetL1ValidatorSet(
+		ctx context.Context,
+		height uint64,
+		subnetID ids.ID,
+	) (map[ids.NodeID]*GetValidatorOutput, error)
 }
 
 type lockedState struct {
@@ -128,6 +140,17 @@ func (s *lockedState) GetCurrentValidatorSet(
 	return s.s.GetCurrentValidatorSet(ctx, subnetID)
 }
 
+func (s *lockedState) GetL1ValidatorSet(
+	ctx context.Context,
+	height uint64,
+	subnetID ids.ID,
+) (map[ids.NodeID]*GetValidatorOutput, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.s.GetL1ValidatorSet(ctx, height, subnetID)
+}
+
 type noValidators struct {
 	State
 }
@@ -149,6 +172,10 @@ func (*noValidators) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.N
 func (n *noValidators) GetCurrentValidatorSet(ctx context.Context, _ ids.ID) (map[ids.ID]*GetCurrentValidatorOutput, uint64, error) {
 	height, err := n.GetCurrentHeight(ctx)
 	return nil, height, err
+}
+
+func (*noValidators) GetL1ValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*GetValidatorOutput, error) {
+	return nil, nil
 }
 
 type cachedState struct {
