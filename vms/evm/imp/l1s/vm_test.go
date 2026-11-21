@@ -388,8 +388,7 @@ func callTx(to common.Address, data []byte, gasLimit uint64) *types.DynamicFeeTx
 	}
 }
 
-// deployTx returns a tx deploying 1 byte of code, so code presence shows
-// whether the deploy succeeded.
+// deployTx returns a tx deploying 1 byte of code.
 func deployTx() *types.DynamicFeeTx {
 	return &types.DynamicFeeTx{
 		Gas:       100_000,

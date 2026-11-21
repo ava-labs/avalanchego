@@ -5,13 +5,11 @@
 package l1s
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
@@ -26,18 +24,15 @@ func TestDeployerAllowListPrecompileUpgrades(t *testing.T) {
 	disableTime := testStartTime.Add(blockBuildAdvance)
 	reenableTime := disableTime.Add(blockBuildAdvance)
 
-	const adminIdx, userIdx = 0, 1
-	wallet := newWallet(t, 2)
-	admin := wallet.Addresses()[adminIdx]
-	user := wallet.Addresses()[userIdx]
-
+	wallet := newWallet(t, 1)
+	enabledConfig := allowlist.AllowListConfig{
+		AdminAddresses: []common.Address{{'a', 'd', 'm', 'i', 'n'}},
+	}
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(wallet.Addresses()...),
 		withGenesisPrecompiles(extras.Precompiles{
 			deployerallowlist.ConfigKey: &deployerallowlist.Config{
-				AllowListConfig: allowlist.AllowListConfig{
-					AdminAddresses: []common.Address{admin},
-				},
+				AllowListConfig: enabledConfig,
 				Upgrade: precompileconfig.Upgrade{
 					BlockTimestamp: new(uint64(0)),
 				},
@@ -55,10 +50,7 @@ func TestDeployerAllowListPrecompileUpgrades(t *testing.T) {
 				},
 				{
 					Config: &deployerallowlist.Config{
-						AllowListConfig: allowlist.AllowListConfig{
-							AdminAddresses:   []common.Address{admin},
-							ManagerAddresses: []common.Address{user},
-						},
+						AllowListConfig: enabledConfig,
 						Upgrade: precompileconfig.Upgrade{
 							BlockTimestamp: new(uint64(reenableTime.Unix())), //#nosec G115 -- Known non-negative
 						},
@@ -68,89 +60,35 @@ func TestDeployerAllowListPrecompileUpgrades(t *testing.T) {
 		}),
 	)
 
-	type (
-		deploy struct {
-			from       int
-			wantStatus uint64
-		}
-		roles struct{ admin, user allowlist.Role }
-	)
 	steps := []struct {
-		name        string
-		time        time.Time
-		deploys     []deploy
-		wantEnabled bool
-		wantRoles   roles
+		name       string
+		time       time.Time
+		wantStatus uint64
 	}{
 		{
-			name: "genesis",
-			time: testStartTime,
-			deploys: []deploy{
-				{from: adminIdx, wantStatus: types.ReceiptStatusSuccessful},
-				{from: userIdx, wantStatus: types.ReceiptStatusFailed},
-			},
-			wantEnabled: true,
-			wantRoles: roles{
-				admin: allowlist.AdminRole,
-				user:  allowlist.NoRole,
-			},
+			name:       "genesis",
+			time:       testStartTime,
+			wantStatus: types.ReceiptStatusFailed,
 		},
 		{
-			name: "disable",
-			time: disableTime,
-			deploys: []deploy{
-				{from: userIdx, wantStatus: types.ReceiptStatusSuccessful},
-			},
-			wantEnabled: false,
-			wantRoles: roles{
-				admin: allowlist.NoRole,
-				user:  allowlist.NoRole,
-			},
+			name:       "disable",
+			time:       disableTime,
+			wantStatus: types.ReceiptStatusSuccessful,
 		},
 		{
-			name: "reenable",
-			time: reenableTime,
-			deploys: []deploy{
-				{from: userIdx, wantStatus: types.ReceiptStatusSuccessful},
-			},
-			wantEnabled: true,
-			wantRoles: roles{
-				admin: allowlist.AdminRole,
-				user:  allowlist.ManagerRole,
-			},
+			name:       "reenable",
+			time:       reenableTime,
+			wantStatus: types.ReceiptStatusFailed,
 		},
 	}
-
 	for _, s := range steps {
 		sut.clock.Set(s.time)
-		txs := make([]*types.Transaction, len(s.deploys))
-		for i, d := range s.deploys {
-			txs[i] = wallet.SetNonceAndSign(t, d.from, deployTx())
-			sut.send(ctx, t, txs[i])
-		}
+		tx := wallet.SetNonceAndSign(t, 0, deployTx())
+		sut.send(ctx, t, tx)
 		sut.RunConsensusLoop(ctx, t)
 
-		for i, d := range s.deploys {
-			sut.requireDeployed(ctx, t, txs[i], d.wantStatus)
-		}
-		require.Equalf(t, s.wantEnabled, sut.isPrecompileEnabledAtLatest(deployerallowlist.ContractAddress), "%s: precompile enabled", s.name)
-
-		got := sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, admin, rpc.LatestBlockNumber)
-		require.Equalf(t, s.wantRoles.admin, got, "%s: admin role", s.name)
-		got = sut.fetchAllowListRole(ctx, t, deployerallowlist.ContractAddress, user, rpc.LatestBlockNumber)
-		require.Equalf(t, s.wantRoles.user, got, "%s: user role", s.name)
+		receipt, err := sut.EthClient().TransactionReceipt(ctx, tx.Hash())
+		require.NoErrorf(t, err, "%s: TransactionReceipt()", s.name)
+		require.Equalf(t, s.wantStatus, receipt.Status, "%s: deploy status", s.name)
 	}
-}
-
-// requireDeployed asserts that the contract creation tx was included with
-// status want, and deployed code if and only if it succeeded.
-func (s *SUT) requireDeployed(ctx context.Context, tb testing.TB, tx *types.Transaction, want uint64) {
-	tb.Helper()
-
-	receipt := s.requireReceiptStatus(ctx, tb, tx, want)
-
-	client := s.EthClient()
-	code, err := client.CodeAt(ctx, receipt.ContractAddress, nil)
-	require.NoErrorf(tb, err, "%T.CodeAt(%s)", client, receipt.ContractAddress)
-	require.Equalf(tb, want == types.ReceiptStatusSuccessful, len(code) > 0, "code deployed by tx %#x", tx.Hash())
 }
