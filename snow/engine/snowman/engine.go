@@ -902,7 +902,7 @@ func (e *Engine) sendQuery(
 			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
 			zap.Error(err),
 		)
-	} else if nextHeightToPrefer > maxHeight {
+	} else if heightToQuery > maxHeight {
 		e.Ctx.Log.Debug("querying for block at a lower height than preferred",
 			zap.Stringer("blkID", blkID),
 			zap.Uint64("nextHeightToPrefer", nextHeightToPrefer),
