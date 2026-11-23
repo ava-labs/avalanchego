@@ -3363,6 +3363,7 @@ func TestEngineHeightLimits(t *testing.T) {
 		}
 	}
 
+	const largeHeight = math.MaxUint64 - maxHeightAbovePreferred/2
 	tests := []struct {
 		name            string
 		lastAccepted    *snowmantest.Block
@@ -3403,11 +3404,11 @@ func TestEngineHeightLimits(t *testing.T) {
 		},
 		{
 			name:            "limits_overflow",
-			lastAccepted:    newBlock(math.MaxUint64-maxHeightAbovePreferred/2, snowmantest.GenesisID, snowtest.Accepted),
+			lastAccepted:    newBlock(largeHeight, snowmantest.GenesisID, snowtest.Accepted),
 			numProcessing:   1,
-			height:          math.MaxUint64 - maxHeightAbovePreferred/2 + 2,
+			height:          largeHeight + 2,
 			wantIssued:      true,
-			wantQueryHeight: math.MaxUint64 - maxHeightAbovePreferred/2 + 2,
+			wantQueryHeight: largeHeight + 2,
 		},
 	}
 
