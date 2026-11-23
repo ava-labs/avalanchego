@@ -10,6 +10,7 @@ go_library(
         "//ids",
         "//utils/logging",
         "//utils/set",
+        "//vms/evm/imp/dynamic",
         "//vms/evm/network",
         "//vms/evm/sae",
         "//vms/evm/sae/rpc",

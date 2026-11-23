@@ -85,7 +85,9 @@ type desiredParams struct {
 
 // desired returns c's user-facing targets as internal exponent votes.
 func (c config) desired() desiredParams {
-	var d desiredParams
+	d := desiredParams{
+		delayExponent: c.DesiredDelayExponent(),
+	}
 	if c.GasTarget != nil {
 		e := dynamic.DesiredTargetExponent(*c.GasTarget)
 		d.targetExponent = &e
@@ -93,10 +95,6 @@ func (c config) desired() desiredParams {
 	if c.PriceTarget != nil {
 		e := dynamic.DesiredPriceExponent(*c.PriceTarget)
 		d.priceExponent = &e
-	}
-	if c.MinDelayTarget != nil {
-		e := dynamic.DesiredDelayExponent(*c.MinDelayTarget)
-		d.delayExponent = &e
 	}
 	return d
 }

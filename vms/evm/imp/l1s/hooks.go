@@ -26,6 +26,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
 	"github.com/ava-labs/avalanchego/x/blockdb"
@@ -43,23 +45,33 @@ type hooks struct {
 	chainConfig *params.ChainConfig
 }
 
-func newHooks(ctx *snow.Context, c *params.ChainConfig, now func() time.Time) *hooks {
+func newHooks(
+	ctx *snow.Context,
+	c *params.ChainConfig,
+	now func() time.Time,
+	desiredDelay *dynamic.DelayExponent,
+) *hooks {
 	return &hooks{
 		builder: builder{
-			ctx: ctx,
-			now: now,
+			ctx:          ctx,
+			now:          now,
+			desiredDelay: desiredDelay,
 		},
 		chainConfig: c,
 	}
 }
 
 func (h *hooks) BlockRebuilderFrom(b *types.Block) (hookadaptor.BlockBuilder, error) {
-	now := blockTime(b.Header())
+	header := b.Header()
+	now := blockTime(header)
 	return &builder{
 		ctx: h.ctx,
 		now: func() time.Time {
 			return now
 		},
+		// Voting for the block's own delay reproduces it, because
+		// [dynamic.DelayExponent.Toward] stays within the per-block cap.
+		desiredDelay: (*dynamic.DelayExponent)(customtypes.GetHeaderExtra(header).MinDelayExcess),
 	}, nil
 }
 
@@ -111,6 +123,11 @@ func blockTime(h *types.Header) time.Time {
 	return saeheader.Time(h.Time, customtypes.HeaderTimeMilliseconds(h))
 }
 
+// delayExponent returns h's ACP-226 minimum block delay exponent.
+func delayExponent(h *types.Header) dynamic.DelayExponent {
+	return blockdelay.Exponent(customtypes.GetHeaderExtra(h).MinDelayExcess)
+}
+
 func (*hooks) VerifyBlockSyntax(*types.Block) error {
 	// L1 VM has no extra block body fields.
 	return nil
@@ -145,19 +162,26 @@ var _ hookadaptor.BlockBuilder = (*builder)(nil)
 type builder struct {
 	ctx *snow.Context
 	now func() time.Time
+	// desiredDelay is this node's ACP-226 minimum block delay vote; nil
+	// follows the parent.
+	desiredDelay *dynamic.DelayExponent
 }
+
+var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
 
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
-	// TODO: Enforce the ACP-226 minimum block delay, and move it toward this
-	// node's desired delay.
-	minDelayExcess := acp226.InitialDelayExcess
-	if de := customtypes.GetHeaderExtra(parent).MinDelayExcess; de != nil {
-		minDelayExcess = *de
+	now := b.now()
+	de := delayExponent(parent)
+	parentTime := blockTime(parent)
+	if minTime := parentTime.Add(de.DelayDuration()); now.Before(minTime) {
+		return nil, fmt.Errorf("%w: block time %s is before the minimum %s (parent %s + %s)",
+			errBelowMinBlockDelay, now, minTime, parentTime, de.DelayDuration())
 	}
+	minDelayExcess := acp226.DelayExcess(de.Toward(b.desiredDelay))
 
-	nowMS := uint64(b.now().UnixMilli()) //#nosec G115 -- Known non-negative
+	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash: parent.Hash(),
