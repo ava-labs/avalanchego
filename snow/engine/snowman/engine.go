@@ -899,7 +899,7 @@ func (e *Engine) sendQuery(
 		return
 	}
 
-	heightToAskAbout := nextHeightToPrefer
+	heightToQuery := nextHeightToPrefer
 	_, lastAcceptedHeight := e.Consensus.LastAccepted()
 	if maxHeight, err := math.Add(lastAcceptedHeight, maxHeightAboveAccepted); err != nil {
 		e.Ctx.Log.Debug("overflow computing max query height",
@@ -912,9 +912,9 @@ func (e *Engine) sendQuery(
 			zap.Stringer("blkID", blkID),
 			zap.Uint64("nextHeightToPrefer", nextHeightToPrefer),
 			zap.Uint64("maxHeight", maxHeight),
-			zap.Uint64("heightToAskAbout", heightToAskAbout),
+			zap.Uint64("heightToRequest", heightToQuery),
 		)
-		heightToAskAbout = maxHeight
+		heightToQuery = maxHeight
 	}
 
 	vdrBag := bag.Of(vdrIDs...)
@@ -930,9 +930,9 @@ func (e *Engine) sendQuery(
 
 	vdrSet := set.Of(vdrIDs...)
 	if push {
-		e.Sender.SendPushQuery(ctx, vdrSet, e.requestID, blkBytes, heightToAskAbout)
+		e.Sender.SendPushQuery(ctx, vdrSet, e.requestID, blkBytes, heightToQuery)
 	} else {
-		e.Sender.SendPullQuery(ctx, vdrSet, e.requestID, blkID, heightToAskAbout)
+		e.Sender.SendPullQuery(ctx, vdrSet, e.requestID, blkID, heightToQuery)
 	}
 }
 
