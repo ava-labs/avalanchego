@@ -293,6 +293,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint64(StakeSupplyCapKey, genesis.LocalParams.RewardConfig.SupplyCap, "Supply cap of the staking function")
 	// Subnets
 	fs.String(TrackSubnetsKey, "", "List of subnets for the node to track. A node tracking a subnet will track the uptimes of the subnet validators and attempt to sync all the chains in the subnet. Before validating a subnet, a node should be tracking the subnet to avoid impacting their subnet validation uptime")
+	fs.String(OnlySyncSubnetsKey, "", fmt.Sprintf("%s", "List of subnets for the node to track aside from the P-chain. The node will not sync the X-chain and C-chain. This config flag combines %s and %s. For more info, see %s and %s.", TrackSubnetsKey, PartialSyncPrimaryNetworkKey, TrackSubnetsKey, PartialSyncPrimaryNetworkKey))
 
 	// State syncing
 	fs.String(StateSyncIPsKey, "", "Comma separated list of state sync peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
