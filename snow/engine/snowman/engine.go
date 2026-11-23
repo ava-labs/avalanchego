@@ -1177,9 +1177,7 @@ func (e *Engine) getProcessingAncestor(initialVote ids.ID) (ids.ID, bool) {
 	}
 }
 
-// shouldIssueBlock reports whether blk should be enqueued for issuance. It is
-// false if blk is decided, already enqueued or issued, or too far above the
-// engine's progress.
+// shouldIssueBlock reports whether blk should be enqueued for issuance.
 func (e *Engine) shouldIssueBlock(blk snowman.Block) bool {
 	if e.isDecided(blk) {
 		return false
