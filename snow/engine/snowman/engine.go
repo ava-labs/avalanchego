@@ -1188,8 +1188,6 @@ func (e *Engine) shouldIssueBlock(blk snowman.Block) bool {
 		return false
 	}
 
-	// isDecided guarantees height > lastAcceptedHeight. Subtracting rather
-	// than adding avoids overflow.
 	height := blk.Height()
 	_, lastAcceptedHeight := e.Consensus.LastAccepted()
 	_, preferredHeight := e.Consensus.Preference()
