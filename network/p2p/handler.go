@@ -31,6 +31,10 @@ const (
 	EVMCodeRequestHandlerID
 	EVMBlockRequestHandlerID
 	EVMAtomicLeafRequestHandlerID
+	// OracleSignatureRequestHandlerID is the handler ID for oracle attestation
+	// signature requests. Distinct from SignatureRequestHandlerID (ACP-118)
+	// which is reserved for native warp.
+	OracleSignatureRequestHandlerID
 )
 
 var (
