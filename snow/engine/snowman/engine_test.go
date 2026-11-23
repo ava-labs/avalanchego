@@ -3349,131 +3349,6 @@ func (m *mockPChainProgressUpdater) SetProgress(height uint64) {
 	m.setProgressF(height)
 }
 
-// TestEngineAbandonsBlocksTooFarAhead tests when the engine decides to fetch a missing parent block or abandon it.
-// If the parent block is further than [maxAllowedBlockPreferenceHeightDistanceIngestion] in height from the last accepted block,
-// it should abandon the block and not fetch it. Else, it should fetch it. In case of an overflow it should still fetch it.
-func TestEngineAbandonsBlocksTooFarAhead(t *testing.T) {
-	tests := []struct {
-		name                string
-		laggingLastAccepted uint64 // the lagging node's last accepted height
-		childHeight         uint64 // the offered block, whose parent is missing
-		expectFetch         bool
-	}{
-		{
-			name:                "at the cutoff is fetched",
-			laggingLastAccepted: 0,
-			childHeight:         maxAllowedBlockPreferenceHeightDistanceIngestion,
-			expectFetch:         true,
-		},
-		{
-			name:                "just past the cutoff is abandoned",
-			laggingLastAccepted: 0,
-			childHeight:         maxAllowedBlockPreferenceHeightDistanceIngestion + 1,
-			expectFetch:         false,
-		},
-		{
-			name:                "overflow of the ingestion cutoff is fetched",
-			laggingLastAccepted: math.MaxUint64 - 100,
-			childHeight:         math.MaxUint64,
-			expectFetch:         true,
-		},
-		{
-			// The preferred height plus [maxAllowedBlockPreferenceHeightDistanceIngestion] overflows.
-			name:                "overflow of the preference cutoff is fetched",
-			laggingLastAccepted: math.MaxUint64 - maxAllowedBlockPreferenceHeightDistanceIngestion/2,
-			childHeight:         math.MaxUint64,
-			expectFetch:         true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			newBlock := func(height uint64, parentID ids.ID, status snowtest.Status) *snowmantest.Block {
-				id := ids.GenerateTestID()
-				return &snowmantest.Block{
-					Decidable:  snowtest.Decidable{IDV: id, Status: status},
-					ParentV:    parentID,
-					HeightV:    height,
-					TimestampV: snowmantest.GenesisTimestamp,
-					BytesV:     id[:],
-				}
-			}
-
-			var chain []*snowmantest.Block
-			if test.laggingLastAccepted != 0 { // Used to test the uint64 overflow case.
-				chain = append(chain, newBlock(test.laggingLastAccepted, snowmantest.GenesisID, snowtest.Accepted))
-			}
-
-			// The block the lagging node is missing:
-			missingParent := newBlock(test.childHeight-1, snowmantest.GenesisID, snowtest.Undecided)
-			// The block the peer prefers:
-			lastBlockOfUpdatedNode := newBlock(test.childHeight, missingParent.ID(), snowtest.Undecided)
-			chain = append(chain, missingParent, lastBlockOfUpdatedNode)
-
-			network := snowmanenginetest.NewNetwork(t)
-
-			laggingNodeID := ids.GenerateTestNodeID()
-			upToDateNodeID := ids.GenerateTestNodeID()
-
-			// The up-to-date node has accepted [lastBlockOfUpdatedNode] and prefers it, but does not hold [missingParent].
-			upToDateVM := snowmanenginetest.NewVM(t, acceptedCopies([]*snowmantest.Block{lastBlockOfUpdatedNode}))
-
-			laggingVM := snowmanenginetest.NewVM(t, chain)
-
-			newEngine := func(self, peer ids.NodeID, vm *snowmanenginetest.VM) *Engine {
-				cfg := DefaultConfig(t)
-				require.NoError(cfg.Validators.AddStaker(cfg.Ctx.SubnetID, peer, nil, ids.Empty, 1))
-				require.NoError(cfg.ConnectedValidators.Connected(t.Context(), peer, version.Current))
-				cfg.Validators.RegisterSetCallbackListener(cfg.Ctx.SubnetID, cfg.ConnectedValidators)
-				cfg.VM = vm
-
-				cfg.Sender = network.CreateSender(self)
-				snowGetHandler, err := getter.New(vm, cfg.Sender, cfg.Ctx.Log, time.Second, 2000, cfg.Ctx.Registerer)
-				require.NoError(err)
-				cfg.AllGetsServer = snowGetHandler
-
-				e, err := New(cfg)
-				require.NoError(err)
-				return e
-			}
-
-			upToDateEngine := newEngine(upToDateNodeID, laggingNodeID, upToDateVM)
-			laggingEngine := newEngine(laggingNodeID, upToDateNodeID, laggingVM)
-
-			// The up-to-date node records whenever it is asked for [missingParent].
-			// That request is the proof that the lagging node chose to fetch rather than abandon.
-			var parentRequested bool
-			network.Register(upToDateNodeID, snowmanenginetest.WithGetInterceptor(upToDateEngine,
-				func(_ context.Context, _ ids.NodeID, _ uint32, blkID ids.ID) error {
-					if blkID == missingParent.ID() {
-						parentRequested = true
-					}
-					return nil
-				},
-			))
-			network.Register(laggingNodeID, laggingEngine)
-
-			require.NoError(upToDateEngine.Start(t.Context(), 0))
-			require.NoError(laggingEngine.Start(t.Context(), 0))
-
-			// The lagging node learns about [lastBlockOfUpdatedNode] and then either requests [missingParent] or abandons it depending on how
-			// far ahead it is.
-			require.NoError(laggingEngine.Gossip(t.Context()))
-			network.DeliverMessages()
-
-			require.Equal(test.expectFetch, parentRequested)
-
-			// Whether the lagging node abandoned [lastBlockOfUpdatedNode] itself or
-			// its fetch of [missingParent] failed, nothing is left waiting on the
-			// abandoned blocks and no request for them is outstanding.
-			require.Zero(laggingEngine.blocked.NumDependencies())
-			require.Zero(laggingEngine.blkReqs.Len())
-		})
-	}
-}
-
 // newFakeEngine registers an engine for [self] on [network], backed by the fake
 // [vm] and treating [peers] as its connected validators. Get requests are
 // served from [vm] through the standard getter, so a node only answers for the
@@ -3508,84 +3383,54 @@ func newFakeEngine(
 }
 
 // TestEngineStopsBufferingBlocksTooFarAhead tests that the engine queues only
-// blocks within [maxAllowedBlockAcceptedHeightDistanceIngestion] of its last
-// accepted block, however many blocks a peer pushes.
+// blocks within [maxHeightAbovePreferred] of its preference, however many
+// blocks a peer pushes.
 func TestEngineStopsBufferingBlocksTooFarAhead(t *testing.T) {
-	const heightLimit = maxAllowedBlockAcceptedHeightDistanceIngestion
+	const heightLimit = maxHeightAbovePreferred
 
-	tests := []struct {
-		name      string
-		numBlocks int
-	}{
-		{name: "fewer blocks than the limit", numBlocks: heightLimit / 2},
-		{name: "exactly the limit", numBlocks: heightLimit},
-		{name: "many times the limit", numBlocks: 3 * heightLimit},
+	require := require.New(t)
+
+	// The node is never sent [chain]'s first block, so no block reaches
+	// consensus and the preference stays at genesis.
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 3*heightLimit)
+	network := snowmanenginetest.NewNetwork(t)
+	nodeID := ids.GenerateTestNodeID()
+	peerID := ids.GenerateTestNodeID()
+
+	// Neither the node nor the peer holds any block of [chain], so the only way
+	// the node learns about a block is from the message that carries it.
+	peerVM := snowmanenginetest.NewVM(t, chain)
+	newFakeEngine(t, network, peerID, peerVM, nodeID)
+
+	nodeVM := snowmanenginetest.NewVM(t, chain)
+	node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
+
+	pushed := chain[1:]
+	for i, blk := range pushed {
+		require.NoError(node.PushQuery(t.Context(), peerID, uint32(i+1), blk.Bytes(), 0))
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			chain := snowmantest.BuildDescendants(snowmantest.Genesis, test.numBlocks)
-			chain[0].ParentV = ids.GenerateTestID()
-			network := snowmanenginetest.NewNetwork(t)
-			nodeID := ids.GenerateTestNodeID()
-			peerID := ids.GenerateTestNodeID()
-
-			// Neither the node nor the peer holds any block of [chain], so the only way
-			// the node learns about a block is from the message that carries it.
-			peerVM := snowmanenginetest.NewVM(t, chain)
-			newFakeEngine(t, network, peerID, peerVM, nodeID)
-
-			nodeVM := snowmanenginetest.NewVM(t, chain)
-			node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
-
-			_, lastAcceptedHeight := node.Consensus.LastAccepted()
-			highestAllowed := lastAcceptedHeight + heightLimit
-
-			var peakPending, peakBlockedDependencies int
-			for i, blk := range chain {
-				require.NoError(node.PushQuery(t.Context(), peerID, uint32(i+1), blk.Bytes(), 0))
-				peakPending = max(peakPending, len(node.pending))
-				peakBlockedDependencies = max(peakBlockedDependencies, node.blocked.NumDependencies())
-
-				for _, queued := range node.pending {
-					require.LessOrEqual(queued.Height(), highestAllowed)
-				}
-			}
-
-			require.LessOrEqual(peakPending, heightLimit)
-			require.LessOrEqual(peakBlockedDependencies, heightLimit)
-
-			// The upper bounds above would also hold if the engine queued
-			// nothing at all, so check it doesn't hold vacuously.
-			atLeast := min(test.numBlocks, heightLimit) - 1
-			require.GreaterOrEqual(peakPending, atLeast)
-			require.GreaterOrEqual(peakBlockedDependencies, atLeast)
-
-			// The block at the limit was queued and the one above it wasn't.
-			if test.numBlocks > heightLimit {
-				var highestQueued uint64
-				for _, queued := range node.pending {
-					highestQueued = max(highestQueued, queued.Height())
-				}
-				require.Equal(highestAllowed, highestQueued)
-			}
-
-			network.DeliverMessages()
-			require.Empty(node.pending)
-			require.Zero(node.blocked.NumDependencies())
-			require.Zero(node.Consensus.NumProcessing())
-		})
+	// Exactly the pushed blocks up to the limit are queued.
+	queued := chain[1:heightLimit]
+	for _, blk := range queued {
+		require.Contains(node.pending, blk.ID())
 	}
+	require.Len(node.pending, len(queued))
+
+	// The peer can't supply [chain]'s first block either, so every queued
+	// block is abandoned.
+	network.DeliverMessages()
+	require.Empty(node.pending)
+	require.Zero(node.blocked.NumDependencies())
+	require.Zero(node.Consensus.NumProcessing())
 }
 
 // TestEngineRecoversFromIngestionCap tests that a node with
-// [maxAllowedBlockAcceptedHeightDistanceIngestion] blocks processing above its
+// [maxHeightAboveAccepted] blocks processing above its
 // last accepted block still finalizes them and then catches up.
 func TestEngineRecoversFromIngestionCap(t *testing.T) {
 	const (
-		heightLimit = maxAllowedBlockAcceptedHeightDistanceIngestion
+		heightLimit = maxHeightAboveAccepted
 		chainLength = 3 * heightLimit
 	)
 
@@ -3658,62 +3503,9 @@ func TestEngineRecoversFromIngestionCap(t *testing.T) {
 	require.Equal(tip.ID(), acceptedID)
 }
 
-// TestEngineRejectsFetchedBlockTooFarAhead tests that a block more than
-// [maxAllowedBlockAcceptedHeightDistanceIngestion] above the last accepted block
-// is rejected when it arrives in reply to a Get.
-func TestEngineRejectsFetchedBlockTooFarAhead(t *testing.T) {
-	const heightLimit = maxAllowedBlockAcceptedHeightDistanceIngestion
-
-	require := require.New(t)
-
-	chain := snowmantest.BuildDescendants(snowmantest.Genesis, heightLimit+1)
-	tooFar := chain[heightLimit]
-
-	network := snowmanenginetest.NewNetwork(t)
-	nodeID := ids.GenerateTestNodeID()
-	peerID := ids.GenerateTestNodeID()
-
-	// Neither the node nor the peer holds any block of [chain], so the only way
-	// the node learns about a block is from the message that carries it.
-	peerVM := snowmanenginetest.NewVM(t, chain)
-	newFakeEngine(t, network, peerID, peerVM, nodeID)
-
-	nodeVM := snowmanenginetest.NewVM(t, chain)
-	node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
-
-	// The node sees its only validator as disconnected, so it issues every
-	// block it is pushed without polling for it, and ends up with
-	// [heightLimit] blocks processing and none accepted.
-	require.NoError(node.ConnectedValidators.Disconnected(t.Context(), peerID))
-	for i, blk := range chain[:heightLimit] {
-		require.NoError(node.PushQuery(t.Context(), peerID, uint32(i+1), blk.Bytes(), 0))
-	}
-	require.Equal(heightLimit, node.Consensus.NumProcessing())
-
-	// A vote for [tooFar] makes the node request it, and the vote waits on it.
-	require.NoError(node.Chits(t.Context(), peerID, math.MaxUint32, tooFar.ID(), snowmantest.GenesisID, 0))
-	req, ok := node.blkReqs.GetKey(tooFar.ID())
-	require.True(ok)
-	require.Equal(1, node.blocked.NumDependencies())
-
-	// The peer replies with [tooFar]. Its parent is processing, so only the
-	// ingestion limit keeps it out of consensus.
-	require.NoError(node.Put(t.Context(), req.NodeID, req.RequestID, tooFar.Bytes()))
-	require.False(node.Consensus.Processing(tooFar.ID()))
-	require.True(node.Consensus.Processing(tooFar.Parent()))
-	require.Equal(heightLimit, node.Consensus.NumProcessing())
-
-	// Rejecting [tooFar] failed the request, so the vote no longer waits on it.
-	require.False(node.blkReqs.HasValue(tooFar.ID()))
-	require.Zero(node.blocked.NumDependencies())
-}
-
-// TestEngineQueriesNextHeightWhenIngestionLimitOverflows tests that when the last
-// accepted height is so close to maxuint64 that adding
-// [maxAllowedBlockAcceptedHeightDistanceIngestion] to it overflows, the engine
-// still queries for the height after its preference, rather than for the
-// bogus ingestion limit the overflowing addition yields.
-func TestEngineQueriesNextHeightWhenIngestionLimitOverflows(t *testing.T) {
+// TestEngineIgnoresOverflowingHeightLimits tests that height limits that
+// overflow neither prevent issuance nor cap the height polls ask about.
+func TestEngineIgnoresOverflowingHeightLimits(t *testing.T) {
 	require := require.New(t)
 
 	newBlock := func(height uint64, parentID ids.ID, status snowtest.Status) *snowmantest.Block {
@@ -3727,8 +3519,8 @@ func TestEngineQueriesNextHeightWhenIngestionLimitOverflows(t *testing.T) {
 		}
 	}
 
-	// [lastAccepted] is high enough that adding the ingestion distance to its height overflows.
-	lastAccepted := newBlock(math.MaxUint64-100, snowmantest.GenesisID, snowtest.Accepted)
+	// Adding either height limit to [lastAccepted]'s height overflows.
+	lastAccepted := newBlock(math.MaxUint64-maxHeightAbovePreferred/2, snowmantest.GenesisID, snowtest.Accepted)
 	child := newBlock(lastAccepted.Height()+1, lastAccepted.ID(), snowtest.Undecided)
 
 	network := snowmanenginetest.NewNetwork(t)
@@ -3753,7 +3545,7 @@ func TestEngineQueriesNextHeightWhenIngestionLimitOverflows(t *testing.T) {
 			// Every poll must ask about the height after [child], the node's preference.
 			preferred, preferredHeight := node.Consensus.Preference()
 			require.Equal(child.ID(), preferred)
-			require.Equal(math.MaxUint64-uint64(99), preferredHeight)
+			require.Equal(child.Height(), preferredHeight)
 			require.Equal(child.Height()+1, requestedHeight)
 			numQueries++
 			return nil
