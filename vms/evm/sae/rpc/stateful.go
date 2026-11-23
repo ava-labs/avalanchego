@@ -371,6 +371,12 @@ func (a *tracerAPI) TraceCall(ctx context.Context, args ethapi.TransactionArgs, 
 	return a.traceCall.TraceCall(ctx, args, blockNrOrHash, config)
 }
 
+// Errors returned for malformed blocks.
+var (
+	ErrMissingBaseFee      = errors.New("missing base fee")
+	ErrMissingBlobGasField = errors.New("missing blob gas field(s)")
+)
+
 // TraceBlock shadows [tracers.API.TraceBlock] to replace the caller-supplied
 // block's worst-case base fee with the executed base fee before delegating.
 // The block need not be canonical, but its parent MUST be.
@@ -386,10 +392,19 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 		return nil, errors.New("genesis is not traceable") // Copied from [tracers.TraceBlock]
 	}
 
-	// A synchronous (pre-SAE) block carries the base fee its transactions
-	// actually paid, so it is traced as supplied.
 	resealed := block
-	if hdr := block.Header(); !hook.Synchronous(a.tracerBackend.Hooks(), hdr) {
+	if hdr := block.Header(); hook.Synchronous(a.tracerBackend.Hooks(), hdr) {
+		// We rely on (a potentially malicious caller's) header to claim that
+		// the block is synchronous, so it MUST carry the fields that the EVM
+		// dereferences under the active forks. A panic in a JS tracer's worker
+		// goroutine isn't recovered by the RPC's HTTP handler.
+		switch cfg := a.tracerBackend.ChainConfig(); {
+		case cfg.IsLondon(hdr.Number) && hdr.BaseFee == nil:
+			return nil, ErrMissingBaseFee
+		case cfg.IsCancun(hdr.Number, hdr.Time) && (hdr.BlobGasUsed == nil || hdr.ExcessBlobGas == nil):
+			return nil, ErrMissingBlobGasField
+		}
+	} else {
 		parent, err := a.tracerBackend.restoreExecutedParent(ctx, block)
 		if err != nil {
 			return nil, fmt.Errorf("restoring parent block: %w", err)

@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -44,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/saetest/escrow"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
+	saerpc "github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 	ethereum "github.com/ava-labs/libevm"
 )
 
@@ -1126,4 +1128,45 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 			want:   b.Header(),
 		})
 	})
+}
+
+func TestRegression_TraceBlockSynchronousNilBaseFee(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+
+	malicious := types.NewBlock(
+		&types.Header{
+			Number:     new(big.Int).Add(sut.genesis.Number(), big.NewInt(1)),
+			ParentHash: sut.genesis.Hash(),
+			BaseFee:    nil, // derefrenced due to non-zero fee cap below
+		},
+		types.Transactions{sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas,
+			GasFeeCap: big.NewInt(1), // original attack vector
+		})},
+		nil, // uncles
+		nil, // receipts
+		saetest.TrieHasher(),
+	)
+	vector, err := rlp.EncodeToBytes(malicious)
+	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", malicious)
+
+	want := testerr.Contains(saerpc.ErrMissingBaseFee.Error())
+	sut.testRPC(ctx, t,
+		rpcTest{
+			name:    "default_tracer",
+			method:  "debug_traceBlock",
+			args:    []any{hexutil.Bytes(vector)},
+			wantErr: want,
+		},
+		rpcTest{
+			name:   "js_tracer",
+			method: "debug_traceBlock",
+			args: []any{
+				hexutil.Bytes(vector),
+				tracers.TraceConfig{Tracer: new("opcountTracer")}, // arbitrary JS tracer
+			},
+			wantErr: want,
+		},
+	)
 }
