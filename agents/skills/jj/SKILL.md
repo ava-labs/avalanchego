@@ -1,6 +1,6 @@
 ---
 name: jj
-description: Use Jujutsu (jj) for version control on repos where the contributor works with jj as the front-end over git. Triggers on commit, branch, status, history, rebase, or PR-conflict-resolution requests in such repos. Covers the jj-vs-git command mapping and the preferred merge-commit flow for resolving conflicts on PR branches.
+description: Use Jujutsu (jj) for version control on repos where the contributor works with jj as the front-end over git. Triggers on commit, branch, status, history, rebase, review checkout, or PR-conflict-resolution requests in such repos. Overrides the git steps of other skills (including firewood-review) with jj equivalents. Covers the jj-vs-git command mapping and the preferred merge-commit flow for resolving conflicts on PR branches.
 ---
 
 # jj (Jujutsu)
@@ -37,6 +37,28 @@ Run `jj status` (or check for a `.jj/` directory at the repo root). If it succee
 | Create a PR | `gh pr create --head <bookmark> --base <base>` | jj leaves git's `HEAD` detached, so `gh pr create` can't infer the branch — always pass `--head` and `--base` explicitly. |
 
 Only fall back to raw `git` when jj genuinely lacks the feature — this is rare.
+
+## Overriding git-based repository skills
+
+Repository skills are written for git because not every contributor uses jj. In a jj-managed repo, **this skill takes precedence over the git commands in any other skill** — including the ava-labs/firewood `firewood-review` skill. Keep everything else in that skill (agents, checks, review standards); replace only the version-control steps with the equivalents below.
+
+### `firewood-review` equivalents
+
+Steps are named by the skill's numbered sections (§ 0–7). Keep the skill's paths, especially `$SCRATCH/checkout`, so subagent prompts and briefs still match.
+
+| `firewood-review` step | jj equivalent |
+| --- | --- |
+| § 1 PR review step 3: `git fetch <upstream> pull/<PR>/head && git worktree add --detach $SCRATCH/checkout <headRefOid>` | `jj git fetch`, then `jj workspace add --name review-<N> -r <headRefOid> $SCRATCH/checkout`. Never `git worktree add` (see *The colocated-repo trap*). The workspace builds from its own empty `target/`; that is intended, since the main checkout's `target/` may hold libraries another project links against. |
+| Same step, fork PR (`isCrossRepository` is true) | `git fetch https://github.com/ava-labs/firewood.git pull/<N>/head:refs/heads/pr-<N>` (jj has no PR-ref fetch; the colocated repo imports the branch as bookmark `pr-<N>`), then use `pr-<N>` as the `-r` above. Remove afterwards with `jj bookmark delete pr-<N>`. |
+| § 1 Local review step 1: staged-vs-unstaged question, `git stash push --keep-index …` | Not applicable: jj has no index and the working copy is a commit. Skip the question and the stash, and review `@` as-is (ask whether to include its ancestors in the stack). § 7's stash restore is skipped too. |
+| § 1 Local review step 1, branch not checked out here: `git worktree add --detach $SCRATCH/checkout <branch>` | `jj workspace add --name review-local-<bookmark> -r <bookmark> $SCRATCH/checkout`. |
+| § 1 Local review step 3: `git fetch <upstream> main` + `git merge-base <branch> FETCH_HEAD` | `jj git fetch`, then use `fork_point(main@origin \| <rev>)` as the base. |
+| § 2: `git diff --name-only <base>...<head>` (plus uncommitted/untracked) | `jj diff --name-only --from 'fork_point(main@origin \| <head>)' --to <head>`. For a working-tree review, `<head>` is `@`, which already includes uncommitted and untracked (non-ignored) files. |
+| § 3: tree comparison (`git rev-parse <ref>^{tree}`, `git merge-tree --write-tree`) | These read-only git plumbing commands are fine in a colocated repo. For a jj revision, use `git rev-parse $(jj log --no-graph -r <rev> -T commit_id)^{tree}`; for the working copy that is `<rev>` = `@` after any `jj` command has snapshotted it, so "uncommitted changes always differ" does not apply. |
+| § 7: `git worktree remove $SCRATCH/checkout`; confirm with `git worktree list` | `jj workspace forget review-<N> && rm -rf $SCRATCH/checkout`; confirm with `jj workspace list`. Leave the rest of `$SCRATCH` in place, as the skill says. |
+| Older skill versions (before #2360): `EnterWorktree`, `gh pr co`, `git diff --exit-code ffi/firewood.h`, `git stash pop` | Use the workspace rows above for checkout and clean-up, skip the stash, and check header drift with `test -z "$(jj diff --git ffi/firewood.h)"` followed by `jj restore ffi/firewood.h`. |
+
+Subagents inherit these rules: pass them the workspace path and tell them not to create checkouts of their own. In jj, every file a command modifies becomes part of `@` — for example, an unlocked `cargo` command can rewrite a tracked `Cargo.lock`, and the FFI build in `just lint` rewrites a stale `ffi/firewood.h`. Run `jj status` after validation and `jj restore <path>` anything the review itself changed, so it is not mistaken for part of the PR.
 
 ### Diffing a branch against the default branch
 
