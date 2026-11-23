@@ -33,16 +33,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-// Polls ask about the height after the preference, so blocks are fetched in
-// order. The engine can therefore ignore blocks far above its progress, which
-// keeps a lagging node from fetching blocks it can only process much later.
+// Limiting the issuance of blocks significantly far ahead of the current
+// consensus state ensures fast finalization even when our node is lagging.
 const (
-	// Blocks further above the preference aren't issued, so their missing
-	// ancestors aren't fetched.
 	maxHeightAbovePreferred = 100
-	// Blocks further above the last accepted block aren't issued. Polls cap the
-	// height they ask about here, so blocks at the limit can still arrive.
-	maxHeightAboveAccepted = 1000
+	maxHeightAboveAccepted  = 1000
 )
 
 const (
