@@ -899,28 +899,22 @@ func (e *Engine) sendQuery(
 		return
 	}
 
+	heightToAskAbout := nextHeightToPrefer
 	_, lastAcceptedHeight := e.Consensus.LastAccepted()
-
-	maxQueryHeight, err := math.Add(lastAcceptedHeight, maxHeightAboveAccepted)
-	if err != nil {
+	if maxHeight, err := math.Add(lastAcceptedHeight, maxHeightAboveAccepted); err != nil {
 		e.Ctx.Log.Debug("overflow computing max query height",
 			zap.Stringer("blkID", blkID),
 			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
 			zap.Error(err),
 		)
-		// If the addition overflowed, it means that lastAcceptedHeight is near maxuint64.
-		// In this case, we can safely query for the next height to prefer, as it is not too far ahead of our last accepted height.
-	}
-
-	heightToAskAbout := nextHeightToPrefer
-	if nextHeightToPrefer > maxQueryHeight && err == nil {
-		heightToAskAbout = maxQueryHeight
+	} else if nextHeightToPrefer > maxHeight {
 		e.Ctx.Log.Debug("querying for block at a lower height than preferred",
 			zap.Stringer("blkID", blkID),
 			zap.Uint64("nextHeightToPrefer", nextHeightToPrefer),
-			zap.Uint64("maxQueryHeight", maxQueryHeight),
+			zap.Uint64("maxHeight", maxHeight),
 			zap.Uint64("heightToAskAbout", heightToAskAbout),
 		)
+		heightToAskAbout = maxHeight
 	}
 
 	vdrBag := bag.Of(vdrIDs...)
