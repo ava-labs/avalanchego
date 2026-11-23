@@ -3366,7 +3366,7 @@ func TestEngineHeightLimits(t *testing.T) {
 	tests := []struct {
 		name            string
 		lastAccepted    *snowmantest.Block
-		numProcessing   int // also the preference's height
+		numProcessing   int
 		height          uint64
 		wantIssued      bool
 		wantQueryHeight uint64
@@ -3405,9 +3405,9 @@ func TestEngineHeightLimits(t *testing.T) {
 			name:            "limits_overflow",
 			lastAccepted:    newBlock(math.MaxUint64-maxHeightAbovePreferred/2, snowmantest.GenesisID, snowtest.Accepted),
 			numProcessing:   1,
-			height:          2,
+			height:          math.MaxUint64 - maxHeightAbovePreferred/2 + 2,
 			wantIssued:      true,
-			wantQueryHeight: 2,
+			wantQueryHeight: math.MaxUint64 - maxHeightAbovePreferred/2 + 2,
 		},
 	}
 
@@ -3419,7 +3419,7 @@ func TestEngineHeightLimits(t *testing.T) {
 
 			// [blk]'s parent is unknown, so if it is issued it waits in
 			// [Engine.pending].
-			blk := newBlock(test.lastAccepted.Height()+test.height, ids.GenerateTestID(), snowtest.Undecided)
+			blk := newBlock(test.height, ids.GenerateTestID(), snowtest.Undecided)
 			chain = append(chain, blk)
 
 			var queryHeight uint64
@@ -3449,7 +3449,7 @@ func TestEngineHeightLimits(t *testing.T) {
 				require.NoError(t, e.PushQuery(t.Context(), peerID, uint32(i), processingBlk.Bytes(), 0))
 			}
 			require.Equal(t, test.numProcessing, e.Consensus.NumProcessing())
-			require.Equal(t, test.lastAccepted.Height()+test.wantQueryHeight, queryHeight)
+			require.Equal(t, test.wantQueryHeight, queryHeight)
 
 			require.NoError(t, e.PushQuery(t.Context(), peerID, uint32(len(processing)), blk.Bytes(), 0))
 			_, issued := e.pending[blk.ID()]

@@ -42,24 +42,25 @@ type VM struct {
 }
 
 // NewVM returns a [VM] that can parse the given chain. The heights must ascend
-// and be contiguous. The genesis block, and any prefix of [chain] that is
-// already accepted, are the VM's accepted blocks.
+// and be contiguous. The prefix of [chain] that is already accepted is the
+// VM's accepted blocks, and MUST be non-empty.
 func NewVM(t *testing.T, chain []*snowmantest.Block) *VM {
 	vm := &VM{
-		byBytes:          make(map[string]*snowmantest.Block, len(chain)+1),
+		byBytes:          make(map[string]*snowmantest.Block, len(chain)),
 		verified:         make(map[ids.ID]*snowmantest.Block),
-		accepted:         make(map[ids.ID]*snowmantest.Block, len(chain)+1),
-		acceptedByHeight: make(map[uint64]*snowmantest.Block, len(chain)+1),
+		accepted:         make(map[ids.ID]*snowmantest.Block, len(chain)),
+		acceptedByHeight: make(map[uint64]*snowmantest.Block, len(chain)),
 	}
-	vm.byBytes[string(snowmantest.Genesis.Bytes())] = snowmantest.Genesis
-	vm.recordAccepted(snowmantest.Genesis)
 	for _, blk := range chain {
 		vm.byBytes[string(blk.Bytes())] = blk
 		if blk.Status == snowtest.Accepted {
-			require.Greater(t, blk.Height(), vm.lastAccepted.Height(), "accepted blocks must ascend")
+			if vm.lastAccepted != nil {
+				require.Greater(t, blk.Height(), vm.lastAccepted.Height(), "accepted blocks must ascend")
+			}
 			vm.recordAccepted(blk)
 		}
 	}
+	require.NotNil(t, vm.lastAccepted, "chain must start with an accepted block")
 
 	vm.T = t
 	vm.Default(true)
@@ -119,10 +120,8 @@ func (vm *VM) wrap(blk *snowmantest.Block) snowman.Block {
 // checkContiguous returns [ErrNotContiguous] unless blk is the child of the last
 // accepted block.
 func (vm *VM) checkContiguous(blk *snowmantest.Block) error {
-	if last := vm.lastAccepted; last != nil {
-		if blk.Parent() != last.ID() || blk.Height() != last.Height()+1 {
-			return ErrNotContiguous
-		}
+	if last := vm.lastAccepted; blk.Parent() != last.ID() || blk.Height() != last.Height()+1 {
+		return ErrNotContiguous
 	}
 	return nil
 }
