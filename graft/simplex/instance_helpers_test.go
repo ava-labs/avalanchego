@@ -760,6 +760,12 @@ func (n *network) addNodeWithConfig(id common.NodeID, cfg nodeConfig) *node {
 
 	vm := newBlockBuilderVM(storage, n.pending)
 	wc := &walCreator{t: n.t}
+	// track WALs handed to the instance directly, e.g. on restart, so they can be inspected too
+	for _, w := range cfg.wals {
+		if tw, ok := w.(*testutil.TestWAL); ok {
+			wc.wals = append(wc.wals, tw)
+		}
+	}
 	var lastNonSimplex avalanchego.VMBlock = genesisBlock
 	if cfg.lastNonSimplexBlock != nil {
 		lastNonSimplex = cfg.lastNonSimplexBlock
