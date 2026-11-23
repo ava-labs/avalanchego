@@ -448,6 +448,7 @@ tasks:
       # differs when the workspace is enabled vs disabled.
       - cmd: "{{.NIX_RUN}} bash -c 'cd graft/evm && GOWORK=off go mod tidy'"
       - cmd: "{{.NIX_RUN}} bash -c 'cd graft/coreth && GOWORK=off go mod tidy'"
+      - cmd: "{{.NIX_RUN}} bash -c 'cd graft/simplex && GOWORK=off go mod tidy'"
       - cmd: "{{.NIX_RUN}} bash -c 'cd graft/subnet-evm && GOWORK=off go mod tidy'"
       - task: sync-go-work
       # Update use_repo() in MODULE.bazel to match go.mod dependencies
