@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -37,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -57,6 +59,7 @@ import (
 
 	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
 	saerpc "github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -128,9 +131,14 @@ func withMaxAllocFor(addrs ...common.Address) sutOption {
 	})
 }
 
-// withAccount adds addr to the genesis allocation.
+// withAccount adds addr to the genesis allocation, with a zero balance if
+// acc.Balance is nil.
 func withAccount(addr common.Address, acc types.Account) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
+		// The genesis JSON requires a balance.
+		if acc.Balance == nil {
+			acc.Balance = new(big.Int)
+		}
 		c.genesis.Alloc[addr] = acc
 	})
 }
@@ -418,12 +426,49 @@ func (s *SUT) send(ctx context.Context, tb testing.TB, tx *types.Transaction) {
 }
 
 // buildBlock advances the clock by advance and builds a block holding tx.
-func (s *SUT) buildBlock(ctx context.Context, tb testing.TB, advance time.Duration, tx *types.Transaction) *blocks.Block {
+func (s *SUT) buildBlock(ctx context.Context, tb testing.TB, advance time.Duration, tx *types.Transaction, opts ...vmtest.BlockOption) *blocks.Block {
 	tb.Helper()
 
 	s.clock.Advance(advance)
 	s.send(ctx, tb, tx)
-	return s.RunConsensusLoop(ctx, tb)
+	return s.RunConsensusLoop(ctx, tb, opts...)
+}
+
+// appRequest sends request, from the SUT's p2pclient, to the SUT's p2p handler
+// registered with handlerID and unmarshals the reply into response.
+//
+// If the SUT instead responds with an [snowcommon.AppError], it is returned and
+// response is left untouched.
+//
+// appRequest is not thread-safe and should only be called from a single
+// goroutine at a time.
+func (s *SUT) appRequest(
+	ctx context.Context,
+	tb testing.TB,
+	handlerID uint64,
+	request proto.Message,
+	response proto.Message,
+) *snowcommon.AppError {
+	tb.Helper()
+
+	requestBytes, err := proto.Marshal(request)
+	require.NoErrorf(tb, err, "proto.Marshal(%T)", request)
+
+	prefixedRequest := p2p.PrefixMessage(p2p.ProtocolPrefix(handlerID), requestBytes)
+	require.NoErrorf(tb, s.AppRequest(
+		ctx,
+		s.p2pclient.NodeID(),
+		1,           // requestID
+		time.Time{}, // deadline
+		prefixedRequest,
+	), "%T.AppRequest(protocol %d)", s.VM, handlerID)
+
+	_, _, responseBytes, appErr := s.p2pclient.Response()
+	if appErr != nil {
+		return appErr
+	}
+	require.NoErrorf(tb, proto.Unmarshal(responseBytes, response), "proto.Unmarshal(%T)", response)
+	return nil
 }
 
 // headerMinPrice returns the min price in b's header, which MUST be set.

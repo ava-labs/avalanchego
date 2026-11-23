@@ -6,19 +6,16 @@ package cchain
 import (
 	"context"
 	"math/big"
-	"slices"
 	"testing"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/core/vm"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
@@ -160,41 +157,6 @@ func TestSendWarpMessage(t *testing.T) {
 	sut.signAndVerifyWarpMessage(ctx, t, hashMsg)
 }
 
-// forwardAndLogCode returns runtime bytecode that forwards its calldata to
-// callee and emits the returned data as a log.
-func forwardAndLogCode(tb testing.TB, callee common.Address) []byte {
-	tb.Helper()
-	return slices.Concat(
-		// mem[0:cds) = calldata
-		saetest.Ops(vm.CALLDATASIZE, vm.PUSH0, vm.PUSH0, vm.CALLDATACOPY),
-		// call callee with mem[0:cds) as input
-		saetest.Ops(vm.PUSH0, vm.PUSH0),        // return size + offset; read via RETURNDATACOPY instead
-		saetest.Ops(vm.CALLDATASIZE, vm.PUSH0), // input size + offset
-		saetest.Ops(vm.PUSH0),                  // value
-		saetest.Push(tb, callee[:]),
-		saetest.Ops(vm.GAS, vm.CALL),
-		saetest.Ops(vm.POP), // discard the success flag
-		// mem[0:rds) = return data
-		saetest.Ops(vm.RETURNDATASIZE, vm.PUSH0, vm.PUSH0, vm.RETURNDATACOPY),
-		// log0(mem[0:rds))
-		saetest.Ops(vm.RETURNDATASIZE, vm.PUSH0, vm.LOG0),
-		saetest.Ops(vm.STOP),
-	)
-}
-
-// warpAccessList returns an access list carrying each of the messages for the
-// warp precompile.
-func warpAccessList(msgs ...*avalanchewarp.Message) types.AccessList {
-	al := make(types.AccessList, len(msgs))
-	for i, msg := range msgs {
-		al[i] = types.AccessTuple{
-			Address:     corethwarp.ContractAddress,
-			StorageKeys: predicate.New(msg.Bytes()),
-		}
-	}
-	return al
-}
-
 // TestReceiveWarpMessage verifies that the intrinsic gas accounts for warp
 // messages and that the warp precompile correctly delivers messages.
 func TestReceiveWarpMessage(t *testing.T) {
@@ -206,7 +168,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 	)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(wallet.Addresses()...),
-		withAccount(warpLogger, types.Account{Code: forwardAndLogCode(t, corethwarp.ContractAddress)}),
+		withAccount(warpLogger, types.Account{Code: saetest.ForwardAndLogCode(t, corethwarp.ContractAddress)}),
 		withValidators(vdrs),
 	)
 
@@ -335,7 +297,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 				GasTipCap:  big.NewInt(1),
 				GasFeeCap:  big.NewInt(1),
 				Data:       tt.callData,
-				AccessList: warpAccessList(tt.msg),
+				AccessList: warptest.AccessList(tt.msg),
 			})
 			err := sut.EthClient().SendTransaction(ctx, tx)
 			if diff := testerr.Diff(err, tt.wantIssueErr); diff != "" {

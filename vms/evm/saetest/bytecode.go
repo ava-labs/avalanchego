@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/stretchr/testify/require"
 )
@@ -42,5 +43,27 @@ func LogTopOfStackAfter(fragments ...[]byte) []byte {
 			vm.LOG1,
 			vm.STOP,
 		),
+	)
+}
+
+// ForwardAndLogCode returns runtime bytecode that forwards its calldata to
+// callee and emits the returned data as a log.
+func ForwardAndLogCode(tb testing.TB, callee common.Address) []byte {
+	tb.Helper()
+	return slices.Concat(
+		// mem[0:cds) = calldata
+		Ops(vm.CALLDATASIZE, vm.PUSH0, vm.PUSH0, vm.CALLDATACOPY),
+		// call callee with mem[0:cds) as input
+		Ops(vm.PUSH0, vm.PUSH0),        // return size + offset; read via RETURNDATACOPY instead
+		Ops(vm.CALLDATASIZE, vm.PUSH0), // input size + offset
+		Ops(vm.PUSH0),                  // value
+		Push(tb, callee[:]),
+		Ops(vm.GAS, vm.CALL),
+		Ops(vm.POP), // discard the success flag
+		// mem[0:rds) = return data
+		Ops(vm.RETURNDATASIZE, vm.PUSH0, vm.PUSH0, vm.RETURNDATACOPY),
+		// log0(mem[0:rds))
+		Ops(vm.RETURNDATASIZE, vm.PUSH0, vm.LOG0),
+		Ops(vm.STOP),
 	)
 }
