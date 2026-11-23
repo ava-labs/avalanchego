@@ -3372,7 +3372,7 @@ func TestEngineHeightLimits(t *testing.T) {
 		wantQueryHeight uint64
 	}{
 		{
-			name:            "at preference limit",
+			name:            "at_preference_limit",
 			lastAccepted:    snowmantest.Genesis,
 			numProcessing:   1,
 			height:          1 + maxHeightAbovePreferred,
@@ -3380,14 +3380,14 @@ func TestEngineHeightLimits(t *testing.T) {
 			wantQueryHeight: 2,
 		},
 		{
-			name:            "past preference limit",
+			name:            "past_preference_limit",
 			lastAccepted:    snowmantest.Genesis,
 			numProcessing:   1,
 			height:          2 + maxHeightAbovePreferred,
 			wantQueryHeight: 2,
 		},
 		{
-			name:            "at accepted limit",
+			name:            "at_accepted_limit",
 			lastAccepted:    snowmantest.Genesis,
 			numProcessing:   maxHeightAboveAccepted,
 			height:          maxHeightAboveAccepted,
@@ -3395,14 +3395,14 @@ func TestEngineHeightLimits(t *testing.T) {
 			wantQueryHeight: maxHeightAboveAccepted,
 		},
 		{
-			name:            "past accepted limit",
+			name:            "past_accepted_limit",
 			lastAccepted:    snowmantest.Genesis,
 			numProcessing:   maxHeightAboveAccepted,
 			height:          maxHeightAboveAccepted + 1,
 			wantQueryHeight: maxHeightAboveAccepted,
 		},
 		{
-			name:            "limits overflow",
+			name:            "limits_overflow",
 			lastAccepted:    newBlock(math.MaxUint64-maxHeightAbovePreferred/2, snowmantest.GenesisID, snowtest.Accepted),
 			numProcessing:   1,
 			height:          2,
@@ -3413,8 +3413,6 @@ func TestEngineHeightLimits(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			chain := []*snowmantest.Block{test.lastAccepted}
 			processing := snowmantest.BuildDescendants(test.lastAccepted, test.numProcessing)
 			chain = append(chain, processing...)
@@ -3437,25 +3435,25 @@ func TestEngineHeightLimits(t *testing.T) {
 
 			peerID := ids.GenerateTestNodeID()
 			cfg := DefaultConfig(t)
-			require.NoError(cfg.Validators.AddStaker(cfg.Ctx.SubnetID, peerID, nil, ids.Empty, 1))
-			require.NoError(cfg.ConnectedValidators.Connected(t.Context(), peerID, version.Current))
+			require.NoError(t, cfg.Validators.AddStaker(cfg.Ctx.SubnetID, peerID, nil, ids.Empty, 1))
+			require.NoError(t, cfg.ConnectedValidators.Connected(t.Context(), peerID, version.Current))
 			cfg.Validators.RegisterSetCallbackListener(cfg.Ctx.SubnetID, cfg.ConnectedValidators)
 			cfg.VM = snowmanenginetest.NewVM(t, chain)
 			cfg.Sender = sender
 			e, err := New(cfg)
-			require.NoError(err)
-			require.NoError(e.Start(t.Context(), 0))
+			require.NoError(t, err)
+			require.NoError(t, e.Start(t.Context(), 0))
 
 			// Each processing block becomes the preference and is polled for.
 			for i, processingBlk := range processing {
-				require.NoError(e.PushQuery(t.Context(), peerID, uint32(i), processingBlk.Bytes(), 0))
+				require.NoError(t, e.PushQuery(t.Context(), peerID, uint32(i), processingBlk.Bytes(), 0))
 			}
-			require.Equal(test.numProcessing, e.Consensus.NumProcessing())
-			require.Equal(test.lastAccepted.Height()+test.wantQueryHeight, queryHeight)
+			require.Equal(t, test.numProcessing, e.Consensus.NumProcessing())
+			require.Equal(t, test.lastAccepted.Height()+test.wantQueryHeight, queryHeight)
 
-			require.NoError(e.PushQuery(t.Context(), peerID, uint32(len(processing)), blk.Bytes(), 0))
+			require.NoError(t, e.PushQuery(t.Context(), peerID, uint32(len(processing)), blk.Bytes(), 0))
 			_, issued := e.pending[blk.ID()]
-			require.Equal(test.wantIssued, issued)
+			require.Equal(t, test.wantIssued, issued)
 		})
 	}
 }
