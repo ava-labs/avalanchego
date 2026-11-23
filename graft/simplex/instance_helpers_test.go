@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
+	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 	"github.com/ava-labs/avalanchego/graft/simplex/wal"
 	"github.com/stretchr/testify/require"
@@ -304,6 +305,20 @@ func (w *walCreator) containsNotarization(round uint64) bool {
 
 	for _, tw := range w.wals {
 		if tw.ContainsNotarization(round) {
+			return true
+		}
+	}
+	return false
+}
+
+// containsEmptyNotarization reports whether any WAL this creator handed out holds an
+// empty notarization for the given round.
+func (w *walCreator) containsEmptyNotarization(round uint64) bool {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
+	for _, tw := range w.wals {
+		if tw.ContainsEmptyNotarization(round) {
 			return true
 		}
 	}
@@ -688,6 +703,45 @@ type network struct {
 	offline map[string]struct{}
 }
 
+// currentRound returns the highest round among the online validators of the current epoch.
+func (n *network) currentRound() uint64 {
+	var round uint64
+	for _, node := range n.nodesSnapshot() {
+		if n.isOffline(node.id) {
+			continue
+		}
+
+		node.inst.lock.Lock()
+		e := node.inst.e
+		node.inst.lock.Unlock()
+
+		if e != nil {
+			round = max(round, e.Metadata().Round)
+		}
+	}
+	return round
+}
+
+// roundNotarized reports whether any online node's WAL holds a notarization for [round].
+func (n *network) roundNotarized(round uint64) bool {
+	for _, node := range n.nodesSnapshot() {
+		if !n.isOffline(node.id) && node.wals.containsNotarization(round) {
+			return true
+		}
+	}
+	return false
+}
+
+// roundEmptyNotarized reports whether any online node's WAL holds an empty notarization for [round].
+func (n *network) roundEmptyNotarized(round uint64) bool {
+	for _, node := range n.nodesSnapshot() {
+		if !n.isOffline(node.id) && node.wals.containsEmptyNotarization(round) {
+			return true
+		}
+	}
+	return false
+}
+
 func (n *network) nodesSnapshot() []node {
 	n.lock.Lock()
 	defer n.lock.Unlock()
@@ -877,8 +931,23 @@ func (n *network) acceptNewBlock() (common.VerifiedBlock, common.Finalization) {
 
 	n.waitUntilValidatorsReady()
 
+	round := n.currentRound()
 	// Adds a pending block to the network, to be built by the next online node.
 	n.pending.addPendingBlock()
+
+	// We may need to resend the block in case we empty notarized the round.
+	// Therefore, we check each round until one is notarized, since an empty notarization means a block may not get committed.
+	for !n.roundNotarized(round) {
+		if !n.roundEmptyNotarized(round) {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		// An online leader consumed the pending block for its dropped proposal, so add it back.
+		if !n.isOffline(simplex.LeaderForRound(n.epochValidatorSet.NodeIDs(), round)) {
+			n.pending.addPendingBlock()
+		}
+		round++
+	}
 
 	var block common.VerifiedBlock
 	var finalization common.Finalization
