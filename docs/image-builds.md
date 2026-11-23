@@ -15,9 +15,15 @@
 ## Overview
 
 The repository builds container images for AvalancheGo, Subnet-EVM, XSVM, and
-Antithesis test setups. Repository tasks provide the standard interface for
-these builds. Product-specific scripts configure Buildx and supply the inputs
-that each image needs.
+Antithesis test setups. This guide covers the Dockerfile and Buildx paths.
+Repository tasks provide the standard interface for these builds. Product-specific
+scripts configure Buildx and supply the inputs that each image needs.
+
+The separate [Bazel image validation path](./bazel-multiarch-image-validation.md)
+builds and tests AvalancheGo images without publishing production images.
+In CI, Bazel setup prepares separate input caches before image validation begins.
+The inner build disables repository and Go module downloads explicitly; it does
+not use the Dockerfile proxy mounts described below.
 
 Go build instructions compile code without network access. The build scripts
 provide a local file proxy from the module cache for Go tasks outside Bazel.
