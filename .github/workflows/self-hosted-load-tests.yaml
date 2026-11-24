@@ -17,8 +17,13 @@ on:
         description: "Load test duration: e.g. 5m, 10m, 1h..."
         required: false
 
+permissions: {}
+
 jobs:
   load_test:
+    permissions:
+      contents: read
+      packages: read
     name: Run load test on self-hosted runners
     runs-on: avalanche-avalanchego-runner
     container:
@@ -33,6 +38,8 @@ jobs:
             sudo apt-get install -y xz-utils
           fi
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Run load test
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:

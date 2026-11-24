@@ -38,13 +38,19 @@ on:
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
+permissions: {}
+
 jobs:
   define-matrix:
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.define-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Define Matrix
         id: define-matrix
         shell: bash -x {0}
@@ -53,16 +59,16 @@ jobs:
             {
               echo "matrix<<EOF"
               printf '{ "include": [{ "test": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "min-wait-time": "%s", "max-wait-time": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
-                "${{ github.event.inputs.test }}" \
-                "${{ github.event.inputs.start-block }}" \
-                "${{ github.event.inputs.end-block }}" \
-                "${{ github.event.inputs.block-dir-src }}" \
-                "${{ github.event.inputs.current-state-dir-src }}" \
-                "${{ github.event.inputs.config }}" \
-                "${{ github.event.inputs.min-wait-time }}" \
-                "${{ github.event.inputs.max-wait-time }}" \
-                "${{ github.event.inputs.runner }}" \
-                "${{ github.event.inputs.timeout-minutes }}"
+                "${GITHUB_EVENT_INPUTS_TEST}" \
+                "${GITHUB_EVENT_INPUTS_START_BLOCK}" \
+                "${GITHUB_EVENT_INPUTS_END_BLOCK}" \
+                "${GITHUB_EVENT_INPUTS_BLOCK_DIR_SRC}" \
+                "${GITHUB_EVENT_INPUTS_CURRENT_STATE_DIR_SRC}" \
+                "${GITHUB_EVENT_INPUTS_CONFIG}" \
+                "${GITHUB_EVENT_INPUTS_MIN_WAIT_TIME}" \
+                "${GITHUB_EVENT_INPUTS_MAX_WAIT_TIME}" \
+                "${GITHUB_EVENT_INPUTS_RUNNER}" \
+                "${GITHUB_EVENT_INPUTS_TIMEOUT_MINUTES}"
               echo EOF
             } >> "$GITHUB_OUTPUT"
           else
@@ -72,6 +78,17 @@ jobs:
               echo EOF
             } >> "$GITHUB_OUTPUT"
           fi
+        env:
+          GITHUB_EVENT_INPUTS_TEST: ${{ github.event.inputs.test }}
+          GITHUB_EVENT_INPUTS_START_BLOCK: ${{ github.event.inputs.start-block }}
+          GITHUB_EVENT_INPUTS_END_BLOCK: ${{ github.event.inputs.end-block }}
+          GITHUB_EVENT_INPUTS_BLOCK_DIR_SRC: ${{ github.event.inputs.block-dir-src }}
+          GITHUB_EVENT_INPUTS_CURRENT_STATE_DIR_SRC: ${{ github.event.inputs.current-state-dir-src }}
+          GITHUB_EVENT_INPUTS_CONFIG: ${{ github.event.inputs.config }}
+          GITHUB_EVENT_INPUTS_MIN_WAIT_TIME: ${{ github.event.inputs.min-wait-time }}
+          GITHUB_EVENT_INPUTS_MAX_WAIT_TIME: ${{ github.event.inputs.max-wait-time }}
+          GITHUB_EVENT_INPUTS_RUNNER: ${{ github.event.inputs.runner }}
+          GITHUB_EVENT_INPUTS_TIMEOUT_MINUTES: ${{ github.event.inputs.timeout-minutes }}
 
   firewood-chaos-test:
     needs: define-matrix
@@ -88,6 +105,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/install-nix
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
@@ -97,8 +116,9 @@ jobs:
           role-duration-seconds: '43200'
       - name: Run chaos test with Firewood
         shell: nix develop --impure --command bash -x {0}
-        run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ matrix.test || '' }}"
+        run: ./scripts/run_task.sh test-cchain-reexecution -- "${MATRIX_TEST}"
         env:
+          MATRIX_TEST: ${{ matrix.test || '' }}
           CHAOS_MODE: '1'
           START_BLOCK: ${{ matrix.start-block }}
           END_BLOCK: ${{ matrix.end-block }}

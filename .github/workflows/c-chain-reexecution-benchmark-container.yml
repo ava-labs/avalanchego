@@ -40,8 +40,12 @@ on:
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
+permissions: {}
+
 jobs:
   define-matrix:
+    permissions:
+      contents: read
     name: define-matrix
     runs-on: ubuntu-24.04
     outputs:
@@ -49,6 +53,8 @@ jobs:
       has-aws-role: ${{ steps.check-aws-role.outputs.available }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Check AWS Role Availability
         id: check-aws-role
         run: echo "available=${{ secrets.AWS_S3_READ_ONLY_ROLE != '' }}" >> "$GITHUB_OUTPUT"
@@ -58,19 +64,19 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             FIREWOOD_REF="" LIBEVM_REF=""
-            [[ "${{ github.event.inputs.with-dependencies }}" =~ firewood=([^,]+) ]] && FIREWOOD_REF="${BASH_REMATCH[1]}"
-            [[ "${{ github.event.inputs.with-dependencies }}" =~ libevm=([^,]+) ]] && LIBEVM_REF="${BASH_REMATCH[1]}"
+            [[ "${GITHUB_EVENT_INPUTS_WITH_DEPENDENCIES}" =~ firewood=([^,]+) ]] && FIREWOOD_REF="${BASH_REMATCH[1]}"
+            [[ "${GITHUB_EVENT_INPUTS_WITH_DEPENDENCIES}" =~ libevm=([^,]+) ]] && LIBEVM_REF="${BASH_REMATCH[1]}"
             {
               echo "matrix<<EOF"
               printf '{ "include": [{ "test": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s, "firewood-ref": "%s", "libevm-ref": "%s" }] }\n' \
-                "${{ github.event.inputs.test }}" \
-                "${{ github.event.inputs.start-block }}" \
-                "${{ github.event.inputs.end-block }}" \
-                "${{ github.event.inputs.block-dir-src }}" \
-                "${{ github.event.inputs.current-state-dir-src }}" \
-                "${{ github.event.inputs.config }}" \
-                "${{ github.event.inputs.runner }}" \
-                "${{ github.event.inputs.timeout-minutes }}" \
+                "${GITHUB_EVENT_INPUTS_TEST}" \
+                "${GITHUB_EVENT_INPUTS_START_BLOCK}" \
+                "${GITHUB_EVENT_INPUTS_END_BLOCK}" \
+                "${GITHUB_EVENT_INPUTS_BLOCK_DIR_SRC}" \
+                "${GITHUB_EVENT_INPUTS_CURRENT_STATE_DIR_SRC}" \
+                "${GITHUB_EVENT_INPUTS_CONFIG}" \
+                "${GITHUB_EVENT_INPUTS_RUNNER}" \
+                "${GITHUB_EVENT_INPUTS_TIMEOUT_MINUTES}" \
                 "$FIREWOOD_REF" \
                 "$LIBEVM_REF"
               echo EOF
@@ -83,6 +89,16 @@ jobs:
               echo EOF
             } >> "$GITHUB_OUTPUT"
           fi
+        env:
+          GITHUB_EVENT_INPUTS_WITH_DEPENDENCIES: ${{ github.event.inputs.with-dependencies }}
+          GITHUB_EVENT_INPUTS_TEST: ${{ github.event.inputs.test }}
+          GITHUB_EVENT_INPUTS_START_BLOCK: ${{ github.event.inputs.start-block }}
+          GITHUB_EVENT_INPUTS_END_BLOCK: ${{ github.event.inputs.end-block }}
+          GITHUB_EVENT_INPUTS_BLOCK_DIR_SRC: ${{ github.event.inputs.block-dir-src }}
+          GITHUB_EVENT_INPUTS_CURRENT_STATE_DIR_SRC: ${{ github.event.inputs.current-state-dir-src }}
+          GITHUB_EVENT_INPUTS_CONFIG: ${{ github.event.inputs.config }}
+          GITHUB_EVENT_INPUTS_RUNNER: ${{ github.event.inputs.runner }}
+          GITHUB_EVENT_INPUTS_TIMEOUT_MINUTES: ${{ github.event.inputs.timeout-minutes }}
 
   c-chain-reexecution:
     # Keep PR check names short. GitHub can hide a job duration when its name is long.
@@ -105,6 +121,8 @@ jobs:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Install ARC Dependencies
         shell: bash
         run: |

@@ -24,8 +24,11 @@ on:
         required: true
         type: string
 
+permissions: {}
+
 jobs:
   antithesis_avalanchego:
+    permissions: {}
     name: Run Antithesis Avalanchego Test Setup
     runs-on: ubuntu-24.04
     steps:

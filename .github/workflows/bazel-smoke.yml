@@ -16,37 +16,48 @@ env:
   BAZEL_REMOTE_CACHE_URL: ${{ secrets.BAZEL_REMOTE_CACHE_URL || '' }}
   BAZEL_REMOTE_CACHE_AUTH_HEADER: ${{ secrets.BAZEL_REMOTE_CACHE_AUTH_HEADER || '' }}
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   # Prepare Bazel CI for this platform before the smoke tests run.
   setup:
+    permissions:
+      contents: read
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-bazel
         with:
           is-setup-job: 'true'
 
   unit-smoke:
+    permissions:
+      contents: read
     needs: setup
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Run Bazel unit-test smoke test
         uses: ./.github/actions/run-bazel-with-disk-space
         with:
           run: ./scripts/run_task.sh bazel-test-unit-smoke
 
   e2e-smoke:
+    permissions:
+      contents: read
     needs: setup
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       # Do not use the monitored action here. It installs Nix for Prometheus and Promtail.
       # macOS smoke jobs skip monitoring to limit pre-merge time. Scheduled full E2E jobs retain it.
       - name: Run E2E smoke test with Bazel-built binary

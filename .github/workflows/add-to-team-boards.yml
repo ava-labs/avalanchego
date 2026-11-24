@@ -1,9 +1,11 @@
 name: Add team items to project boards
-on:
+on: # zizmor: ignore[dangerous-triggers] no PR code is checked out; only labels and adds to project boards
   issues:
     types: [opened]
   pull_request_target:
     types: [opened]
+
+permissions: {}
 
 jobs:
   route_team_items:
@@ -20,6 +22,10 @@ jobs:
           private-key: ${{ secrets.TEAM_BOARDS_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
+          permission-members: read
+          permission-organization-projects: write
+          permission-issues: read
+          permission-pull-requests: read
 
       - name: Determine author team membership
         id: membership

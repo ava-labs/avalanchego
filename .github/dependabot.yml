@@ -10,23 +10,33 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 0 # Disable non-security version updates
+    cooldown:
+      default-days: 7
   - package-ecosystem: "gomod"
     directory: "/graft/coreth"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 0
+    cooldown:
+      default-days: 7
   - package-ecosystem: "gomod"
     directory: "/graft/subnet-evm"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 0
+    cooldown:
+      default-days: 7
   - package-ecosystem: "gomod"
     directory: "/graft/evm"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 0
+    cooldown:
+      default-days: 7
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
     open-pull-requests-limit: 0
+    cooldown:
+      default-days: 7
