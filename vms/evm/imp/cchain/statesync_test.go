@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -348,47 +347,6 @@ func TestStateSyncDBFailure(t *testing.T) {
 					dst.assertChainsMatch(ctx, t, src)
 				})
 			}
-		})
-	}
-}
-
-// TestGetLastStateSummaryBeforeBootstrapping asserts that a restarted node
-// doesn't advertise a summary until its state sync server is registered.
-func TestGetLastStateSummaryBeforeBootstrapping(t *testing.T) {
-	const commitInterval = 4
-
-	key := txtest.NewKey(t)
-	ethW := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
-	timeOpt, _ := withVMTime(testStartTime)
-	opts := []sutOption{
-		timeOpt,
-		withMaxAllocFor(key.EthAddress(), ethW.Addresses()[0]),
-		withCommitInterval(commitInterval),
-		withDB(memdb.New()),
-		withChainDataDir(t.TempDir()),
-	}
-
-	// HashDB keeps the summary's root across the restart, so only the VM's
-	// state can make it unservable.
-	ctx, src := newSUT(t, opts...)
-	w := newWallet(key, src.ctx, src.Client)
-	src.produceBlocks(ctx, t, w, ethW, commitInterval+1)
-	want, err := src.GetLastStateSummary(ctx)
-	require.NoErrorf(t, err, "%T.GetLastStateSummary() before restart", src.VM)
-	require.Equal(t, uint64(commitInterval), want.Height(), "summary height before restart")
-	require.NoErrorf(t, src.Shutdown(ctx), "%T.Shutdown()", src.VM)
-
-	for _, state := range []snow.State{snow.Initializing, snow.StateSyncing} {
-		t.Run(state.String(), func(t *testing.T) {
-			ctx, sut := newSUT(t, append(opts, withState(state))...)
-
-			_, err := sut.GetLastStateSummary(ctx)
-			require.ErrorIsf(t, err, database.ErrNotFound, "%T.GetLastStateSummary() while %s", sut.VM, state)
-
-			require.NoErrorf(t, sut.SetState(ctx, snow.Bootstrapping), "%T.SetState(Bootstrapping)", sut.VM)
-			got, err := sut.GetLastStateSummary(ctx)
-			require.NoErrorf(t, err, "%T.GetLastStateSummary() while bootstrapping", sut.VM)
-			require.Equal(t, want.ID(), got.ID(), "summary ID after restart")
 		})
 	}
 }

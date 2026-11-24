@@ -194,6 +194,22 @@ func checkSummaryMatchesBlock(t *testing.T, summary *Summary, block *types.Block
 	}
 }
 
+// TestGetLastStateSummaryBeforeRegisterHandlers asserts that a summary isn't
+// advertised by a handler that hasn't registered its state sync handlers.
+func TestGetLastStateSummaryBeforeRegisterHandlers(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	vm := newVM(t)
+	vm.acceptBlocks(t, defaultCommitInterval+1)
+	_, err := vm.Handler.GetLastStateSummary(ctx)
+	require.NoError(t, err, "GetLastStateSummary() after RegisterHandlers()")
+
+	unregistered := newSUT(t, withDiskOf(vm.sut))
+	_, err = unregistered.GetLastStateSummary(ctx)
+	require.ErrorIs(t, err, database.ErrNotFound, "GetLastStateSummary() before RegisterHandlers()")
+}
+
 // TestGetLastStateSummaryAfterRestart asserts that a Firewood node, which loses
 // its revision history when it shuts down, doesn't advertise a summary until it
 // can serve one again.
