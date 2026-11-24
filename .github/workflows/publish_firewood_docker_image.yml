@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       firewood-ref:
-        description: 'Firewood branch, tag or commit to build from source'
+        description: 'Firewood branch, tag or commit to build from source (default branch is main, not master)'
         required: true
+        default: main
 
 jobs:
   publish_firewood_docker_image:
