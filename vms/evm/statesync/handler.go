@@ -8,11 +8,13 @@ package statesync
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -44,25 +46,20 @@ type Handler struct {
 	snowCtx     *snow.Context
 	network     *network.Network
 	blockParser syncblocks.Parser
-	servable    ServableFunc
+	// triedb serves state to syncing peers, set by [Handler.RegisterHandlers].
+	triedb atomic.Pointer[triedb.Database]
 }
-
-// A ServableFunc reports whether this node can currently serve the state at
-// root to syncing peers.
-type ServableFunc func(root common.Hash) bool
 
 // New constructs a new [Handler] with the given configuration and
 // database. See the README for the guarantees expected of the database.
 //
-// The last summary is only advertised if servable reports that its state can
-// be served. A nil servable treats every state as servable.
+// The last summary isn't advertised until [Handler.RegisterHandlers] is called.
 func New(
 	cfg Config,
 	db ethdb.Database,
 	snowCtx *snow.Context,
 	network *network.Network,
 	hooks hook.Points,
-	servable ServableFunc,
 ) (*Handler, error) {
 	if err := cfg.DBConfig.Verify(); err != nil {
 		return nil, err
@@ -77,7 +74,6 @@ func New(
 		network:     network,
 		hooks:       hooks,
 		blockParser: parser(hooks),
-		servable:    servable,
 	}, nil
 }
 
@@ -116,16 +112,19 @@ func (h *Handler) GetLastStateSummary(context.Context) (*Summary, error) {
 }
 
 // checkServable returns [database.ErrNotFound] if the state of summary can't
-// be served to syncing peers.
+// be served to syncing peers. Firewood only holds the roots it committed since
+// it was opened, so after a restart it can't serve the last summary until the
+// next one is executed.
 func (h *Handler) checkServable(summary *Summary) error {
-	if h.servable == nil {
-		return nil
+	tdb := h.triedb.Load()
+	if tdb == nil {
+		return fmt.Errorf("%w: state sync handlers not registered", database.ErrNotFound)
 	}
 	hdr := rawdb.ReadHeader(h.db, summary.AcceptedHash, summary.AcceptedHeight)
 	if hdr == nil {
 		return database.ErrNotFound
 	}
-	if !h.servable(hdr.Root) {
+	if _, err := tdb.Reader(hdr.Root); err != nil {
 		return fmt.Errorf("%w: state root %s of summary at height %d", database.ErrNotFound, hdr.Root, summary.AcceptedHeight)
 	}
 	return nil

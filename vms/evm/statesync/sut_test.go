@@ -7,7 +7,6 @@ import (
 	"context"
 	"math/big"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -61,8 +60,6 @@ type (
 		db      ethdb.Database
 		sender  *saetest.Sender
 		clock   *saetest.Clock
-		// serving is the triedb that serves state, set once a VM is running.
-		serving atomic.Pointer[triedb.Database]
 	}
 
 	vmSUT struct {
@@ -224,7 +221,17 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 	net, err := network.New(snowCtx, sender)
 	require.NoError(t, err, "network.New()")
 
+	handler, err := New(
+		cfg.syncConfig,
+		ethDB,
+		snowCtx,
+		net,
+		settledOverride{Stub: hooks, height: cfg.lastSynchronous},
+	)
+	require.NoError(t, err, "New()")
+
 	s := &sut{
+		Handler: handler,
 		Network: net,
 		cfg:     cfg,
 		snowCtx: snowCtx,
@@ -235,19 +242,6 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 		sender:  sender,
 		clock:   clock,
 	}
-	// As with a real VM, nothing is servable until the VM is running.
-	s.Handler, err = New(
-		cfg.syncConfig,
-		ethDB,
-		snowCtx,
-		net,
-		settledOverride{Stub: hooks, height: cfg.lastSynchronous},
-		func(root ethcommon.Hash) bool {
-			tdb := s.serving.Load()
-			return tdb != nil && CanServe(tdb, root)
-		},
-	)
-	require.NoError(t, err, "New()")
 
 	s.sender.Start(t, s)
 	return s
@@ -343,7 +337,6 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	}, s.snowCtx, chainConfig, s.db, s.network)
 	require.NoError(t, err, "NewVM()")
 	shutdown := sync.OnceValue(func() error {
-		s.serving.Store(nil)
 		return vm.Shutdown(context.WithoutCancel(ctx))
 	})
 	t.Cleanup(func() {
@@ -353,8 +346,7 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	require.NoError(t, vm.SetState(ctx, snow.NormalOp), "SetState(NormalOp)")
 
 	tdb, snaps := vm.EVMState()
-	require.NoError(t, RegisterHandlers(s.snowCtx.Log, s.Network.Network, s.db, tdb, snaps, prometheus.NewRegistry()), "RegisterHandlers")
-	s.serving.Store(tdb)
+	require.NoError(t, s.RegisterHandlers(tdb, snaps, prometheus.NewRegistry()), "RegisterHandlers()")
 
 	return &vmSUT{
 		sut:      s,

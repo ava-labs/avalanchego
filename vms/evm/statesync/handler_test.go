@@ -208,10 +208,6 @@ func TestGetLastStateSummaryAfterRestart(t *testing.T) {
 	require.NoError(t, err, "GetLastStateSummary() before restart")
 	checkSummaryMatchesBlock(t, summary, vm.blockAtHeight(t, defaultCommitInterval).EthBlock())
 
-	require.NoError(t, vm.shutdown(), "shutdown()")
-	_, err = vm.Handler.GetLastStateSummary(ctx)
-	require.ErrorIs(t, err, database.ErrNotFound, "GetLastStateSummary() while shut down")
-
 	restarted := vm.restart(t)
 
 	// The last summary is still at the same height, but its root predates

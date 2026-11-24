@@ -23,7 +23,6 @@ go_library(
         "//network/p2p",
         "//snow",
         "//snow/engine/snowman/block",
-        "//utils/logging",
         "//vms/evm/adaptor",
         "//vms/evm/blocks",
         "//vms/evm/firewood",
