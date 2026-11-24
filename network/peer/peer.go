@@ -381,6 +381,8 @@ func (p *Peer) readMessages() {
 			return
 		}
 
+		arrivalTime := p.Clock.Time()
+
 		// Wait until the throttler says we can proceed to read the message.
 		//
 		// Invariant: When done processing this message, onFinishedHandling() is
@@ -464,7 +466,7 @@ func (p *Peer) readMessages() {
 
 		// Handle the message. Note that when we are done handling this message,
 		// we must call [msg.OnFinishedHandling()].
-		p.handle(msg)
+		p.handle(msg, arrivalTime)
 		p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
 	}
 }
@@ -712,7 +714,7 @@ func (p *Peer) shouldDisconnect() bool {
 	return false
 }
 
-func (p *Peer) handle(msg *message.InboundMessage) {
+func (p *Peer) handle(msg *message.InboundMessage, arrivalTime time.Time) {
 	switch m := msg.Message.(type) { // Network-related message types
 	case *p2p.Ping:
 		p.handlePing(m)
@@ -723,7 +725,7 @@ func (p *Peer) handle(msg *message.InboundMessage) {
 		msg.OnFinishedHandling()
 		return
 	case *p2p.Handshake:
-		p.handleHandshake(m)
+		p.handleHandshake(m, arrivalTime)
 		msg.OnFinishedHandling()
 		return
 	case *p2p.GetPeerList:
@@ -811,7 +813,7 @@ func (p *Peer) handlePong(*p2p.Pong) {
 	p.Metrics.RTTSum.Add(float64(elapsed))
 }
 
-func (p *Peer) handleHandshake(msg *p2p.Handshake) {
+func (p *Peer) handleHandshake(msg *p2p.Handshake, arrivalTime time.Time) {
 	if p.gotHandshake.Get() {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
@@ -834,7 +836,10 @@ func (p *Peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
-	localTime := p.Clock.Time()
+	// Compare against the time the handshake arrived rather than the current
+	// time, so that time spent waiting on the inbound message throttler isn't
+	// counted as clock skew.
+	localTime := arrivalTime
 	localUnixTime := uint64(localTime.Unix())
 	clockDifference := math.Abs(float64(msg.MyTime) - float64(localUnixTime))
 
