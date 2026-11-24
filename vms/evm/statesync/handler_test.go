@@ -215,9 +215,15 @@ func TestGetLastStateSummaryAfterRestart(t *testing.T) {
 	_, err = restarted.Handler.GetLastStateSummary(ctx)
 	require.ErrorIs(t, err, database.ErrNotFound, "GetLastStateSummary() after restart")
 
-	// Executing the block at the next summary height commits its root again.
 	const nextHeight = 2 * defaultCommitInterval
-	restarted.acceptBlocks(t, nextHeight-restarted.lastAcceptedBlock(t).Height())
+	for h := restarted.lastAcceptedBlock(t).Height() + 1; h < nextHeight; h++ {
+		restarted.acceptBlocks(t, 1)
+		_, err = restarted.Handler.GetLastStateSummary(ctx)
+		require.ErrorIsf(t, err, database.ErrNotFound, "GetLastStateSummary() at height %d", h)
+	}
+
+	// Executing the block at the next summary height commits its root again.
+	restarted.acceptBlocks(t, 1)
 	summary, err = restarted.Handler.GetLastStateSummary(ctx)
 	require.NoError(t, err, "GetLastStateSummary() after the next summary height")
 	checkSummaryMatchesBlock(t, summary, restarted.blockAtHeight(t, nextHeight).EthBlock())
