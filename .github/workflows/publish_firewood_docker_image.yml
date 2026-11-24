@@ -18,8 +18,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
         with:
-          # The Firewood ref can require modules that are not in the repository cache.
-          disable_go_proxy: 'false'
+          # run-docker-with-disk-space restores the module cache itself; restoring it twice floods the log with tar errors.
+          setup_go_module_cache: 'false'
       - name: Build and publish the Docker image
         uses: ./.github/actions/run-docker-with-disk-space
         with:
