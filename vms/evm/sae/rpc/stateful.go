@@ -382,8 +382,9 @@ var (
 // block need not be canonical, but its parent MUST be.
 //
 // A synchronous (pre-SAE) block is traced with the base fee as supplied, which
-// is the real fee paid by its transactions. A nil blob base fee is treated as
-// zero, which mirrors canonical chain behavior.
+// is the real fee paid by its transactions. For Cancun-active blocks, missing
+// excess blob gas is treated as zero, yielding a blob base fee of 1 wei and
+// matching canonical chain behavior.
 func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *tracers.TraceConfig) ([]*tracers.TxTraceResult, error) {
 	block := new(types.Block)
 	if err := rlp.DecodeBytes(blob, block); err != nil {
