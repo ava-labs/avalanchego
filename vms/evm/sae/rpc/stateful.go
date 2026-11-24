@@ -378,11 +378,12 @@ var (
 )
 
 // TraceBlock shadows [tracers.API.TraceBlock] to replace the caller-supplied
-// block's worst-case base fee with the executed base fee before delegating.
-// The block need not be canonical, but its parent MUST be.
+// block's worst-case base fee with the executed base fee before delegating. The
+// block need not be canonical, but its parent MUST be.
 //
 // A synchronous (pre-SAE) block is traced with the base fee as supplied, which
-// is the real fee paid by its transactions.
+// is the real fee paid by its transactions. A nil blob base fee is treated as
+// zero, which mirrors canonical chain behavior.
 func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *tracers.TraceConfig) ([]*tracers.TxTraceResult, error) {
 	block := new(types.Block)
 	if err := rlp.DecodeBytes(blob, block); err != nil {
@@ -397,13 +398,16 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 		}
 	}
 
-	resealed := block
-	if hdr := block.Header(); hook.Synchronous(a.tracerBackend.Hooks(), hdr) {
-		// The (potentially malicious) caller's header decides whether the block is
-		// synchronous, so it MUST carry every field the EVM dereferences. Note
-		// that, unlike other tracers, a panic in a JS tracer's worker goroutine
-		// isn't recovered by the RPC's HTTP handler.
-		if c := a.tracerBackend.ChainConfig(); c.IsLondon(hdr.Number) && hdr.BaseFee == nil {
+	var (
+		hdr    = block.Header()
+		isSync = hook.Synchronous(a.tracerBackend.Hooks(), hdr)
+		cfg    = a.tracerBackend.ChainConfig()
+	)
+	if cfg.IsCancun(hdr.Number, hdr.Time) && hdr.ExcessBlobGas == nil {
+		hdr.ExcessBlobGas = new(uint64)
+	}
+	if isSync {
+		if cfg.IsLondon(hdr.Number) && hdr.BaseFee == nil {
 			return nil, ErrMissingBaseFee
 		}
 	} else {
@@ -416,8 +420,8 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 		gasClock := parent.ExecutedByGasTime()
 		gasClock.BeforeBlock(a.tracerBackend.Hooks().BlockTime(hdr))
 		hdr.BaseFee = gasClock.BaseFee().ToBig()
-		resealed = block.WithSeal(hdr)
 	}
+	resealed := block.WithSeal(hdr)
 
 	api := tracers.NewAPI(&suppliedHashBackend{
 		tracerBackend: a.tracerBackend,

@@ -1139,10 +1139,29 @@ func TestRegression_TraceBlocksNilBaseFee(t *testing.T) {
 	sync := types.CopyHeader(async)
 	hookstest.ConvertToSynchronous(sync)
 
+	withBaseFee := func(h *types.Header) *types.Header {
+		h = types.CopyHeader(h)
+		h.BaseFee = big.NewInt(0)
+		return h
+	}
+	withBlobs := func(h *types.Header) *types.Header {
+		h = types.CopyHeader(h)
+		h.ExcessBlobGas = new(uint64)
+		h.BlobGasUsed = new(uint64)
+		h.WithdrawalsHash = new(common.Hash)
+		return h
+	}
+
 	dynTx := &types.DynamicFeeTx{
 		To:        &common.Address{},
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1), // original attack vector
+	}
+	callBlobBaseFeeOp := &types.DynamicFeeTx{
+		To:        nil, // runs data as code
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(1),
+		Data:      []byte{byte(vm.BLOBBASEFEE)},
 	}
 	blobTx := &types.BlobTx{}
 
@@ -1165,13 +1184,25 @@ func TestRegression_TraceBlocksNilBaseFee(t *testing.T) {
 			wantErr: testerr.Contains(saerpc.ErrMissingBaseFee.Error()),
 		},
 		{
-			name:    "async_nil_excess_blob_gas",
+			name:    "async_nil_blob_gas",
+			header:  async,
+			tx:      callBlobBaseFeeOp,
+			wantErr: nil,
+		},
+		{
+			name:    "sync_nil_blob_gas",
+			header:  withBaseFee(sync),
+			tx:      callBlobBaseFeeOp,
+			wantErr: nil,
+		},
+		{
+			name:    "async_with_blob_tx",
 			header:  async,
 			tx:      blobTx,
 			wantErr: testerr.Contains(saerpc.ErrBlobTxsUnsupported.Error()),
 		},
 		{
-			name:    "sync_nil_excess_blob_gas",
+			name:    "sync_with_blob_tx",
 			header:  sync,
 			tx:      blobTx,
 			wantErr: testerr.Contains(saerpc.ErrBlobTxsUnsupported.Error()),
