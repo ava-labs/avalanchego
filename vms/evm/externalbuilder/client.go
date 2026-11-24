@@ -8,6 +8,7 @@ package externalbuilder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -22,7 +23,11 @@ import (
 // binary-encoded transactions.
 const Method = "builder_proposeTxs"
 
-var _ sae.ExternalBuilder = (*Client)(nil)
+var (
+	_ sae.ExternalBuilder = (*Client)(nil)
+
+	errUndecodableTx = errors.New("undecodable transaction")
+)
 
 // Client calls an external block builder over JSON-RPC.
 type Client struct {
@@ -49,7 +54,7 @@ func (c *Client) ProposeTxs(ctx context.Context, header *types.Header) ([]*types
 	for i, b := range encoded {
 		txs[i] = new(types.Transaction)
 		if err := txs[i].UnmarshalBinary(b); err != nil {
-			return nil, fmt.Errorf("decoding tx %d: %w", i, err)
+			return nil, fmt.Errorf("%w %d: %w", errUndecodableTx, i, err)
 		}
 	}
 	return txs, nil

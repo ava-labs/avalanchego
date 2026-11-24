@@ -85,11 +85,13 @@ func TestProposeTxs(t *testing.T) {
 
 	t.Run("sidecar error", func(t *testing.T) {
 		_, err := dial(t, &sidecar{err: errors.New("no bids")}).ProposeTxs(t.Context(), hdr)
-		require.ErrorContains(t, err, "no bids")
+		var rpcErr rpc.Error
+		require.ErrorAs(t, err, &rpcErr)
+		require.Equal(t, "no bids", rpcErr.Error())
 	})
 
 	t.Run("undecodable transaction", func(t *testing.T) {
 		_, err := dial(t, &sidecar{txs: []hexutil.Bytes{{0x02, 0xff}}}).ProposeTxs(t.Context(), hdr)
-		require.ErrorContains(t, err, "decoding tx 0")
+		require.ErrorIs(t, err, errUndecodableTx)
 	})
 }
