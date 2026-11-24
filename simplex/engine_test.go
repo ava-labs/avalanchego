@@ -6,15 +6,18 @@ package simplex
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/ava-labs/avalanchego/utils"
@@ -34,9 +37,100 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 	ctx := t.Context()
 	engine, configs := setupEngine(t)
 
-	qcBytes := buildQCBytes(t, configs)
+	for _, msg := range allSimplexMessages(buildQCBytes(t, configs)) {
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
+	}
+}
 
-	allSimplexMessages := []*p2p.Simplex{
+// TestSimplexMessageRoundTrip tests that for every p2p message x:
+//
+//	encode(decode(x)) == x
+//
+// where decode converts a p2p message into a simplex message and encode
+// converts it back.
+func TestSimplexMessageRoundTrip(t *testing.T) {
+	configs := createSimplexEngineConfig(t, noKeyReuse)
+	// Parse the inner block into a block with the same bytes, so the block
+	// re-encodes to the same bytes.
+	configs[0].VM.(*wrappedVM).ParseBlockF = func(_ context.Context, bytes []byte) (snowman.Block, error) {
+		return &snowmantest.Block{BytesV: bytes}, nil
+	}
+	engine, err := NewEngine(t.Context(), configs[0])
+	require.NoError(t, err)
+
+	chainID := ids.GenerateTestID()
+	for _, msg := range allSimplexMessages(buildQCBytes(t, configs)) {
+		t.Run(fmt.Sprintf("%T", msg.GetMessage()), func(t *testing.T) {
+			decoded, err := engine.p2pToSimplexMessage(t.Context(), msg)
+			require.NoError(t, err)
+
+			// We receive blocks, but we send verified blocks.
+			encoded, err := simplexMessageToP2P(chainID, toVerifiedMessage(t, decoded))
+			require.NoError(t, err)
+
+			// The chain ID isn't part of the simplex message, so encode uses its own.
+			expected := proto.Clone(msg).(*p2p.Simplex)
+			expected.ChainId = chainID[:]
+			require.True(t, proto.Equal(expected, encoded), "expected %v, got %v", expected, encoded)
+		})
+	}
+}
+
+// toVerifiedMessage converts a received message into the message we would
+// send, which carries verified blocks instead of blocks.
+func toVerifiedMessage(t *testing.T, msg *simplexcommon.Message) *simplexcommon.Message {
+	switch {
+	case msg.BlockMessage != nil:
+		return &simplexcommon.Message{
+			VerifiedBlockMessage: &simplexcommon.VerifiedBlockMessage{
+				VerifiedBlock: toVerifiedBlock(t, msg.BlockMessage.Block),
+				Vote:          msg.BlockMessage.Vote,
+			},
+		}
+	case msg.ReplicationResponse != nil:
+		resp := msg.ReplicationResponse
+		data := make([]simplexcommon.VerifiedQuorumRound, len(resp.Data))
+		for i := range resp.Data {
+			data[i] = *toVerifiedQuorumRound(t, &resp.Data[i])
+		}
+		return &simplexcommon.Message{
+			VerifiedReplicationResponse: &simplexcommon.VerifiedReplicationResponse{
+				Data:               data,
+				LatestRound:        toVerifiedQuorumRound(t, resp.LatestRound),
+				LatestFinalizedSeq: toVerifiedQuorumRound(t, resp.LatestSeq),
+			},
+		}
+	default:
+		return msg
+	}
+}
+
+// toVerifiedQuorumRound returns nil if [qr] is nil.
+func toVerifiedQuorumRound(t *testing.T, qr *simplexcommon.QuorumRound) *simplexcommon.VerifiedQuorumRound {
+	if qr == nil {
+		return nil
+	}
+	return &simplexcommon.VerifiedQuorumRound{
+		VerifiedBlock:     toVerifiedBlock(t, qr.Block),
+		Notarization:      qr.Notarization,
+		Finalization:      qr.Finalization,
+		EmptyNotarization: qr.EmptyNotarization,
+	}
+}
+
+// toVerifiedBlock returns nil if [block] is nil.
+func toVerifiedBlock(t *testing.T, block simplexcommon.Block) simplexcommon.VerifiedBlock {
+	if block == nil {
+		return nil
+	}
+	verifiedBlock, ok := block.(simplexcommon.VerifiedBlock)
+	require.True(t, ok)
+	return verifiedBlock
+}
+
+// allSimplexMessages returns a message of every simplex message type.
+func allSimplexMessages(qcBytes []byte) []*p2p.Simplex {
+	return []*p2p.Simplex{
 		simplexBlockProposal,
 		simplexVote,
 		simplexEmptyVote,
@@ -49,10 +143,6 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 		simplexBlockDigestRequest,
 		simplexAuxiliaryInfo,
 		simplexEpochTransitionApproval,
-	}
-
-	for _, msg := range allSimplexMessages {
-		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
 	}
 }
 
