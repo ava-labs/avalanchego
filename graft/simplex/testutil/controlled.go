@@ -159,6 +159,11 @@ func (t *ControlledNode) BlockShouldBeBuilt() {
 	t.bb.TriggerBlockShouldBeBuilt()
 }
 
+// BlockShouldBeBuiltInRound signals that a block should be built in the given round.
+func (t *ControlledNode) BlockShouldBeBuiltInRound(round uint64) {
+	t.bb.TriggerBlockShouldBeBuiltInRound(round)
+}
+
 func (t *ControlledNode) TickUntilRoundAdvanced(round uint64, tick time.Duration) {
 	timeout := time.NewTimer(time.Minute)
 	defer timeout.Stop()

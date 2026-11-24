@@ -1487,7 +1487,8 @@ func TestReplicationChain(t *testing.T) {
 	// The other nodes notarize the leader's block, but the lagging node can't vote for it,
 	// as it is missing the block's ancestors.
 	// Make it time out on this round, so its empty vote prompts the other nodes to send it what it needs to replicate them.
-	laggingNode.BlockShouldBeBuilt()
+	// The round is given explicitly, as a replication response may have already advanced the lagging node past it.
+	laggingNode.BlockShouldBeBuiltInRound(numNotarizations)
 
 	for _, n := range net.Instances {
 		// the message filter blocks finalizations for blockFinalize3

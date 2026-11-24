@@ -98,10 +98,6 @@ func (t *TestBlockBuilder) TriggerBlockShouldBeBuilt() {
 
 // TriggerBlockShouldBeBuiltInRound signals that a block should be built in the given round.
 func (t *TestBlockBuilder) TriggerBlockShouldBeBuiltInRound(round uint64) {
-	if t.currentRound == nil {
-		panic("CurrentRound must be set before triggering a block to be built")
-	}
-
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
