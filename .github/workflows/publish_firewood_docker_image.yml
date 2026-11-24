@@ -10,6 +10,9 @@ on:
 jobs:
   publish_firewood_docker_image:
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
