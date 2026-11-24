@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       firewood-ref:
-        description: 'Firewood branch, tag or commit to build from source (default branch is main, not master)'
+        description: 'Firewood branch, tag or commit to build from source'
         required: true
         default: main
 
