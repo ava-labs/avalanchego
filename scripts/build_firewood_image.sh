@@ -14,6 +14,13 @@ set -euo pipefail
 
 : "${FIREWOOD_REF:?FIREWOOD_REF must be set to a Firewood branch, tag or commit}"
 
+# Fail fast on a bad ref. Commit hashes can't be checked with ls-remote, so they pass through.
+if [[ ! "$FIREWOOD_REF" =~ ^[0-9a-f]{7,40}$ ]] &&
+  ! git ls-remote --exit-code https://github.com/ava-labs/firewood "refs/heads/$FIREWOOD_REF" "refs/tags/$FIREWOOD_REF" >/dev/null; then
+  echo "FIREWOOD_REF '$FIREWOOD_REF' is not a branch or tag of https://github.com/ava-labs/firewood" >&2
+  exit 1
+fi
+
 if [[ "$(uname -s)" != "Linux" ]]; then
   echo "A Linux host is required: Firewood is built for the host and linked into a Linux image." >&2
   exit 1

@@ -1,4 +1,4 @@
-name: Publish Docker Image with custom Firewood
+name: Publish Docker Image with Firewood
 
 on:
   workflow_dispatch:
