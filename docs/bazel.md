@@ -219,6 +219,7 @@ gazelle prefix directives.
 | `MODULE.bazel.lock` | Locked module/dependency resolution state | Yes (regenerated) |
 | `go.work` | Go workspace aggregating all modules (used by `go_deps`) | **No** |
 | `.bazelrc` | Bazel build flags and settings | **No** |
+| `.bazelrc.local` | Untracked host and CI overrides imported by `.bazelrc` (see below) | Yes (regenerated on macOS by direnv; configured by `setup-bazel` in CI) |
 | `.bazelignore` | Directories excluded from Bazel | **No** |
 | `.bazelversion` | Bazel version pin (used by bazelisk) | **No** |
 | `BUILD.bazel` (root) | Gazelle config: prefix, exclusions, proto disable | **No** |
@@ -889,13 +890,43 @@ full unit-test and E2E suites across its platform matrix. It
 includes a race-detection and shuffled-order unit-test run. That run disables
 test-result caching so it executes rather than reusing a cached random result.
 
-The scheduled workflow also disables the remote cache. This provides daily
-validation that does not depend on remote action or test results.
+Pre-merge CI uses the remote action and test-result cache to improve speed
+and reliability. Unmerged code can write results to that cache when CI grants
+access. We do not treat those cached results as the final check of the merged
+source.
+
+The scheduled workflow disables both reads and writes to the remote cache to
+verify the source independently of cached action and test results. This does
+not prevent cache poisoning; it keeps scheduled validation independent of any
+poisoned results, including those introduced by unmerged code.
+
+When binary, package, and image builds transition to Bazel, those artifact
+builds will also disable the remote cache. They must build from source rather
+than reuse potentially poisoned remote outputs. Disabling the remote cache
+alone does not ensure a clean build. The build must also use a fresh local
+output tree and no disk action cache. Dependency-download caches can still be
+used: this policy concerns reuse of build outputs and test results, not
+downloaded inputs.
+
+The `setup-bazel` action writes its CI configuration to the workspace's
+`.bazelrc.local` and exports `BAZEL_REMOTE_CACHE_CONFIGURED` to indicate
+whether it configured the remote cache. The Bazel AvalancheGo image task uses
+this flag to decide whether compilation can access the network. It derives a
+temporary configuration from that file and mounts it as a secret. It also
+mounts the prepared repository and Gazelle module caches. The builder
+installs the pinned Bazel release before compilation. The image job runs in
+the Linux pre-merge and scheduled workflows with their respective
+remote-cache policies. Compilation runs without network access when the
+remote cache is not configured. See [Bazel-built AvalancheGo
+image](./image-builds.md#bazel-built-avalanchego-image) for configuration and
+validation. This job builds and smoke-tests a CI validation image; it does
+not publish an image. The artifact-build policy above applies when a Bazel
+build is used to produce published artifacts.
 
 The remote cache stores results from the cacheable pre-merge unit tests when
-CI provides the remote-cache URL and authorization header. This policy applies
-only to Bazel CI. Go module version CI remains unchanged because it checks
-compatibility for downstream consumers.
+CI provides the remote-cache URL and authorization header. This policy
+applies only to Bazel CI. Go module version CI remains unchanged because it
+checks compatibility for downstream consumers.
 
 When you change the CI test set, update
 `./scripts/bazel_ci_dependency_list.sh`. The list must include every target
@@ -1192,7 +1223,14 @@ entrypoint. The script uses `xcode-select -p` and `xcrun --sdk macosx
 --show-sdk-path` to determine the host's active Apple developer
 directory and macOS SDK and writes those values to `.bazelrc.local`.
 The script can also be run directly and is invoked automatically by
-direnv.
+direnv. It replaces the whole file.
+
+In CI, the `setup-bazel` action appends dependency-cache, download-restriction,
+and remote-cache settings to `.bazelrc.local`. Keeping these settings in the
+workspace lets the image task supply them to the container as a secret.
+CI jobs do not run the macOS generation script, which would overwrite these
+settings. Because `.bazelrc` imports `.bazelrc.local` before its later settings,
+keep settings in it that do not conflict with those later lines.
 
 Both entrypoints run inside the nix dev shell, whose `DEVELOPER_DIR`
 and `SDKROOT` would make `xcode-select` and `xcrun` report nix's SDK.

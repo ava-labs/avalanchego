@@ -1,0 +1,78 @@
+# syntax=docker/dockerfile:1.7
+ARG BAZEL_BUILD_MODE=offline
+# Bazel supplies the Go SDK, so the builder only needs a Debian base and native
+# compiler prerequisites. The digest pins the multi-platform index.
+ARG BAZEL_BUILDER_IMAGE=debian:bookworm-slim@sha256:e67eeead736ff7bbe258ef088bff683635c561b1fcfefad0806c1df4ab49ce0e
+FROM ${BAZEL_BUILDER_IMAGE} AS builder
+# Re-declare the FROM argument so compilation can include it in its fingerprint.
+ARG BAZEL_BUILDER_IMAGE
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gcc g++ git libc6-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+# Install the pinned Linux Bazel release before copying the source so source
+# changes reuse the installed executable.
+COPY .bazelversion .bazelversion
+COPY scripts/install_bazel_linux.sh scripts/install_bazel_linux.sh
+ARG TARGETARCH
+RUN bash scripts/install_bazel_linux.sh /usr/local/bin/bazel
+
+COPY . .
+# Make the selected network mode available to the compilation script as well.
+ARG BAZEL_BUILD_MODE
+ARG AVALANCHEGO_COMMIT
+ARG BAZEL_CACHE_NAMESPACE=avalanchego-bazel
+ARG BAZEL_REPOSITORY_CACHE=/tmp/bazel-repository-cache
+ARG BAZEL_GO_MOD_CACHE=/tmp/bazel-go-repository-modcache
+# Invoke Bazel on each build to exercise its own persistent caches.
+ARG BAZEL_INVOCATION_KEY
+# Outside CI, prepare dependencies here with network access, using the same
+# script as setup-bazel. A temporary output tree makes Bazel write registry
+# metadata to the caches, so the offline compilation below detects missing
+# inputs. The persistent cache mounts speed up repeated builds; use a new
+# BAZEL_CACHE_NAMESPACE to start from empty ones.
+FROM builder AS prepare
+RUN --mount=type=secret,id=bazelrc,target=/workspace/.bazelrc.local,required=true \
+    --mount=type=cache,id=${BAZEL_CACHE_NAMESPACE}-repository-${TARGETARCH},target=${BAZEL_REPOSITORY_CACHE},sharing=locked \
+    --mount=type=cache,id=${BAZEL_CACHE_NAMESPACE}-modules-${TARGETARCH},target=${BAZEL_GO_MOD_CACHE},sharing=locked \
+    BAZEL=bazel \
+    BAZEL_STARTUP_OPTIONS="--batch --output_base=/tmp/bazel-prepare-output" \
+    bash scripts/cache_bazel_ci_build_dependencies.sh && \
+    mkdir -p /prepared/repository /prepared/modules && \
+    cp -a "${BAZEL_REPOSITORY_CACHE}/." /prepared/repository/ && \
+    cp -a "${BAZEL_GO_MOD_CACHE}/." /prepared/modules/
+
+# CI overrides these two stages with --build-context, using the caches that
+# setup-bazel prepared on the host.
+FROM scratch AS bazel_repository_cache
+COPY --from=prepare /prepared/repository /
+
+FROM scratch AS bazel_go_mod_cache
+COPY --from=prepare /prepared/modules /
+
+# RUN --network does not support argument expansion. Keep separate stages and
+# share the compilation script so only the network policy differs.
+FROM builder AS build-offline
+RUN --network=none \
+    --mount=type=secret,id=bazelrc,target=/workspace/.bazelrc.local,required=true \
+    --mount=type=bind,from=bazel_repository_cache,target=${BAZEL_REPOSITORY_CACHE} \
+    --mount=type=bind,from=bazel_go_mod_cache,target=${BAZEL_GO_MOD_CACHE} \
+    --mount=type=cache,id=${BAZEL_CACHE_NAMESPACE}-output-${TARGETARCH},target=/root/.cache/bazel,sharing=locked \
+    --mount=type=cache,id=${BAZEL_CACHE_NAMESPACE}-disk-${TARGETARCH},target=/root/.cache/bazel-disk-cache,sharing=locked \
+    bash scripts/build_bazel_image_binary.sh
+
+FROM builder AS build-online
+RUN --mount=type=secret,id=bazelrc,target=/workspace/.bazelrc.local,required=true \
+    --mount=type=bind,from=bazel_repository_cache,target=${BAZEL_REPOSITORY_CACHE} \
+    --mount=type=bind,from=bazel_go_mod_cache,target=${BAZEL_GO_MOD_CACHE} \
+    --mount=type=cache,id=${BAZEL_CACHE_NAMESPACE}-output-${TARGETARCH},target=/root/.cache/bazel,sharing=locked \
+    --mount=type=cache,id=${BAZEL_CACHE_NAMESPACE}-disk-${TARGETARCH},target=/root/.cache/bazel-disk-cache,sharing=locked \
+    bash scripts/build_bazel_image_binary.sh
+
+FROM build-${BAZEL_BUILD_MODE} AS binary
+
+FROM debian:12-slim
+COPY --from=binary /tmp/avalanchego /avalanchego/build/avalanchego
+WORKDIR /avalanchego/build
+CMD ["./avalanchego"]

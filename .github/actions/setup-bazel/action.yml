@@ -81,8 +81,8 @@ runs:
     - name: Disable dependency downloads
       shell: bash
       run: |
-        echo 'common --repository_disable_download' >> "$HOME/.bazelrc"
-        echo 'common --repo_env=GOPROXY=off' >> "$HOME/.bazelrc"
+        echo 'common --repository_disable_download' >> .bazelrc.local
+        echo 'common --repo_env=GOPROXY=off' >> .bazelrc.local
 
     - name: Check Bazel metadata
       if: ${{ inputs.is-setup-job == 'true' }}

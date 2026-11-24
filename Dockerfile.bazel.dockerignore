@@ -1,0 +1,10 @@
+.git
+.ci
+.github
+.idea
+.vscode
+build
+bazel-*
+.envrc
+.bazelrc.local
+*.md

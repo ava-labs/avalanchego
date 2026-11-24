@@ -85,6 +85,18 @@ jobs:
         with:
           is-setup-job: 'true'
 
+  build-image-avalanchego:
+    if: ${{ startsWith(inputs.platform_name, 'linux-') || startsWith(inputs.platform_name, 'ubuntu-') }}
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.unit_timeout_minutes }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build and smoke-test the Bazel image
+        uses: ./.github/actions/run-bazel-with-disk-space
+        with:
+          run: ./scripts/run_task.sh bazel-build-image-avalanchego
+
   unit:
     needs: setup
     runs-on: ${{ inputs.runner }}
