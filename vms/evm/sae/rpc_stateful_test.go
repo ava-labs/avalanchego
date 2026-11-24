@@ -1144,13 +1144,6 @@ func TestRegression_TraceBlocksNilBaseFee(t *testing.T) {
 		h.BaseFee = big.NewInt(0)
 		return h
 	}
-	withBlobs := func(h *types.Header) *types.Header {
-		h = types.CopyHeader(h)
-		h.ExcessBlobGas = new(uint64)
-		h.BlobGasUsed = new(uint64)
-		h.WithdrawalsHash = new(common.Hash)
-		return h
-	}
 
 	dynTx := &types.DynamicFeeTx{
 		To:        &common.Address{},
