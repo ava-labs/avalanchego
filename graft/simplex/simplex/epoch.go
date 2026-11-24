@@ -1386,6 +1386,15 @@ func (e *Epoch) persistFinalization(finalization common.Finalization) error {
 			e.Logger.Error("Failed to index finalizations", zap.Error(err))
 			return err
 		}
+
+		// We may have already replicated the sequences that follow the one we just committed.
+		// We must process them now or they would remain in the replication state until another
+		// replication message arrives.
+		if err := e.processReplicationState(); err != nil {
+			e.haltedError = err
+			e.Logger.Error("Failed to process replication state", zap.Error(err))
+			return err
+		}
 	} else {
 		finalizationRecord := common.NewQuorumRecord(finalization.QC.Bytes(), finalization.Finalization.Bytes(), common.FinalizationRecordType)
 		if err := e.appendToWAL(finalizationRecord); err != nil {

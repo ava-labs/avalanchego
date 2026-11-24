@@ -2018,3 +2018,55 @@ func TestReplicationRedeliversRestoredFinalization(t *testing.T) {
 	require.NoError(t, e.HandleMessage(replicateSeq(blocks[1]), nodes[1]))
 	storage.WaitForBlockCommit(1)
 }
+
+// TestReplicationProcessesReplicationStateAfterCommit tests that a node will process replication state
+// once it indexes a block and finalization.
+func TestReplicationProcessesReplicationStateAfterCommit(t *testing.T) {
+	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	blocks := createBlocks(t, nodes, 4)
+	quorum := common.Quorum(len(nodes))
+
+	bb := testutil.NewTestBlockBuilder()
+	conf, _, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), bb)
+	conf.ReplicationEnabled = true
+
+	e, err := simplex.NewEpoch(conf)
+	require.NoError(t, err)
+	t.Cleanup(e.Stop)
+	require.NoError(t, e.Start())
+
+	// Notarize block 0, but do not finalize it yet.
+	block0, _ := advanceRound(t, e, bb, true, false, &blocks[0].Finalization.Finalization.ProtocolMetadata)
+	require.Equal(t, blocks[0].VerifiedBlock.BlockHeader().Digest, block0.BlockHeader().Digest)
+	require.Equal(t, uint64(0), storage.NumBlocks())
+
+	// Replicate the finalized blocks of sequences 1 to 3.
+	// They are stored in the replication state, but cannot be committed before sequence 0 is.
+	quorumRounds := make([]common.QuorumRound, 0, 3)
+	for _, b := range blocks[1:] {
+		finalization := b.Finalization
+		quorumRounds = append(quorumRounds, common.QuorumRound{
+			Block:        b.VerifiedBlock.(*testutil.TestBlock),
+			Finalization: &finalization,
+		})
+	}
+
+	require.NoError(t, e.HandleMessage(&common.Message{
+		ReplicationResponse: &common.ReplicationResponse{
+			LatestRound: &quorumRounds[len(quorumRounds)-1],
+			Data:        quorumRounds,
+		},
+	}, nodes[1]))
+	require.Equal(t, uint64(0), storage.NumBlocks())
+
+	// Commit sequence 0 by collecting finalize votes for it.
+	// No other message is sent to the node after this.
+	for _, node := range nodes[:quorum] {
+		testutil.InjectTestFinalizeVote(t, e, block0, node)
+	}
+
+	// The node must commit the sequences it had already replicated, without needing another message.
+	require.Eventually(t, func() bool {
+		return storage.NumBlocks() == uint64(len(blocks))
+	}, testutil.DefaultTimeout, 10*time.Millisecond, "stored replicated sequences were not committed after committing the preceding sequence")
+}
