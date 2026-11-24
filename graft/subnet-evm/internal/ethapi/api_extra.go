@@ -7,7 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
+	"slices"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -211,4 +213,40 @@ func (s *BlockChainAPI) stateQueryBlockNumberAllowed(blockNumOrHash rpc.BlockNum
 	}
 	return fmt.Errorf("block number %d is before the oldest allowed block number %d (window of %d blocks)",
 		number, oldestAllowed, queryWindow)
+}
+
+// Predicate storage keys carry data rather than storage slots, and their order
+// matters. [AccessList] must therefore neither generate predicate tuples nor let
+// the access-list tracer, which reorders and deduplicates storage keys, rewrite
+// the caller's.
+
+// tracerExclusions returns the precompiles and the predicate addresses, which
+// the access-list tracer excludes from the access lists that it generates.
+func tracerExclusions(precompiles []common.Address, rules params.Rules) []common.Address {
+	return slices.Concat(precompiles, slices.Collect(maps.Keys(params.GetRulesExtra(rules).Predicaters)))
+}
+
+// splitPredicates returns the tuples of acl for the access-list tracer, and the
+// predicate tuples, in their original order.
+func splitPredicates(acl *types.AccessList, rules params.Rules) (traced, predicates types.AccessList) {
+	if acl == nil {
+		return nil, nil
+	}
+	extra := params.GetRulesExtra(rules)
+	for _, t := range *acl {
+		if extra.HasPredicate(t.Address) {
+			predicates = append(predicates, t)
+		} else {
+			traced = append(traced, t)
+		}
+	}
+	return traced, predicates
+}
+
+// withPredicates returns acl followed by the predicate tuples.
+func withPredicates(acl, predicates types.AccessList) types.AccessList {
+	if len(predicates) == 0 {
+		return acl
+	}
+	return slices.Concat(acl, predicates)
 }
