@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       issues: write # Required for GITHUB_TOKEN to add the evm label to issues
-      pull-requests: write # Required for GITHUB_TOKEN to add the evm label to PRs and assign their authors
+      pull-requests: write # Required for GITHUB_TOKEN to assign PR authors
     steps:
       - name: Mint installation token
         id: token
@@ -62,11 +62,11 @@ jobs:
           project-url: https://github.com/orgs/ava-labs/projects/23
           github-token: ${{ steps.token.outputs.token }}
 
-      - name: Add evm label
-        if: steps.membership.outputs.evm == 'true'
+      - name: Add evm label to issue
+        if: github.event_name == 'issues' && steps.membership.outputs.evm == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          NUMBER: ${{ github.event.issue.number }}
         run: |
           gh api --silent "repos/$GITHUB_REPOSITORY/issues/$NUMBER/labels" -f "labels[]=evm"
 

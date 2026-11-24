@@ -151,7 +151,6 @@ graft_go_test(
         "//graft/subnet-evm/precompile/precompileconfig",
         "//snow/engine/snowman/block",
         "//upgrade",
-        "//upgrade/upgradetest",
         "//utils/set",
         "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//common",

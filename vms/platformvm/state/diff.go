@@ -70,20 +70,13 @@ type Diff struct {
 func NewDiff(
 	parentID ids.ID,
 	stateVersions Versions,
-	allowAddingStakerAfterDeletion StakerAdditionAfterDeletionLegality,
 ) (*Diff, error) {
 	parentState, ok := stateVersions.GetState(parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &Diff{
-		modifiedStakingInfo: make(map[ids.ID]map[ids.NodeID]StakingInfo),
-		currentStakerDiffs: diffStakers{
-			isAdditionAfterDeletionAllowed: allowAddingStakerAfterDeletion,
-		},
-		pendingStakerDiffs: diffStakers{
-			isAdditionAfterDeletionAllowed: allowAddingStakerAfterDeletion,
-		},
+		modifiedStakingInfo:         make(map[ids.ID]map[ids.NodeID]StakingInfo),
 		parentID:                    parentID,
 		stateVersions:               stateVersions,
 		timestamp:                   parentState.GetTimestamp(),
@@ -106,10 +99,10 @@ func (s stateGetter) GetState(ids.ID) (Chain, bool) {
 	return s.state, true
 }
 
-func NewDiffOn(parentState Chain, allowAddingStakerAfterDeletion StakerAdditionAfterDeletionLegality) (*Diff, error) {
+func NewDiffOn(parentState Chain) (*Diff, error) {
 	return NewDiff(ids.Empty, stateGetter{
 		state: parentState,
-	}, allowAddingStakerAfterDeletion)
+	})
 }
 
 func (d *Diff) GetTimestamp() time.Time {

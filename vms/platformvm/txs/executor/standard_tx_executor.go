@@ -48,8 +48,6 @@ var (
 	errEmptyNodeID                      = errors.New("validator nodeID cannot be empty")
 	errMaxStakeDurationTooLarge         = errors.New("max stake duration must be less than or equal to the global max stake duration")
 	errMissingStartTimePreDurango       = errors.New("staker transactions must have a StartTime pre-Durango")
-	errEtnaUpgradeNotActive             = errors.New("attempting to use an Etna-upgrade feature prior to activation")
-	errHeliconUpgradeNotActive          = errors.New("attempting to use a Helicon-upgrade feature prior to activation")
 	errTransformSubnetTxPostEtna        = errors.New("TransformSubnetTx is not permitted post-Etna")
 	errMaxNumActiveValidators           = errors.New("already at the max number of active validators")
 	errCouldNotLoadSubnetToL1Conversion = errors.New("could not load subnet conversion")
@@ -685,14 +683,6 @@ func (e *standardTxExecutor) TransferSubnetOwnershipTx(tx *platform.TransferSubn
 }
 
 func (e *standardTxExecutor) BaseTx(tx *platform.BaseTx) error {
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		upgrades         = e.backend.Config.UpgradeConfig
-	)
-	if !upgrades.IsDurangoActivated(currentTimestamp) {
-		return ErrDurangoUpgradeNotActive
-	}
-
 	// Verify the tx is well-formed
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
@@ -740,14 +730,6 @@ func (e *standardTxExecutor) BaseTx(tx *platform.BaseTx) error {
 }
 
 func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1Tx) error {
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		upgrades         = e.backend.Config.UpgradeConfig
-	)
-	if !upgrades.IsEtnaActivated(currentTimestamp) {
-		return errEtnaUpgradeNotActive
-	}
-
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
 	}
@@ -762,6 +744,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1T
 	}
 
 	var (
+		currentTimestamp         = e.state.GetTimestamp()
 		startTime                = uint64(currentTimestamp.Unix())
 		currentFees              = e.state.GetAccruedFees()
 		subnetToL1ConversionData = message.SubnetToL1ConversionData{
@@ -873,14 +856,6 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1T
 }
 
 func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1ValidatorTx) error {
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		upgrades         = e.backend.Config.UpgradeConfig
-	)
-	if !upgrades.IsEtnaActivated(currentTimestamp) {
-		return errEtnaUpgradeNotActive
-	}
-
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
 	}
@@ -942,6 +917,7 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1Valida
 	}
 
 	// Verify that the message contains a valid expiry time.
+	currentTimestamp := e.state.GetTimestamp()
 	currentTimestampUnix := uint64(currentTimestamp.Unix())
 	if msg.Expiry <= currentTimestampUnix {
 		return fmt.Errorf("%w at %d and it is currently %d", errWarpMessageExpired, msg.Expiry, currentTimestampUnix)
@@ -1031,14 +1007,6 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1Valida
 }
 
 func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorWeightTx) error {
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		upgrades         = e.backend.Config.UpgradeConfig
-	)
-	if !upgrades.IsEtnaActivated(currentTimestamp) {
-		return errEtnaUpgradeNotActive
-	}
-
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
 	}
@@ -1177,14 +1145,6 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorW
 }
 
 func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *platform.IncreaseL1ValidatorBalanceTx) error {
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		upgrades         = e.backend.Config.UpgradeConfig
-	)
-	if !upgrades.IsEtnaActivated(currentTimestamp) {
-		return errEtnaUpgradeNotActive
-	}
-
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
 	}
@@ -1254,14 +1214,6 @@ func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *platform.IncreaseL
 }
 
 func (e *standardTxExecutor) DisableL1ValidatorTx(tx *platform.DisableL1ValidatorTx) error {
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		upgrades         = e.backend.Config.UpgradeConfig
-	)
-	if !upgrades.IsEtnaActivated(currentTimestamp) {
-		return errEtnaUpgradeNotActive
-	}
-
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
 	}
