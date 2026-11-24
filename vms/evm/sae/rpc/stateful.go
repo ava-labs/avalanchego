@@ -373,8 +373,8 @@ func (a *tracerAPI) TraceCall(ctx context.Context, args ethapi.TransactionArgs, 
 
 // Errors returned for malformed blocks.
 var (
-	ErrMissingBaseFee      = errors.New("missing base fee")
-	ErrMissingBlobGasField = errors.New("missing blob gas field(s)")
+	ErrMissingBaseFee     = errors.New("missing base fee")
+	ErrBlobTxsUnsupported = errors.New("blob transactions not supported")
 )
 
 // TraceBlock shadows [tracers.API.TraceBlock] to replace the caller-supplied
@@ -391,18 +391,20 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 	if block.NumberU64() == 0 {
 		return nil, errors.New("genesis is not traceable") // Copied from [tracers.TraceBlock]
 	}
+	for _, tx := range block.Transactions() {
+		if tx.Type() == types.BlobTxType {
+			return nil, ErrBlobTxsUnsupported
+		}
+	}
 
 	resealed := block
 	if hdr := block.Header(); hook.Synchronous(a.tracerBackend.Hooks(), hdr) {
-		// We rely on (a potentially malicious caller's) header to claim that
-		// the block is synchronous, so it MUST carry the fields that the EVM
-		// dereferences under the active forks. A panic in a JS tracer's worker
-		// goroutine isn't recovered by the RPC's HTTP handler.
-		switch cfg := a.tracerBackend.ChainConfig(); {
-		case cfg.IsLondon(hdr.Number) && hdr.BaseFee == nil:
+		// The (potentially malicious) caller's header decides whether the block is
+		// synchronous, so it MUST carry every field the EVM dereferences. Note
+		// that, unlike other tracers, a panic in a JS tracer's worker goroutine
+		// isn't recovered by the RPC's HTTP handler.
+		if c := a.tracerBackend.ChainConfig(); c.IsLondon(hdr.Number) && hdr.BaseFee == nil {
 			return nil, ErrMissingBaseFee
-		case cfg.IsCancun(hdr.Number, hdr.Time) && (hdr.BlobGasUsed == nil || hdr.ExcessBlobGas == nil):
-			return nil, ErrMissingBlobGasField
 		}
 	} else {
 		parent, err := a.tracerBackend.restoreExecutedParent(ctx, block)

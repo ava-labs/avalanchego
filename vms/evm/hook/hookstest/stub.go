@@ -276,6 +276,14 @@ func (*Stub) AfterExecutingBlock(*types.Block, types.Receipts) error {
 	return nil
 }
 
+// ConvertToSynchronous modifies the provided header such that [hook.Synchronous] will
+// return true with a [Stub] implementation of [hook.Points].
+func ConvertToSynchronous(h *types.Header) {
+	e := getHeaderExtra(h)
+	e.settled = storedSettled{}
+	h.Extra = e.MarshalCanoto()
+}
+
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
 
 //nolint:revive // struct-tag: canoto allows unexported fields

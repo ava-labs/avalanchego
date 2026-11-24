@@ -103,6 +103,8 @@ func (w *Wallet) SetNonceAndSign(tb testing.TB, account int, data types.TxData) 
 		d.Nonce = n
 	case *types.DynamicFeeTx:
 		d.Nonce = n
+	case *types.BlobTx:
+		d.Nonce = n
 	default:
 		tb.Fatalf("Unsupported transaction type: %T", d)
 	}
