@@ -16,6 +16,8 @@
 
 ### Configs
 
+- Added the C-Chain options `block-builder-url` and `block-builder-timeout` (default `200ms`). When `block-builder-url` is set, each block the node builds starts with the transactions an external builder returns from `builder_proposeTxs`, followed by transactions from the mempool. If any proposed transaction can't be included, or the builder fails or times out, the block is built from the mempool alone. Block verification is unchanged.
+
 ### Fixes
 
 - Fixed node shutdown leaving health check and bootstrapper timeout goroutines running. Shutdown now stops them, and waits up to 10 seconds for the health check goroutines to finish.
