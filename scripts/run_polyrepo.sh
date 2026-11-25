@@ -6,7 +6,8 @@ set -euo pipefail
 #
 # Environment variables (optional):
 #   LIBEVM_REF   - Git ref for libevm (runs: go get && go mod tidy)
-#   FIREWOOD_REF - Git ref for firewood (runs: polyrepo sync firewood@ref)
+#   FIREWOOD_REF - Git ref for firewood (runs: polyrepo sync firewood@ref, then
+#                  points go.work at the local build)
 #
 # Examples:
 #   # Using env vars
@@ -29,6 +30,8 @@ fi
 if [[ -n "${FIREWOOD_REF:-}" ]]; then
   echo "Syncing firewood at ${FIREWOOD_REF}..."
   $POLYREPO_CMD sync "firewood@${FIREWOOD_REF}"
+  # The pinned polyrepo predates the firewood-go module, so it doesn't add this.
+  go work edit -replace github.com/ava-labs/firewood-go/ffi=./firewood/ffi/result/ffi
 fi
 
 if [[ $# -gt 0 ]]; then
