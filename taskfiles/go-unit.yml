@@ -1,0 +1,13 @@
+version: '3'
+
+tasks:
+  test-unit:
+    desc: Runs cacheable unified unit tests
+    env:
+      NO_SHUFFLE: TRUE # Allows caching
+      NO_RACE: TRUE # Reduces execution time
+    cmd: '{{.NIX_RUN}} bash ./scripts/tests.unit.sh'
+
+  test-unit-race-shuffle:
+    desc: Runs unified unit tests with race detection and shuffle
+    cmd: '{{.NIX_RUN}} bash ./scripts/tests.unit.sh'

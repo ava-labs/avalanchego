@@ -17,6 +17,7 @@ tasks](../CONTRIBUTING.md#running-tasks) in
   - [Keep tasks simple](#keep-tasks-simple)
   - [Task version](#task-version)
   - [Keep Taskfile entries sorted](#keep-taskfile-entries-sorted)
+  - [Cache-specific task files](#cache-specific-task-files)
   - [CI should run named tasks](#ci-should-run-named-tasks)
   - [Some CI-only setup still belongs in workflows](#some-ci-only-setup-still-belongs-in-workflows)
 - [Examples](#examples)
@@ -116,7 +117,35 @@ List public tasks in alphabetical order by name. Keep `default` first. You can g
 internal tasks, whose names start with `_`, near the tasks that use them.
 
 Sorting makes `task --list` and Taskfile review easier. Keep the order when you
-add, rename, or remove a task.
+add, rename, or remove a task. Apply this rule in each Taskfile, including the
+files in `taskfiles/`.
+
+### Cache-specific task files
+
+Most tasks live in the root `Taskfile.yml`. Tasks whose definitions are inputs
+to a Go build-cache key live in separate files under `taskfiles/`:
+
+- [`go-unit.yml`](../taskfiles/go-unit.yml) defines the unit-test tasks for the
+  [Go unit-test cache](./ci.md#go-unit-test-cache).
+- [`go-e2e.yml`](../taskfiles/go-e2e.yml) defines the Go E2E build and test
+  tasks for the [Go E2E build cache](./ci.md#go-e2e-build-cache).
+
+The root Taskfile includes these files with `flatten: true`, so their tasks keep
+their public names. Each cache-key hash includes its own task file and the root
+Taskfile's global settings. It does not include the root task definitions. So a
+change to an unrelated root task does not invalidate either archive.
+
+Put a task in one of these files only when it changes that cache's build or test
+configuration. Do not put such a task in the root Taskfile. The cache-key hash
+does not include root task definitions, so a change to that task would not
+select a new archive.
+
+`NIX_RUN` uses `.ROOT_DIR`, not `.TASKFILE_DIR`. In an included file,
+`.TASKFILE_DIR` is the directory of that file. The wrapper path would then
+resolve to `taskfiles/scripts/nix_run.sh`, which does not exist.
+
+Run `task test-workflow-hash-go-cache-inputs` after you change these files. It
+checks the public task names, the wrapper path, and the hash inputs.
 
 ### CI should run named tasks
 
