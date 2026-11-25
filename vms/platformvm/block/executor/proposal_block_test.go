@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -35,7 +35,7 @@ import (
 func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 
 	// create apricotParentBlk. It's a standard one for simplicity
 	parentHeight := uint64(2022)
@@ -92,7 +92,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	}))
 	require.NoError(env.state.Commit())
 
-	onParentAccept, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	onParentAccept, err := state.NewDiffOn(env.state)
 	require.NoError(err)
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: apricotParentBlk,
@@ -128,7 +128,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, upgradetest.Banff)
+	env := newEnvironment(t, upgrade.Banff)
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := genesistest.DefaultValidatorStartTime
@@ -183,7 +183,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	}))
 	require.NoError(env.state.Commit())
 
-	onParentAccept, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	onParentAccept, err := state.NewDiffOn(env.state)
 	require.NoError(err)
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: banffParentBlk,
@@ -482,7 +482,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, upgradetest.Banff)
+			env := newEnvironment(t, upgrade.Banff)
 
 			subnetID := testSubnet1.ID()
 			env.config.TrackedSubnets.Add(subnetID)
@@ -650,7 +650,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Banff)
+	env := newEnvironment(t, upgrade.Banff)
 
 	subnetID := testSubnet1.ID()
 	wallet := newWallet(t, env, walletConfig{
@@ -806,7 +806,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, upgradetest.Banff)
+			env := newEnvironment(t, upgrade.Banff)
 
 			subnetID := testSubnet1.ID()
 			if tracked {
@@ -921,7 +921,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Banff)
+	env := newEnvironment(t, upgrade.Banff)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1108,7 +1108,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Banff)
+	env := newEnvironment(t, upgrade.Banff)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1296,7 +1296,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 func TestAddValidatorProposalBlock(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Durango)
+	env := newEnvironment(t, upgrade.Durango)
 
 	wallet := newWallet(t, env, walletConfig{})
 

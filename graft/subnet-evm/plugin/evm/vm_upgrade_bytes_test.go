@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -140,7 +139,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 }
 
 func TestNetworkUpgradesOverridden(t *testing.T) {
-	fork := upgradetest.Granite
+	fork := upgrade.Granite
 	chainConfig := paramstest.ForkToChainConfig[fork]
 	extraConfig := params.GetExtra(chainConfig)
 	extraConfig.NetworkUpgrades.GraniteTimestamp = utils.PointerTo(uint64(upgrade.InitiallyActiveTime.Unix()))
@@ -335,20 +334,20 @@ func TestVMEtnaActivatesCancun(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		fork        upgradetest.Fork
+		fork        upgrade.Upgrade
 		upgradeJSON string
 		check       func(*testing.T, *VM) // function to check the VM state
 	}{
 		{
 			name: "Etna activates Cancun",
-			fork: upgradetest.Etna,
+			fork: upgrade.Etna,
 			check: func(t *testing.T, vm *VM) {
 				require.True(t, vm.chainConfig.IsCancun(common.Big0, defaultEtnaTime))
 			},
 		},
 		{
 			name: "Changed Etna changes Cancun",
-			fork: upgradetest.Etna,
+			fork: upgrade.Etna,
 			upgradeJSON: func() string {
 				upgrade := &extras.UpgradeConfig{
 					NetworkUpgradeOverrides: &extras.NetworkUpgrades{

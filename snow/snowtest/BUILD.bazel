@@ -17,6 +17,7 @@ go_library(
         "//snow",
         "//snow/validators",
         "//snow/validators/validatorstest",
+        "//upgrade",
         "//upgrade/upgradetest",
         "//utils/constants",
         "//utils/crypto/bls/signer/localsigner",

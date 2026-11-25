@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -20,7 +20,7 @@ import (
 func getAllUTXOsBenchmark(b *testing.B, utxoCount int, randSrc rand.Source) {
 	require := require.New(b)
 
-	env := setup(b, &envConfig{fork: upgradetest.Latest})
+	env := setup(b, &envConfig{fork: upgrade.Latest})
 	defer env.vm.ctx.Lock.Unlock()
 
 	addr := ids.GenerateTestShortID()

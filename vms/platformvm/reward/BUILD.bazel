@@ -23,6 +23,7 @@ go_test(
     ],
     embed = [":reward"],
     deps = [
+        "//upgrade",
         "//upgrade/upgradetest",
         "//utils/units",
         "@com_github_stretchr_testify//require",

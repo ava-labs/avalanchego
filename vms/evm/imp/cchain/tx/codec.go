@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
@@ -88,7 +89,7 @@ func ParseSlice(b []byte) ([]*Tx, error) {
 // config specifies at b's timestamp.
 func FromBlock(config *params.ChainConfig, b *types.Block) ([]*Tx, error) {
 	extData := customtypes.BlockExtData(b)
-	if cparams.GetExtra(config).IsApricotPhase5(b.Time()) {
+	if cparams.GetExtra(config).IsActive(upgrade.ApricotPhase5, b.Time()) {
 		return ParseSlice(extData)
 	}
 	if len(extData) == 0 {

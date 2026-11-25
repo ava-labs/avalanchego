@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
@@ -24,11 +25,11 @@ func TestSetEthUpgrades(t *testing.T) {
 	genesisBlock := big.NewInt(0)
 	genesisTimestamp := utils.PointerTo(initiallyActive)
 	tests := []struct {
-		fork     upgradetest.Fork
+		fork     upgrade.Upgrade
 		expected *ChainConfig
 	}{
 		{
-			fork: upgradetest.NoUpgrades,
+			fork: upgrade.NoUpgrades,
 			expected: &ChainConfig{
 				HomesteadBlock:      genesisBlock,
 				EIP150Block:         genesisBlock,
@@ -46,7 +47,7 @@ func TestSetEthUpgrades(t *testing.T) {
 			},
 		},
 		{
-			fork: upgradetest.Durango,
+			fork: upgrade.Durango,
 			expected: &ChainConfig{
 				HomesteadBlock:      genesisBlock,
 				EIP150Block:         genesisBlock,
@@ -64,7 +65,7 @@ func TestSetEthUpgrades(t *testing.T) {
 			},
 		},
 		{
-			fork: upgradetest.Etna,
+			fork: upgrade.Etna,
 			expected: &ChainConfig{
 				HomesteadBlock:      genesisBlock,
 				EIP150Block:         genesisBlock,

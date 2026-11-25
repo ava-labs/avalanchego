@@ -28,12 +28,12 @@ import (
 	. "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 )
 
-var forks = []upgradetest.Fork{
-	upgradetest.Fortuna,
-	upgradetest.Granite,
+var forks = []upgrade.Upgrade{
+	upgrade.Fortuna,
+	upgrade.Granite,
 }
 
-func forkToAvalancheRules(fork upgradetest.Fork) cparams.Rules {
+func forkToAvalancheRules(fork upgrade.Upgrade) cparams.Rules {
 	u := upgradetest.GetConfig(fork)
 	networkUpgrades := cparams.FromUpgrades(u)
 	return networkUpgrades.Rules(uint64(upgrade.InitiallyActiveTime.Unix()))
