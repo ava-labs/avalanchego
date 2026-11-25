@@ -117,29 +117,41 @@ func (c *Comm) Broadcast(msg *simplexcommon.Message) {
 }
 
 func (c *Comm) simplexMessageToOutboundMessage(msg *simplexcommon.Message) (*message.OutboundMessage, error) {
-	var simplexMsg *p2p.Simplex
-	switch {
-	case msg.VerifiedBlockMessage != nil:
-		simplexMsg = newBlockProposal(c.chainID, msg.VerifiedBlockMessage)
-	case msg.VoteMessage != nil:
-		simplexMsg = newVote(c.chainID, msg.VoteMessage)
-	case msg.EmptyVoteMessage != nil:
-		simplexMsg = newEmptyVote(c.chainID, msg.EmptyVoteMessage)
-	case msg.FinalizeVote != nil:
-		simplexMsg = newFinalizeVote(c.chainID, msg.FinalizeVote)
-	case msg.Notarization != nil:
-		simplexMsg = newNotarization(c.chainID, msg.Notarization)
-	case msg.EmptyNotarization != nil:
-		simplexMsg = newEmptyNotarization(c.chainID, msg.EmptyNotarization)
-	case msg.Finalization != nil:
-		simplexMsg = newFinalization(c.chainID, msg.Finalization)
-	case msg.ReplicationRequest != nil:
-		simplexMsg = newReplicationRequest(c.chainID, msg.ReplicationRequest)
-	case msg.VerifiedReplicationResponse != nil:
-		simplexMsg = newReplicationResponse(c.chainID, msg.VerifiedReplicationResponse)
-	default:
-		return nil, fmt.Errorf("unknown message type: %+v", msg)
+	simplexMsg, err := simplexMessageToP2P(c.chainID, msg)
+	if err != nil {
+		return nil, err
 	}
 
 	return c.msgBuilder.SimplexMessage(simplexMsg)
+}
+
+func simplexMessageToP2P(chainID ids.ID, msg *simplexcommon.Message) (*p2p.Simplex, error) {
+	switch {
+	case msg.VerifiedBlockMessage != nil:
+		return newBlockProposal(chainID, msg.VerifiedBlockMessage), nil
+	case msg.VoteMessage != nil:
+		return newVote(chainID, msg.VoteMessage), nil
+	case msg.EmptyVoteMessage != nil:
+		return newEmptyVote(chainID, msg.EmptyVoteMessage), nil
+	case msg.FinalizeVote != nil:
+		return newFinalizeVote(chainID, msg.FinalizeVote), nil
+	case msg.Notarization != nil:
+		return newNotarization(chainID, msg.Notarization), nil
+	case msg.EmptyNotarization != nil:
+		return newEmptyNotarization(chainID, msg.EmptyNotarization), nil
+	case msg.Finalization != nil:
+		return newFinalization(chainID, msg.Finalization), nil
+	case msg.ReplicationRequest != nil:
+		return newReplicationRequest(chainID, msg.ReplicationRequest), nil
+	case msg.VerifiedReplicationResponse != nil:
+		return newReplicationResponse(chainID, msg.VerifiedReplicationResponse), nil
+	case msg.BlockDigestRequest != nil:
+		return newBlockDigestRequest(chainID, msg.BlockDigestRequest), nil
+	case msg.AuxiliaryInfo != nil:
+		return newAuxiliaryInfo(chainID, msg.AuxiliaryInfo), nil
+	case msg.EpochTransitionApproval != nil:
+		return newEpochTransitionApproval(chainID, msg.EpochTransitionApproval), nil
+	default:
+		return nil, fmt.Errorf("unknown message type: %+v", msg)
+	}
 }
