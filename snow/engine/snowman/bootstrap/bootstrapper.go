@@ -693,6 +693,9 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	}
 
 	numToExecute := b.tree.Len()
+
+	// Mark the chain as executing so that the router drops unrequested messages rather than queueing them.
+	b.Ctx.Executing.Set(true)
 	err = execute(
 		ctx,
 		b.Halted,
@@ -706,6 +709,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		b.tree,
 		lastAccepted.Height(),
 	)
+	b.Ctx.Executing.Set(false)
 	if err != nil {
 		// If a fatal error has occurred, include the last accepted block
 		// information.

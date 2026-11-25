@@ -1473,7 +1473,23 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return config.NodeIDs
 	}
 
+	// While the block is executed, a message from the peer should be dropped
+	// by the router instead of being queued for the engine.
+	pullQueryDropped := false
+	consensusCtx.BlockAcceptor = acceptorFunc(func(*snow.ConsensusContext, ids.ID, []byte) error {
+		outMsg, err := mc.PullQuery(ctx.ChainID, 0, time.Hour, ids.GenerateTestID(), 0)
+		require.NoError(err)
+		inMsg, err := mc.Parse(outMsg.Bytes, vdrID, func() { pullQueryDropped = true })
+		require.NoError(err)
+
+		// Since we are executing when this pull query is being handled it should be dropped
+		chainRouter.HandleInbound(t.Context(), inMsg)
+		return nil
+	})
+
 	require.NoError(bootstrapper.Ancestors(t.Context(), vdrID, reqID, [][]byte{rewardValidatorBlk.Bytes()}))
+	require.True(pullQueryDropped)
+	require.False(consensusCtx.Executing.Get())
 
 	// We should again report the validator removal block as the last accepted
 	// block.
@@ -1512,6 +1528,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	ctx.Lock.Unlock()
 	chainRouter.Shutdown(t.Context())
+}
+
+// acceptorFunc is a [snow.Acceptor] that calls itself on Accept.
+type acceptorFunc func(*snow.ConsensusContext, ids.ID, []byte) error
+
+func (f acceptorFunc) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
+	return f(ctx, containerID, container)
 }
 
 func TestUnverifiedParent(t *testing.T) {

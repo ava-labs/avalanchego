@@ -1653,6 +1653,146 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 	}
 }
 
+// TestRouterDropsMessagesWhileExecuting tests that while the chain is marked
+// as executing, both unrequested messages and responses are dropped without
+// being passed to the engine, and that their handling is marked as finished.
+// It also tests that the requests whose responses were dropped still time out,
+// so the engine is notified of their failure, and that a failure sent by a
+// peer is still passed to the engine.
+func TestRouterDropsMessagesWhileExecuting(t *testing.T) {
+	require := require.New(t)
+
+	chainRouter, engine := newChainRouterTest(t)
+	ctx := engine.ContextF()
+
+	mc, err := message.NewCreator(
+		prometheus.NewRegistry(),
+		constants.DefaultNetworkCompressionType,
+		10*time.Second,
+	)
+	require.NoError(err)
+
+	pullQueries := make(chan uint32, 1)
+	engine.PullQueryF = func(_ context.Context, _ ids.NodeID, requestID uint32, _ ids.ID, _ uint64) error {
+		pullQueries <- requestID
+		return nil
+	}
+	chits := make(chan uint32, 1)
+	engine.ChitsF = func(_ context.Context, _ ids.NodeID, requestID uint32, _ ids.ID, _ ids.ID, _ uint64) error {
+		chits <- requestID
+		return nil
+	}
+	ancestors := make(chan uint32, 1)
+	engine.AncestorsF = func(_ context.Context, _ ids.NodeID, requestID uint32, _ [][]byte) error {
+		ancestors <- requestID
+		return nil
+	}
+	queryFailures := make(chan uint32, 1)
+	engine.QueryFailedF = func(_ context.Context, _ ids.NodeID, requestID uint32) error {
+		queryFailures <- requestID
+		return nil
+	}
+	getAncestorsFailures := make(chan uint32, 1)
+	engine.GetAncestorsFailedF = func(_ context.Context, _ ids.NodeID, requestID uint32) error {
+		getAncestorsFailures <- requestID
+		return nil
+	}
+	appRequestFailures := make(chan uint32, 1)
+	engine.AppRequestFailedF = func(_ context.Context, _ ids.NodeID, requestID uint32, _ *common.AppError) error {
+		appRequestFailures <- requestID
+		return nil
+	}
+
+	nodeID := ids.GenerateTestNodeID()
+
+	// numFinishedHandling is the number of messages whose handling has been marked as finished
+	numFinishedHandling := 0
+
+	// parse builds an inbound message the same way the network does.
+	parse := func(outMsg *message.OutboundMessage, err error) *message.InboundMessage {
+		require.NoError(err)
+		inMsg, err := mc.Parse(outMsg.Bytes, nodeID, func() { numFinishedHandling++ })
+		require.NoError(err)
+		return inMsg
+	}
+	pullQuery := func(requestID uint32) *message.InboundMessage {
+		return parse(mc.PullQuery(ctx.ChainID, requestID, time.Hour, ids.GenerateTestID(), 0))
+	}
+	chitsResponse := func(requestID uint32) *message.InboundMessage {
+		return parse(mc.Chits(ctx.ChainID, requestID, ids.Empty, ids.Empty, ids.Empty, 0))
+	}
+	ancestorsResponse := func(requestID uint32) *message.InboundMessage {
+		return parse(mc.Ancestors(ctx.ChainID, requestID, [][]byte{{0x01}}))
+	}
+
+	const queryRequestID = 1
+	chainRouter.RegisterRequest(
+		t.Context(),
+		nodeID,
+		ctx.ChainID,
+		queryRequestID,
+		message.ChitsOp,
+		message.InternalQueryFailed(nodeID, ctx.ChainID, queryRequestID),
+		p2ppb.EngineType_ENGINE_TYPE_CHAIN,
+	)
+	const getAncestorsRequestID = 3
+	chainRouter.RegisterRequest(
+		t.Context(),
+		nodeID,
+		ctx.ChainID,
+		getAncestorsRequestID,
+		message.AncestorsOp,
+		message.InternalGetAncestorsFailed(nodeID, ctx.ChainID, getAncestorsRequestID, p2ppb.EngineType_ENGINE_TYPE_CHAIN),
+		p2ppb.EngineType_ENGINE_TYPE_CHAIN,
+	)
+	const appRequestID = 5
+	chainRouter.RegisterRequest(
+		t.Context(),
+		nodeID,
+		ctx.ChainID,
+		appRequestID,
+		message.AppResponseOp,
+		message.InboundAppError(nodeID, ctx.ChainID, appRequestID, 0, ""),
+		p2ppb.EngineType_ENGINE_TYPE_CHAIN,
+	)
+
+	ctx.Executing.Set(true)
+
+	// Unrequested message is dropped.
+	chainRouter.HandleInbound(t.Context(), pullQuery(0))
+	require.Equal(1, numFinishedHandling)
+
+	// Responses to outstanding requests are dropped too.
+	chainRouter.HandleInbound(t.Context(), chitsResponse(queryRequestID))
+	require.Equal(2, numFinishedHandling)
+
+	chainRouter.HandleInbound(t.Context(), ancestorsResponse(getAncestorsRequestID))
+	require.Equal(3, numFinishedHandling)
+
+	// A failure sent by a peer is not dropped, even while the chain is
+	// executing, so the engine is told that the request failed.
+	chainRouter.HandleInbound(t.Context(), message.InboundAppError(nodeID, ctx.ChainID, appRequestID, 0, ""))
+	require.Equal(uint32(appRequestID), <-appRequestFailures)
+
+	// Dropping the responses left their requests outstanding, so their
+	// timeouts fire and the engine is told that the requests failed. Timeout
+	// failures are not dropped, even while the chain is executing.
+	require.Equal(uint32(queryRequestID), <-queryFailures)
+	require.Equal(uint32(getAncestorsRequestID), <-getAncestorsFailures)
+
+	// The dropped responses must never reach the engine. The handler processes
+	// these messages in order, so they would have been handled before the
+	// failures above.
+	require.Empty(chits)
+	require.Empty(ancestors)
+
+	ctx.Executing.Set(false)
+
+	// Once execution is done, messages reach the engine again.
+	chainRouter.HandleInbound(t.Context(), pullQuery(2))
+	require.Equal(uint32(2), <-pullQueries)
+}
+
 func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	// Create a timeout manager
 	tm, err := timeout.NewManager(
