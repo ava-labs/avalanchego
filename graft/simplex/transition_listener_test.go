@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testEpoch = uint64(5)
+
 var (
 	testNodeID    = avalanchego.NodeID{1}
 	stubSignature = common.SignatureBytes("signature")
@@ -63,18 +65,40 @@ type listenerTestEnv struct {
 	// approvals records the approvals fed via the handleApproval callback.
 	approvals []common.ValidatorSetApproval
 	listener  *epochTransitionListener
+
+	// sealingBlock & finalization for the current epoch
+	sealingBlock        metadata.StateMachineBlock
+	sealingFinalization *common.Finalization
 }
 
-// newListenerTestEnv builds a listener wired to the given next-epoch validator set and auxApp.
-func newListenerTestEnv(t *testing.T, nextEpochValidatorSet metadata.NodeBLSMappings, auxApp metadata.AuxiliaryInfoGenVerifier) *listenerTestEnv {
-	env := &listenerTestEnv{sender: &recordingSender{}}
+// newSealingBlock returns a block whose BlockValidationDescriptor carries the given validator set.
+func newSealingBlock(validators metadata.NodeBLSMappings) metadata.StateMachineBlock {
+	return metadata.StateMachineBlock{
+		Metadata: metadata.StateMachineMetadata{
+			SimplexEpochInfo: metadata.SimplexEpochInfo{
+				BlockValidationDescriptor: &metadata.BlockValidationDescriptor{
+					AggregatedMembership: metadata.AggregatedMembership{Members: validators},
+				},
+			},
+		},
+	}
+}
+
+// newListenerTestEnv builds a listener wired to the given current and next-epoch validator sets and auxApp.
+// The current validator set is served by a finalized sealing block at [testEpoch].
+func newListenerTestEnv(t *testing.T, currentValidatorSet metadata.NodeBLSMappings, nextEpochValidatorSet metadata.NodeBLSMappings, auxApp metadata.AuxiliaryInfoGenVerifier) *listenerTestEnv {
+	env := &listenerTestEnv{
+		sender:              &recordingSender{},
+		sealingBlock:        newSealingBlock(currentValidatorSet),
+		sealingFinalization: &common.Finalization{},
+	}
 
 	getValidatorSet := func(uint64) (metadata.NodeBLSMappings, error) {
 		return nextEpochValidatorSet, nil
 	}
 	getBlock := func(seq uint64, _ common.Digest) (metadata.StateMachineBlock, *common.Finalization, error) {
-		require.Fail(t, "unexpected getBlock call", "seq %d", seq)
-		return metadata.StateMachineBlock{}, nil, nil
+		require.Equal(t, testEpoch, seq, "unexpected getBlock call")
+		return env.sealingBlock, env.sealingFinalization, nil
 	}
 
 	handleApproval := func(approval *common.ValidatorSetApproval) {
@@ -101,7 +125,7 @@ func newTransitionBlock(t *testing.T, nextPChainRef uint64) *ParsedBlock {
 	block := &ParsedBlock{
 		StateMachineBlock: metadata.StateMachineBlock{
 			Metadata: metadata.StateMachineMetadata{
-				SimplexProtocolMetadata: common.ProtocolMetadata{Seq: 10},
+				SimplexProtocolMetadata: common.ProtocolMetadata{Seq: 10, Epoch: testEpoch},
 				SimplexEpochInfo: metadata.SimplexEpochInfo{
 					NextPChainReferenceHeight: nextPChainRef,
 				},
@@ -116,7 +140,7 @@ func TestTransitionNotInValidatorSet(t *testing.T) {
 	// the next validator set does not contain our node
 	otherValidator := metadata.NodeBLSMappings{{NodeID: avalanchego.NodeID{2}, Weight: 1}}
 	auxApp := &stubAuxInfoApp{sufficient: false, generated: []byte("more aux info")}
-	env := newListenerTestEnv(t, otherValidator, auxApp)
+	env := newListenerTestEnv(t, otherValidator, otherValidator, auxApp)
 
 	block := newTransitionBlock(t, 100)
 
@@ -126,13 +150,15 @@ func TestTransitionNotInValidatorSet(t *testing.T) {
 }
 
 // TestTransitionNotEnoughAuxiliary tests that if we do not have a sufficient amount of auxiliary information
-// we will broadcast our own before sending any approvals.
+// we will send our own to the current validators before sending any approvals.
 func TestTransitionNotEnoughAuxiliary(t *testing.T) {
 	peer1 := avalanchego.NodeID{2}
 	peer2 := avalanchego.NodeID{3}
-	validatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: peer1, Weight: 1}, {NodeID: peer2, Weight: 1}}
+	leavingPeer := avalanchego.NodeID{4}
+	currentValidatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: peer1, Weight: 1}, {NodeID: leavingPeer, Weight: 1}}
+	nextValidatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: peer1, Weight: 1}, {NodeID: peer2, Weight: 1}}
 	auxApp := &stubAuxInfoApp{sufficient: false, generated: []byte("more aux info")}
-	env := newListenerTestEnv(t, validatorSet, auxApp)
+	env := newListenerTestEnv(t, currentValidatorSet, nextValidatorSet, auxApp)
 
 	block := newTransitionBlock(t, 100)
 
@@ -140,10 +166,11 @@ func TestTransitionNotEnoughAuxiliary(t *testing.T) {
 
 	// the generated auxiliary info is sent to every other validator instead of an approval
 	require.Len(t, env.sender.messages, 2)
-	require.Equal(t, []common.NodeID{common.NodeID(peer1[:]), common.NodeID(peer2[:])}, env.sender.destinations)
+	require.Equal(t, []common.NodeID{common.NodeID(peer1[:]), common.NodeID(leavingPeer[:])}, env.sender.destinations)
 	for _, msg := range env.sender.messages {
 		require.Nil(t, msg.EpochTransitionApproval)
 		require.NotNil(t, msg.AuxiliaryInfo)
+		require.Equal(t, testEpoch, msg.AuxiliaryInfo.Epoch)
 		require.Equal(t, auxApp.DefaultVersionID(), msg.AuxiliaryInfo.Version)
 		require.Equal(t, auxApp.generated, msg.AuxiliaryInfo.Data)
 	}
@@ -154,16 +181,19 @@ func TestTransitionSendsApproval(t *testing.T) {
 	const nextPChainRef = uint64(100)
 
 	peer := avalanchego.NodeID{2}
-	validatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: peer, Weight: 1}}
-	env := newListenerTestEnv(t, validatorSet, &stubAuxInfoApp{sufficient: true})
+	leavingPeer := avalanchego.NodeID{3}
+	joiningPeer := avalanchego.NodeID{4}
+	currentValidatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: peer, Weight: 1}, {NodeID: leavingPeer, Weight: 1}}
+	nextValidatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: peer, Weight: 1}, {NodeID: joiningPeer, Weight: 1}}
+	env := newListenerTestEnv(t, currentValidatorSet, nextValidatorSet, &stubAuxInfoApp{sufficient: true})
 
 	block := newTransitionBlock(t, nextPChainRef)
 
 	require.NoError(t, env.listener.handleTransitionBlock(block))
 
-	// the approval is sent to the other validator, not to ourselves
-	require.Len(t, env.sender.messages, 1)
-	require.Equal(t, []common.NodeID{common.NodeID(peer[:])}, env.sender.destinations)
+	// the approval is sent to the other current validators, not to ourselves or the joining peer
+	require.Len(t, env.sender.messages, 2)
+	require.Equal(t, []common.NodeID{common.NodeID(peer[:]), common.NodeID(leavingPeer[:])}, env.sender.destinations)
 	msg := env.sender.messages[0]
 	require.Nil(t, msg.AuxiliaryInfo)
 	require.NotNil(t, msg.EpochTransitionApproval)
@@ -183,20 +213,26 @@ func TestTransitionSendsApproval(t *testing.T) {
 // transition, exactly like a validator does. Non-validators pass a nil handleApproval, so
 // nothing is recorded locally, but the auxiliary info is still sent.
 func TestNonValidatorContributesAuxiliaryInfo(t *testing.T) {
-	validatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: avalanchego.NodeID{2}, Weight: 1}}
+	peer1 := avalanchego.NodeID{2}
+	peer2 := avalanchego.NodeID{3}
+	currentValidatorSet := metadata.NodeBLSMappings{{NodeID: peer1, Weight: 1}, {NodeID: peer2, Weight: 1}}
+	nextValidatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: peer1, Weight: 1}}
 	auxApp := &stubAuxInfoApp{sufficient: false, generated: []byte("non-validator aux")}
-	env := newListenerTestEnv(t, validatorSet, auxApp)
+	env := newListenerTestEnv(t, currentValidatorSet, nextValidatorSet, auxApp)
 
 	block := newTransitionBlock(t, 100)
 
 	require.NoError(t, env.listener.handleTransitionBlock(block))
 
-	require.Len(t, env.sender.messages, 1)
-	msg := env.sender.messages[0]
-	require.Nil(t, msg.EpochTransitionApproval)
-	require.NotNil(t, msg.AuxiliaryInfo)
-	require.Equal(t, auxApp.DefaultVersionID(), msg.AuxiliaryInfo.Version)
-	require.Equal(t, auxApp.generated, msg.AuxiliaryInfo.Data)
+	// the auxiliary info is sent to every current validator
+	require.Len(t, env.sender.messages, 2)
+	require.Equal(t, []common.NodeID{common.NodeID(peer1[:]), common.NodeID(peer2[:])}, env.sender.destinations)
+	for _, msg := range env.sender.messages {
+		require.Nil(t, msg.EpochTransitionApproval)
+		require.NotNil(t, msg.AuxiliaryInfo)
+		require.Equal(t, auxApp.DefaultVersionID(), msg.AuxiliaryInfo.Version)
+		require.Equal(t, auxApp.generated, msg.AuxiliaryInfo.Data)
+	}
 }
 
 // TestNonValidatorContributesApproval asserts that once the auxiliary info history is
@@ -205,14 +241,19 @@ func TestNonValidatorContributesAuxiliaryInfo(t *testing.T) {
 func TestNonValidatorContributesApproval(t *testing.T) {
 	const nextPChainRef = uint64(100)
 
-	validatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: avalanchego.NodeID{2}, Weight: 1}}
-	env := newListenerTestEnv(t, validatorSet, &stubAuxInfoApp{sufficient: true})
+	peer1 := avalanchego.NodeID{2}
+	peer2 := avalanchego.NodeID{3}
+	currentValidatorSet := metadata.NodeBLSMappings{{NodeID: peer1, Weight: 1}, {NodeID: peer2, Weight: 1}}
+	nextValidatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: peer1, Weight: 1}}
+	env := newListenerTestEnv(t, currentValidatorSet, nextValidatorSet, &stubAuxInfoApp{sufficient: true})
 
 	block := newTransitionBlock(t, nextPChainRef)
 
 	require.NoError(t, env.listener.handleTransitionBlock(block))
 
-	require.Len(t, env.sender.messages, 1)
+	// the approval is sent to every current validator
+	require.Len(t, env.sender.messages, 2)
+	require.Equal(t, []common.NodeID{common.NodeID(peer1[:]), common.NodeID(peer2[:])}, env.sender.destinations)
 	msg := env.sender.messages[0]
 	require.Nil(t, msg.AuxiliaryInfo)
 	require.NotNil(t, msg.EpochTransitionApproval)
