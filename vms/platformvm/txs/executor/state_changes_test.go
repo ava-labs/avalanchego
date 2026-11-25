@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -43,13 +44,13 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		fork          upgradetest.Fork
+		fork          upgrade.Upgrade
 		initialState  gas.State
 		expectedState gas.State
 	}{
 		{
 			name:          "Pre-Etna",
-			fork:          upgradetest.Durango,
+			fork:          upgrade.Durango,
 			initialState:  gas.State{},
 			expectedState: gas.State{}, // Pre-Etna, fee state should not change
 		},
@@ -66,7 +67,7 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 		},
 		{
 			name: "Etna with usage",
-			fork: upgradetest.Etna,
+			fork: upgrade.Etna,
 			initialState: gas.State{
 				Capacity: 1,
 				Excess:   10_000,
@@ -213,7 +214,7 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 			validatorsModified, err := AdvanceTimeTo(
 				&Backend{
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
+						UpgradeConfig: upgradetest.GetConfig(upgrade.Latest),
 					},
 				},
 				s,
@@ -269,7 +270,7 @@ func TestAdvanceTimeTo_UpdateL1Validators(t *testing.T) {
 				MinPrice:                 genesis.LocalParams.ValidatorFeeConfig.MinPrice,
 				ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
 			},
-			UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
+			UpgradeConfig: upgradetest.GetConfig(upgrade.Latest),
 		}
 	)
 
@@ -418,7 +419,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 					MintingPeriod:      365 * 24 * time.Hour,
 					SupplyCap:          720 * units.MegaAvax,
 				},
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
+				UpgradeConfig: upgradetest.GetConfig(upgrade.Latest),
 			},
 		},
 		s,
@@ -506,7 +507,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
 				RewardConfig:       rewardConfig,
-				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+				UpgradeConfig:      upgradetest.GetConfig(upgrade.Latest),
 			},
 		},
 		s,
@@ -533,7 +534,7 @@ func TestGetRewardsCalculatorTransformedSubnetConfig(t *testing.T) {
 	const heliconRampDuration = 90 * 24 * time.Hour
 	heliconTime := time.Unix(1_000_000, 0)
 	postRampStartTime := heliconTime.Add(heliconRampDuration + time.Second)
-	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime)
+	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(upgrade.Helicon, heliconTime)
 
 	primaryConfig := genesis.MainnetParams.StakingConfig.RewardConfig
 	transformConfig := primaryConfig

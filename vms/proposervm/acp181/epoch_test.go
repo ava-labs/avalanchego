@@ -25,7 +25,7 @@ func TestNewEpoch(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		fork               upgradetest.Fork
+		fork               upgrade.Upgrade
 		parentPChainHeight uint64
 		parentEpoch        statelessblock.Epoch
 		parentTimestamp    time.Time
@@ -34,7 +34,7 @@ func TestNewEpoch(t *testing.T) {
 	}{
 		{
 			name:               "pre_granite",
-			fork:               upgradetest.NoUpgrades,
+			fork:               upgrade.NoUpgrades,
 			parentPChainHeight: 100,
 			parentTimestamp:    now,
 			childTimestamp:     now,
@@ -42,7 +42,7 @@ func TestNewEpoch(t *testing.T) {
 		},
 		{
 			name:               "first_post_granite_epoch",
-			fork:               upgradetest.Latest,
+			fork:               upgrade.Latest,
 			parentPChainHeight: 100,
 			parentTimestamp:    now,
 			childTimestamp:     now.Add(time.Second),
@@ -54,7 +54,7 @@ func TestNewEpoch(t *testing.T) {
 		},
 		{
 			name:               "keep_same_epoch",
-			fork:               upgradetest.Latest,
+			fork:               upgrade.Latest,
 			parentPChainHeight: 101,
 			parentEpoch: statelessblock.Epoch{
 				PChainHeight: 100,
@@ -71,7 +71,7 @@ func TestNewEpoch(t *testing.T) {
 		},
 		{
 			name:               "barely_transition_to_next_epoch",
-			fork:               upgradetest.Latest,
+			fork:               upgrade.Latest,
 			parentPChainHeight: 101,
 			parentEpoch: statelessblock.Epoch{
 				PChainHeight: 100,
@@ -88,7 +88,7 @@ func TestNewEpoch(t *testing.T) {
 		},
 		{
 			name:               "transition_to_next_epoch",
-			fork:               upgradetest.Latest,
+			fork:               upgrade.Latest,
 			parentPChainHeight: 101,
 			parentEpoch: statelessblock.Epoch{
 				PChainHeight: 100,

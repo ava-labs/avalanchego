@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
@@ -45,7 +46,7 @@ func newCalculatorsBeforeHelicon(config Config) []calculatorImplementation {
 			name: "primary_network_before_helicon",
 			calculator: NewPrimaryNetworkCalculator(
 				config,
-				upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime),
+				upgradetest.GetConfigWithUpgradeTime(upgrade.Helicon, heliconTime),
 			),
 		},
 	}
@@ -172,7 +173,7 @@ func TestPrimaryNetworkCalculatorHeliconRewards(t *testing.T) {
 	)
 
 	heliconTime := time.Unix(1_000_000, 0)
-	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime)
+	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(upgrade.Helicon, heliconTime)
 	config := defaultConfig
 
 	// expectedReward = (config.SupplyCap-supply) *

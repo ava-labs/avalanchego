@@ -10,12 +10,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
+
+	// TODO(alarso16): Remove the dependency on the global module registration.
+	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry" // register precompiles
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
+	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
@@ -90,9 +95,14 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("creating network: %w", err)
 	}
 
+	if err := snowCtx.Metrics.Register(firewood.Scheme, ffi.Gatherer{}); err != nil {
+		return fmt.Errorf("registering firewood metrics: %w", err)
+	}
+
 	// TODO: Support state sync, which requires the [sae.VM] to be created
 	// after the node has finished state syncing.
-	vm.VM, err = sae.NewVM(ctx, hookadaptor.Convert(newHooks(snowCtx, vm.now)), saeConfig, snowCtx, genesis.Config, ethDB, vm.Network)
+	hooks := newHooks(snowCtx, genesis.Config, vm.now)
+	vm.VM, err = sae.NewVM(ctx, hookadaptor.Convert(hooks), saeConfig, snowCtx, genesis.Config, ethDB, vm.Network)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}

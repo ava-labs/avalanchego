@@ -6,12 +6,13 @@ package cparams
 import (
 	"fmt"
 	"math/big"
+	"sort"
+
+	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
-
-	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // ChainConfig defines all Avalanche-specific forks and network changes.
@@ -87,12 +88,12 @@ func FromUpgrades(u upgrade.Config) *ChainConfig {
 	}
 }
 
-// CheckConfigCompatible supplements [ethparams.ChainConfig.CheckCompatible]
+// CheckConfigCompatible supplements [params.ChainConfig.CheckCompatible]
 // with Avalanche-specific network upgrades. This is not expected to be called
 // directly by any consumer.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func (c *ChainConfig) CheckConfigCompatible(newEth *ethparams.ChainConfig, headNumber *big.Int, head uint64) *ethparams.ConfigCompatError {
+func (c *ChainConfig) CheckConfigCompatible(newEth *params.ChainConfig, headNumber *big.Int, headTime uint64) *params.ConfigCompatError {
 	if c == nil {
 		c = new(ChainConfig)
 	}
@@ -105,16 +106,17 @@ func (c *ChainConfig) CheckConfigCompatible(newEth *ethparams.ChainConfig, headN
 
 	oldForks := c.forks()
 	newForks := newCfg.forks()
-	for i, oldFork := range oldForks {
-		newFork := newForks[i]
+	for u := range upgrade.Latest + 1 {
+		oldFork := oldForks[u]
+		newFork := newForks[u]
 		if utils.PtrEqual(oldFork.time, newFork.time) {
 			continue
 		}
 
 		// Either fork could retroactively deactivate an upgrade
-		if isTimestampForked(oldFork.time, head) || isTimestampForked(newFork.time, head) {
-			return ethparams.NewTimestampCompatError(
-				fmt.Sprintf("%v fork block timestamp", oldFork.name),
+		if oldFork.isActive(headTime) || newFork.isActive(headTime) {
+			return params.NewTimestampCompatError(
+				fmt.Sprintf("%s fork block timestamp", u),
 				oldFork.time,
 				newFork.time,
 			)
@@ -128,7 +130,7 @@ func (*ChainConfig) Description() string {
 	return "ChainConfig.Description() not implemented"
 }
 
-// CheckConfigForkOrder supplements [ethparams.ChainConfig.CheckConfigForkOrder]
+// CheckConfigForkOrder supplements [params.ChainConfig.CheckConfigForkOrder]
 // with Avalanche-specific network upgrades. This is not expected to be called
 // directly by any consumer.
 func (c *ChainConfig) CheckConfigForkOrder() error {
@@ -137,149 +139,84 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	}
 
 	forks := c.forks()
-	for i := 1; i < len(forks); i++ {
-		prev, cur := forks[i-1], forks[i]
+	for cu := upgrade.ApricotPhase1; cu <= upgrade.Latest; cu++ {
+		cur := forks[cu]
 		if cur.time == nil {
 			continue
 		}
+
+		pu := cu - 1
+		prev := forks[pu]
 		if prev.time == nil {
 			return fmt.Errorf("unsupported fork ordering: %s not enabled, but %s enabled at timestamp %d",
-				prev.name, cur.name, *cur.time)
+				pu, cu, *cur.time)
 		}
 		if *prev.time > *cur.time {
 			return fmt.Errorf("unsupported fork ordering: %s enabled at timestamp %d, but %s enabled at timestamp %d",
-				prev.name, *prev.time, cur.name, *cur.time)
+				pu, *prev.time, cu, *cur.time)
 		}
 	}
 	return nil
 }
 
-// isTimestampForked returns whether a fork scheduled at timestamp t is active
-// at the given head timestamp.
-func isTimestampForked(t *uint64, head uint64) bool {
-	if t == nil {
-		return false
-	}
-	return *t <= head
-}
-
 type fork struct {
-	name string
 	time *uint64
 }
 
-// forks returns a list of all network upgrades in chronological order.
-// Timestamps are NOT guaranteed to be in ascending order.
-func (c *ChainConfig) forks() []fork {
-	return []fork{
-		{name: "Apricot Phase 1", time: c.ApricotPhase1Timestamp},
-		{name: "Apricot Phase 2", time: c.ApricotPhase2Timestamp},
-		{name: "Apricot Phase 3", time: c.ApricotPhase3Timestamp},
-		{name: "Apricot Phase 4", time: c.ApricotPhase4Timestamp},
-		{name: "Apricot Phase 5", time: c.ApricotPhase5Timestamp},
-		{name: "Apricot Phase Pre 6", time: c.ApricotPhasePre6Timestamp},
-		{name: "Apricot Phase 6", time: c.ApricotPhase6Timestamp},
-		{name: "Apricot Phase Post 6", time: c.ApricotPhasePost6Timestamp},
-		{name: "Banff", time: c.BanffTimestamp},
-		{name: "Cortina", time: c.CortinaTimestamp},
-		{name: "Durango", time: c.DurangoTimestamp},
-		{name: "Etna", time: c.EtnaTimestamp},
-		{name: "Fortuna", time: c.FortunaTimestamp},
-		{name: "Granite", time: c.GraniteTimestamp},
-		{name: "Helicon", time: c.HeliconTimestamp},
-		{name: "Igloo", time: c.IglooTimestamp},
+// isActive returns whether f is active at timestamp t.
+func (f fork) isActive(t uint64) bool {
+	return f.time != nil && *f.time <= t
+}
+
+// alwaysActive is a fork that is always considered active.
+var alwaysActive = fork{time: new(uint64)}
+
+// forks returns the activation time of every network upgrade, indexed by
+// [upgrade.Upgrade].
+//
+// Timestamps are only guaranteed to actually be chronological after calling
+// [ChainConfig.CheckConfigForkOrder].
+func (c *ChainConfig) forks() [upgrade.Latest + 1]fork {
+	return [...]fork{
+		upgrade.NoUpgrades:        alwaysActive, // required for [ChainConfig.Rules] binary search
+		upgrade.ApricotPhase1:     {c.ApricotPhase1Timestamp},
+		upgrade.ApricotPhase2:     {c.ApricotPhase2Timestamp},
+		upgrade.ApricotPhase3:     {c.ApricotPhase3Timestamp},
+		upgrade.ApricotPhase4:     {c.ApricotPhase4Timestamp},
+		upgrade.ApricotPhase5:     {c.ApricotPhase5Timestamp},
+		upgrade.ApricotPhasePre6:  {c.ApricotPhasePre6Timestamp},
+		upgrade.ApricotPhase6:     {c.ApricotPhase6Timestamp},
+		upgrade.ApricotPhasePost6: {c.ApricotPhasePost6Timestamp},
+		upgrade.Banff:             {c.BanffTimestamp},
+		upgrade.Cortina:           {c.CortinaTimestamp},
+		upgrade.Durango:           {c.DurangoTimestamp},
+		upgrade.Etna:              {c.EtnaTimestamp},
+		upgrade.Fortuna:           {c.FortunaTimestamp},
+		upgrade.Granite:           {c.GraniteTimestamp},
+		upgrade.Helicon:           {c.HeliconTimestamp},
+		upgrade.Igloo:             {c.IglooTimestamp},
 	}
 }
 
+// Rules returns the [Rules] active at the specified time.
+//
+// [ChainConfig.CheckConfigForkOrder] MUST return nil as this method uses a
+// binary search.
 func (c *ChainConfig) Rules(timestamp uint64) Rules {
-	return Rules{
-		IsApricotPhase1:    c.IsApricotPhase1(timestamp),
-		IsApricotPhase2:    c.IsApricotPhase2(timestamp),
-		IsApricotPhasePre6: c.IsApricotPhasePre6(timestamp),
-		IsApricotPhase6:    c.IsApricotPhase6(timestamp),
-		IsBanff:            c.IsBanff(timestamp),
-		IsDurango:          c.IsDurango(timestamp),
-		IsFortuna:          c.IsFortuna(timestamp),
-		IsGranite:          c.IsGranite(timestamp),
-		IsHelicon:          c.IsHelicon(timestamp),
-		IsIgloo:            c.IsIgloo(timestamp),
+	fs := c.forks()
+	// Finding the first inactive fork removes the need to iterate over any that
+	// share an upgrade time when said time is `timestamp`.
+	inactive := upgrade.Upgrade(sort.Search(len(fs), func(i int) bool {
+		return !fs[i].isActive(timestamp)
+	}))
+	// The inclusion of [upgrade.NoUpgrades] at time 0 guarantees that `inactive` >= 1.
+	return Rules{inactive - 1}
+}
+
+func (c *ChainConfig) IsActive(upg upgrade.Upgrade, timestamp uint64) bool {
+	if upg < upgrade.NoUpgrades || upg > upgrade.Latest {
+		return false
 	}
-}
-
-// IsApricotPhase1 returns whether time represents a block with a timestamp
-// after the Apricot Phase 1 upgrade time.
-func (c *ChainConfig) IsApricotPhase1(time uint64) bool {
-	return isTimestampForked(c.ApricotPhase1Timestamp, time)
-}
-
-// IsApricotPhase2 returns whether time represents a block with a timestamp
-// after the Apricot Phase 2 upgrade time.
-func (c *ChainConfig) IsApricotPhase2(time uint64) bool {
-	return isTimestampForked(c.ApricotPhase2Timestamp, time)
-}
-
-// IsApricotPhase3 returns whether time represents a block with a timestamp
-// after the Apricot Phase 3 upgrade time.
-func (c *ChainConfig) IsApricotPhase3(time uint64) bool {
-	return isTimestampForked(c.ApricotPhase3Timestamp, time)
-}
-
-// IsApricotPhase5 returns whether time represents a block with a timestamp
-// after the Apricot Phase 5 upgrade time.
-func (c *ChainConfig) IsApricotPhase5(time uint64) bool {
-	return isTimestampForked(c.ApricotPhase5Timestamp, time)
-}
-
-// IsApricotPhasePre6 returns whether time represents a block with a timestamp
-// after the Apricot Phase Pre 6 upgrade time.
-func (c *ChainConfig) IsApricotPhasePre6(time uint64) bool {
-	return isTimestampForked(c.ApricotPhasePre6Timestamp, time)
-}
-
-// IsApricotPhase6 returns whether time represents a block with a timestamp
-// after the Apricot Phase 6 upgrade time.
-func (c *ChainConfig) IsApricotPhase6(time uint64) bool {
-	return isTimestampForked(c.ApricotPhase6Timestamp, time)
-}
-
-// IsBanff returns whether time represents a block with a timestamp after the
-// Banff upgrade time.
-func (c *ChainConfig) IsBanff(time uint64) bool {
-	return isTimestampForked(c.BanffTimestamp, time)
-}
-
-// IsDurango returns whether time represents a block with a timestamp after the
-// Durango upgrade time.
-func (c *ChainConfig) IsDurango(time uint64) bool {
-	return isTimestampForked(c.DurangoTimestamp, time)
-}
-
-// IsEtna returns whether time represents a block with a timestamp after the
-// Etna upgrade time.
-func (c *ChainConfig) IsEtna(time uint64) bool {
-	return isTimestampForked(c.EtnaTimestamp, time)
-}
-
-// IsFortuna returns whether time represents a block with a timestamp after the
-// Fortuna upgrade time.
-func (c *ChainConfig) IsFortuna(time uint64) bool {
-	return isTimestampForked(c.FortunaTimestamp, time)
-}
-
-// IsGranite returns whether time represents a block with a timestamp after the
-// Granite upgrade time.
-func (c *ChainConfig) IsGranite(time uint64) bool {
-	return isTimestampForked(c.GraniteTimestamp, time)
-}
-
-// IsHelicon returns whether time represents a block with a timestamp after the
-// Helicon upgrade time.
-func (c *ChainConfig) IsHelicon(time uint64) bool {
-	return isTimestampForked(c.HeliconTimestamp, time)
-}
-
-// IsIgloo returns whether time represents a block with a timestamp after the
-// Igloo upgrade time.
-func (c *ChainConfig) IsIgloo(time uint64) bool {
-	return isTimestampForked(c.IglooTimestamp, time)
+	fs := c.forks()
+	return fs[upg].isActive(timestamp)
 }

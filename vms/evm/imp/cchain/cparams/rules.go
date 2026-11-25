@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
+	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
@@ -17,38 +18,34 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
-
-	ethparams "github.com/ava-labs/libevm/params"
 )
 
 var (
-	_ ethparams.RulesHooks   = Rules{}
+	_ params.RulesHooks      = Rules{}
 	_ precompileconfig.Rules = Rules{} // TODO(alarso16): Delete implementation.
 )
 
 // Rules defines the activation status of various Avalanche network
 // upgrades.
 type Rules struct {
-	IsApricotPhase1    bool
-	IsApricotPhase2    bool
-	IsApricotPhasePre6 bool
-	IsApricotPhase6    bool
-	IsBanff            bool
-	IsDurango          bool
-	IsFortuna          bool
-	IsGranite          bool
-	IsHelicon          bool
-	IsIgloo            bool
+	LatestUpgrade upgrade.Upgrade
+}
+
+// Is returns whether the specified [upgrade.Upgrade] is active under the
+// current Rules.
+func (r Rules) Is(u upgrade.Upgrade) bool {
+	return r.LatestUpgrade >= u
 }
 
 func (r Rules) IsGraniteActivated() bool {
-	return r.IsGranite
+	return r.Is(upgrade.Granite)
 }
 
 func (r Rules) IsDurangoActivated() bool {
-	return r.IsDurango
+	return r.Is(upgrade.Durango)
 }
 
 func (Rules) CanCreateContract(_ *libevm.AddressContext, gas uint64, _ libevm.StateReader) (uint64, error) {
@@ -56,15 +53,15 @@ func (Rules) CanCreateContract(_ *libevm.AddressContext, gas uint64, _ libevm.St
 }
 
 func (r Rules) ShouldRefundGas() bool {
-	return !r.IsApricotPhase1
+	return !r.Is(upgrade.ApricotPhase1)
 }
 
 // MinimumGasConsumption returns the ACP-194 gas-charged floor (ceil(limit/2)).
 func (r Rules) MinimumGasConsumption(limit uint64) uint64 {
-	if r.IsHelicon {
+	if r.Is(upgrade.Helicon) {
 		return hook.MinimumGasConsumption(limit)
 	}
-	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
+	return (params.NOOPHooks{}).MinimumGasConsumption(limit)
 }
 
 // ShouldCreditBaseFeeToCoinbase returns true to credit the base fee to the
@@ -94,7 +91,7 @@ var (
 // [warp.Config.PredicateGas]. Otherwise, it returns override=false to use the
 // default calculation.
 func (r Rules) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
-	if !r.IsDurango {
+	if !r.Is(upgrade.Durango) {
 		return 0, false, nil
 	}
 	gas, err := precompileconfig.AccessListGasWithPredicates(r, warpPredicaters, accessList)
@@ -106,10 +103,10 @@ func (r Rules) AccessListGas(accessList libevm.AccessList) (uint64, bool, error)
 func (r Rules) ActivePrecompiles(existing []common.Address) []common.Address {
 	addresses := slices.Clone(existing)
 	switch {
-	case r.IsGranite:
+	case r.Is(upgrade.Granite):
 		addresses = append(addresses, p256VerifyAddress)
 		fallthrough
-	case r.IsApricotPhase2:
+	case r.Is(upgrade.ApricotPhase2):
 		addresses = append(addresses,
 			nativeasset.GenesisContractAddr,
 			nativeasset.NativeAssetBalanceAddr,
@@ -126,17 +123,17 @@ func (r Rules) PrecompileOverride(addr common.Address) (libevm.PrecompiledContra
 
 func (r Rules) currentPrecompiles() map[common.Address]vm.PrecompiledContract {
 	switch {
-	case r.IsGranite:
+	case r.Is(upgrade.Granite):
 		return precompiledContractsGranite
-	case r.IsDurango:
+	case r.Is(upgrade.Durango):
 		return precompiledContractsDurango
-	case r.IsBanff:
+	case r.Is(upgrade.Banff):
 		return precompiledContractsBanff
-	case r.IsApricotPhase6:
+	case r.Is(upgrade.ApricotPhase6):
 		return precompiledContractsApricotPhase6
-	case r.IsApricotPhasePre6:
+	case r.Is(upgrade.ApricotPhasePre6):
 		return precompiledContractsApricotPhasePre6
-	case r.IsApricotPhase2:
+	case r.Is(upgrade.ApricotPhase2):
 		return precompiledContractsApricotPhase2
 	}
 	return nil
@@ -205,16 +202,14 @@ type environment struct {
 func newEnvironment(env vm.PrecompileEnvironment) (*environment, error) {
 	rules := GetRulesExtra(env.Rules())
 
-	if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.IsGranite {
+	if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.Is(upgrade.Granite) {
 		env.UseGas(env.Gas()) // A revert would otherwise refund the remaining gas.
 		return nil, vm.ErrExecutionReverted
 	}
 
-	predicateBytes := predicateBytesFromExtra(*rules, env.BlockHeader().Extra)
-
 	return &environment{
 		PrecompileEnvironment: env,
-		predicateResults:      customtypes.PredicateResults(env.BlockHeader(), predicateBytes),
+		predicateResults:      customtypes.PredicateResults(env.BlockHeader(), rules.LatestUpgrade),
 		rules:                 rules,
 	}, nil
 }

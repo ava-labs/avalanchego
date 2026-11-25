@@ -118,10 +118,7 @@ func advanceTimeTo(
 	// Invariant: MinStakeDuration > 0 => guarantees [StartTime] != [EndTime]
 	// Invariant: [newChainTime] <= nextStakerChangeTime.
 
-	isAddingStakerAfterDeletionAllowed := state.StakerAdditionAfterDeletionLegality(
-		backend.Config.UpgradeConfig.IsHeliconActivated(newChainTime),
-	)
-	changes, err := state.NewDiffOn(parentState, isAddingStakerAfterDeletionAllowed)
+	changes, err := state.NewDiffOn(parentState)
 	if err != nil {
 		return nil, false, err
 	}

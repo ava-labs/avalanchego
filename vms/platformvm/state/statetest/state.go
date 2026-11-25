@@ -64,7 +64,7 @@ func New(t testing.TB, c Config) *state.State {
 		c.Validators = validators.NewManager()
 	}
 	if c.Upgrades == (upgrade.Config{}) {
-		c.Upgrades = upgradetest.GetConfig(upgradetest.Latest)
+		c.Upgrades = upgradetest.GetConfig(upgrade.Latest)
 	}
 	if c.Config == (config.Config{}) {
 		c.Config = config.Default

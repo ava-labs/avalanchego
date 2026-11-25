@@ -115,7 +115,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	require.ErrorIs(err, errMissingBlockState)
 
 	// Set [blk]'s state in the map as though it had been verified.
-	onAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	onAcceptState, err := state.NewDiffOn(s)
 	require.NoError(err)
 	childID := ids.GenerateTestID()
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
@@ -128,11 +128,11 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 		},
 	}
 	// Give [blk] a child.
-	childOnAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	childOnAcceptState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	childOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	childOnAbortState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	childOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	childOnCommitState, err := state.NewDiffOn(s)
 	require.NoError(err)
 	childState := &blockState{
 		onAcceptState: childOnAcceptState,
@@ -197,7 +197,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	require.ErrorIs(err, errMissingBlockState)
 
 	// Set [blk]'s state in the map as though it had been verified.
-	onAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	onAcceptState, err := state.NewDiffOn(s)
 	require.NoError(err)
 	childID := ids.GenerateTestID()
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
@@ -215,11 +215,11 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 		},
 	}
 	// Give [blk] a child.
-	childOnAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	childOnAcceptState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	childOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	childOnAbortState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	childOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	childOnCommitState, err := state.NewDiffOn(s)
 	require.NoError(err)
 	childState := &blockState{
 		onAcceptState: childOnAcceptState,
@@ -272,11 +272,11 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	require.ErrorIs(err, state.ErrMissingParentState)
 
 	// Set [blk]'s parent in the state map.
-	parentOnAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnAcceptState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnAbortState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnCommitState, err := state.NewDiffOn(s)
 	require.NoError(err)
 	parentStatelessBlk := platform.NewMockBlock(ctrl)
 	calledOnAcceptFunc := false
@@ -380,11 +380,11 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	require.ErrorIs(err, state.ErrMissingParentState)
 
 	// Set [blk]'s parent in the state map.
-	parentOnAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnAcceptState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnAbortState, err := state.NewDiffOn(s)
 	require.NoError(err)
-	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	parentOnCommitState, err := state.NewDiffOn(s)
 	require.NoError(err)
 	parentStatelessBlk := platform.NewMockBlock(ctrl)
 	calledOnAcceptFunc := false

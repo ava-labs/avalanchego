@@ -84,7 +84,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	require.NoError(err)
 	vm := &VM{
 		Config: Config{
-			Upgrades:          upgradetest.GetConfig(upgradetest.Latest),
+			Upgrades:          upgradetest.GetConfig(upgrade.Latest),
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
 			Registerer:        prometheus.NewRegistry(),
@@ -120,7 +120,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := t.Context()
 
-	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgrade.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -246,7 +246,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := t.Context()
 
-	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgrade.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -389,7 +389,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 
 	vm := &VM{
 		Config: Config{
-			Upgrades:          upgradetest.GetConfig(upgradetest.Durango), // Use Durango for pre-Etna behavior
+			Upgrades:          upgradetest.GetConfig(upgrade.Durango), // Use Durango for pre-Etna behavior
 			StakingCertLeaf:   pTestCert,
 			StakingLeafSigner: pTestSigner,
 			Registerer:        prometheus.NewRegistry(),
@@ -424,7 +424,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 func TestPreGraniteBlock_NonZeroEpoch(t *testing.T) {
 	require := require.New(t)
 
-	_, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	_, _, proVM, _ := initTestProposerVM(t, upgrade.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(t.Context()))
 	}()
@@ -461,7 +461,7 @@ func TestPreGraniteBlock_NonZeroEpoch(t *testing.T) {
 func TestPostGraniteBlock_EpochMatches(t *testing.T) {
 	ctx := t.Context()
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgrade.Latest, 0)
 	defer func() {
 		require.NoError(t, proVM.Shutdown(ctx))
 	}()
@@ -591,7 +591,7 @@ func TestFailedToCalculateExpectedProposerLogLevel(t *testing.T) {
 			require := require.New(t)
 			ctx := t.Context()
 
-			coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+			coreVM, valState, proVM, _ := initTestProposerVM(t, upgrade.Latest, 0)
 			defer func() {
 				require.NoError(proVM.Shutdown(ctx))
 			}()

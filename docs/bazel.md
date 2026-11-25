@@ -204,6 +204,7 @@ The repository contains multiple Go modules with different licenses:
 | avalanchego | `/` (root) | BSD-3 | `github.com/ava-labs/avalanchego` |
 | coreth | `graft/coreth/` | LGPL-3 | `github.com/ava-labs/avalanchego/graft/coreth` |
 | evm | `graft/evm/` | - | `github.com/ava-labs/avalanchego/graft/evm` |
+| simplex | `graft/simplex/` | BSD-3 | `github.com/ava-labs/avalanchego/graft/simplex` |
 | subnet-evm | `graft/subnet-evm/` | LGPL-3 | `github.com/ava-labs/avalanchego/graft/subnet-evm` |
 
 Each module has its own `go.mod` with `replace` directives pointing to
@@ -238,6 +239,7 @@ custom content that would be lost if deleted:
 | `main/BUILD.bazel` | `x_defs` for Git commit stamping |
 | `graft/coreth/BUILD.bazel` | `gazelle:prefix`, `gazelle:map_kind` for test timeouts |
 | `graft/evm/BUILD.bazel` | `gazelle:prefix`, `gazelle:map_kind` for test timeouts |
+| `graft/simplex/BUILD.bazel` | `gazelle:prefix`, `gazelle:map_kind` for test timeouts |
 | `graft/subnet-evm/BUILD.bazel` | `gazelle:prefix`, `gazelle:map_kind` for test timeouts |
 
 **Preserving custom content**: Gazelle directives (`# gazelle:prefix`,
@@ -311,7 +313,7 @@ dependencies from graft modules are resolved automatically.
 
 ### Custom Test Macros via `gazelle:map_kind`
 
-The graft modules (coreth, evm, subnet-evm) have longer test timeouts
+The graft modules (coreth, evm, simplex, subnet-evm) have longer test timeouts
 than the root module. Each graft module's root BUILD.bazel uses a
 `gazelle:map_kind` directive to remap `go_test` to the `graft_go_test`
 macro (defined in `.bazel/defs.bzl`, Bazel "long" timeout, 900s):

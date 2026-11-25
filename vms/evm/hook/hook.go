@@ -51,9 +51,16 @@ type PointsG[T Transaction] interface {
 	BlockRebuilderFrom(block *types.Block) (BlockBuilder[T], error)
 }
 
-// Points define user-injected hook points which do not depend on generic
-// types. The SAE README documents when each hook runs and what it may read.
+// Points define user-injected hook points that do not depend on generic types.
+// The SAE README documents when each hook runs and what it may read.
 type Points interface {
+	PointsWithoutBlockOps
+	BlockOpsProvider
+}
+
+// PointsWithoutBlockOps define the subset of user-injected hook points that do
+// not depend on generic types nor non-EVM state changes.
+type PointsWithoutBlockOps interface {
 	// ExecutionResultsDB opens and returns a height-indexed database, which
 	// will be closed by the VM when no longer needed. It MAY use the provided
 	// directory for persistence and MUST NOT write data outside of it.
@@ -75,11 +82,6 @@ type Points interface {
 	// block, beyond the universal invariants enforced by [blocks.Parse]. It
 	// MUST be stateless.
 	VerifyBlockSyntax(*types.Block) error
-	// EndOfBlockOps returns operations outside of the normal EVM state changes
-	// to perform while executing the block, after regular EVM transactions.
-	// These operations will be performed during both worst-case and actual
-	// execution.
-	EndOfBlockOps(*types.Block) ([]Op, error)
 	// AdmitTransaction guards block and mempool inclusion against the settled view,
 	// possibly concurrently. It MUST be stateless, MUST NOT modify tx, and never
 	// runs during execution.
@@ -99,19 +101,18 @@ type Points interface {
 	AfterExecutingBlock(*types.Block, types.Receipts) error
 }
 
+// A BlockOpsProvider provides operations outside of the normal EVM state
+// changes to perform while executing the block. These operations will be
+// performed during both worst-case and actual execution.
+type BlockOpsProvider interface {
+	// EndOfBlockOps returns state-change operations to perform after regular
+	// EVM transactions.
+	EndOfBlockOps(*types.Block) ([]Op, error)
+}
+
 // BlockBuilder constructs a block given its components.
 type BlockBuilder[T Transaction] interface {
-	// BuildHeader constructs a header from the parent header.
-	//
-	// The returned header MUST have [types.Header.ParentHash],
-	// [types.Header.Number] and [types.Header.Time] set appropriately.
-	// [types.Header.Root], [types.Header.GasLimit], [types.Header.BaseFee], and
-	// [types.Header.GasUsed] will be ignored and overwritten. Any other fields
-	// MAY be set as desired.
-	//
-	// SAE always uses this method instead of directly constructing a header, to
-	// ensure any libevm header extras are properly populated.
-	BuildHeader(parent *types.Header) (*types.Header, error)
+	HeaderBuilder
 	// PotentialEndOfBlockOps returns an iterator of custom transactions that
 	// would be valid to include into a block.
 	//
@@ -141,6 +142,21 @@ type BlockBuilder[T Transaction] interface {
 		endOfBlockOps []T,
 		settled Settled,
 	) (*types.Block, error)
+}
+
+// A HeaderBuilder constructs a [types.Header] given its parent.
+type HeaderBuilder interface {
+	// BuildHeader constructs a header from the parent header.
+	//
+	// The returned header MUST have [types.Header.ParentHash],
+	// [types.Header.Number] and [types.Header.Time] set appropriately.
+	// [types.Header.Root], [types.Header.GasLimit], [types.Header.BaseFee], and
+	// [types.Header.GasUsed] will be ignored and overwritten. Any other fields
+	// MAY be set as desired.
+	//
+	// SAE always uses this method instead of directly constructing a header, to
+	// ensure any libevm header extras are properly populated.
+	BuildHeader(parent *types.Header) (*types.Header, error)
 }
 
 // Transaction is a user-defined transaction type that can be represented as an

@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
-func ForkToAvalancheRules(fork upgradetest.Fork) extras.AvalancheRules {
+func ForkToAvalancheRules(fork upgrade.Upgrade) extras.AvalancheRules {
 	networkUpgrades := extras.GetNetworkUpgrades(upgradetest.GetConfig(fork))
 	return networkUpgrades.GetAvalancheRules(uint64(upgrade.InitiallyActiveTime.Unix()))
 }

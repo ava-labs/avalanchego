@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -85,7 +86,7 @@ type environment struct {
 	backend        txexecutor.Backend
 }
 
-func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:unparam
+func newEnvironment(t *testing.T, f upgrade.Upgrade) *environment { //nolint:unparam
 	require := require.New(t)
 
 	res := &environment{
@@ -253,7 +254,7 @@ func addSubnet(t *testing.T, env *environment) {
 	require.NoError(err)
 
 	genesisID := env.state.GetLastAccepted()
-	stateDiff, err := state.NewDiff(genesisID, env.blkManager, state.StakerAdditionAfterDeletionForbidden)
+	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
@@ -270,12 +271,12 @@ func addSubnet(t *testing.T, env *environment) {
 	require.NoError(env.state.Commit())
 }
 
-func defaultConfig(f upgradetest.Fork) *config.Internal {
+func defaultConfig(f upgrade.Upgrade) *config.Internal {
 	upgrades := upgradetest.GetConfigWithUpgradeTime(f, time.Time{})
 	// This package neglects fork ordering
 	upgradetest.SetTimesTo(
 		&upgrades,
-		min(f, upgradetest.ApricotPhase5),
+		min(f, upgrade.ApricotPhase5),
 		genesistest.DefaultValidatorEndTime,
 	)
 

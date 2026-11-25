@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -618,7 +619,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, genesistest.DefaultValidatorStartTime),
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, genesistest.DefaultValidatorStartTime),
 	}}
 	vm.clock.Set(genesistest.DefaultValidatorStartTime.Add(time.Second))
 
