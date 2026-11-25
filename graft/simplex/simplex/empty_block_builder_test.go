@@ -192,7 +192,7 @@ func TestEmptyBlockBuilderWaitForPendingBlockReturnsWhenUnderlyingReturns(t *tes
 		close(done)
 	}()
 
-	bb.BlockShouldBeBuilt <- struct{}{} // application signals a pending block.
+	bb.TriggerBlockShouldBeBuilt()
 
 	select {
 	case <-done:

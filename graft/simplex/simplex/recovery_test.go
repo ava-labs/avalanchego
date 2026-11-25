@@ -784,8 +784,7 @@ func TestWalRecoveryMonitorsProgress(t *testing.T) {
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], recordingComm, bb)
 	require.NoError(t, storage.Index(ctx, initialBlock.VerifiedBlock, initialBlock.Finalization))
 
-	e, err := NewEpoch(conf)
-	require.NoError(t, err)
+	e := testutil.NewEpoch(t, conf, bb)
 	t.Cleanup(e.Stop)
 
 	protocolMetadata := e.Metadata()
@@ -805,7 +804,7 @@ func TestWalRecoveryMonitorsProgress(t *testing.T) {
 	count := 0
 	ticker := time.NewTicker(100 * time.Millisecond)
 	time := time.Now()
-	bb.BlockShouldBeBuilt <- struct{}{}
+	bb.TriggerBlockShouldBeBuilt()
 	for count < 3 {
 		select {
 		case <-ticker.C:
