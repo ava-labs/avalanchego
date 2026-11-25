@@ -4,6 +4,7 @@
 package paralleltest
 
 import (
+	"context"
 	"math/big"
 	"slices"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/precompiles/parallel"
 	"github.com/ava-labs/libevm/params"
@@ -22,8 +24,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/vms/evm/blocks"
+	"github.com/ava-labs/avalanchego/vms/evm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
+	"github.com/ava-labs/avalanchego/vms/evm/saexec"
 )
 
 func TestMain(m *testing.M) {
@@ -107,28 +112,53 @@ func logs(a common.Address, h common.Hash) []*types.Log {
 	}}
 }
 
-func TestNewExecutor(t *testing.T) {
-	logger := loggingtest.New(t, logging.Warn)
-	ctx := logger.CancelOnError(t.Context())
+type sut struct {
+	exec   *saexec.Executor
+	chain  *blockstest.ChainBuilder
+	wallet *saetest.Wallet
+}
+
+func newSut(tb testing.TB, h *handler, precompileAddr common.Address, opts ...Option) (context.Context, *sut) {
+	tb.Helper()
+	logger := loggingtest.New(tb, logging.Warn)
+	ctx := logger.CancelOnError(tb.Context())
 
 	config := saetest.ChainConfig()
 	signer := types.LatestSigner(config)
-	wallet := saetest.NewUNSAFEWallet(t, 1, signer)
+	wallet := saetest.NewUNSAFEWallet(tb, 1, signer)
 
-	precompileAddr := common.Address{'p', 'r', 'e'}
-	const precompileGas = 1000
-	h := &handler{precompileAddr, precompileGas}
-
-	// SUT
 	exec, chain := NewExecutor(
-		t,
+		tb,
 		logger,
 		rawdb.NewMemoryDatabase(),
 		config,
 		saetest.MaxAllocFor(wallet.Addresses()...),
 		precompileAddr,
 		h, 4, 4,
+		opts...,
 	)
+
+	return ctx, &sut{
+		exec:   exec,
+		chain:  chain,
+		wallet: wallet,
+	}
+}
+
+func (s *sut) newEnqueuedBlock(ctx context.Context, tb testing.TB, txs types.Transactions, opts ...blockstest.ChainOption) *blocks.Block {
+	tb.Helper()
+	b := s.chain.NewBlock(tb, txs, opts...)
+	require.NoErrorf(tb, s.exec.Enqueue(ctx, b), "%T.Enqueue()", s.exec)
+	return b
+}
+
+func TestNewExecutor(t *testing.T) {
+	precompileAddr := common.Address{'p', 'r', 'e'}
+	const precompileGas = 1000
+	h := &handler{precompileAddr, precompileGas}
+
+	ctx, sut := newSut(t, h, precompileAddr)
+	chain, wallet := sut.chain, sut.wallet
 
 	const gasLimit = params.TxGas + precompileGas
 	var txs []common.Hash
@@ -140,14 +170,11 @@ func TestNewExecutor(t *testing.T) {
 		})
 		txs = append(txs, tx.Hash())
 
-		b := chain.NewBlock(t, types.Transactions{tx})
-		require.NoErrorf(t, exec.Enqueue(ctx, b), "%T.Enqueue()", exec)
+		sut.newEnqueuedBlock(ctx, t, types.Transactions{tx})
 	}
 	require.NoErrorf(t, chain.Last().WaitUntilExecuted(ctx), "%T.Last().WaitUntilExecuted()", chain)
 
 	for i, b := range chain.AllExceptGenesis() {
-		require.Len(t, b.Receipts(), 1, "%T[%d].Receipts()", b, b.NumberU64())
-
 		ignore := cmp.Options{
 			cmpopts.IgnoreFields(
 				types.Receipt{},
@@ -175,8 +202,44 @@ func TestNewExecutor(t *testing.T) {
 			want.Logs = logs(precompileAddr, txs[i])
 		}
 
-		if diff := cmp.Diff(want, b.Receipts()[0], ignore, cmputils.BigInts()); diff != "" {
-			t.Errorf("%T diff (-want +got):\n%s", b.Receipts()[0], diff)
+		if diff := cmp.Diff(types.Receipts{want}, b.Receipts(), ignore, cmputils.BigInts()); diff != "" {
+			t.Errorf("%T diff (-want +got):\n%s", b.Receipts(), diff)
 		}
+	}
+}
+
+func TestExtraPrecompiles(t *testing.T) {
+	pre := common.Address{'p', 'r', 'e'}
+	other := common.Address{'o', 't', 'h', 'e', 'r'}
+
+	log := &types.Log{
+		Address: other,
+		Topics: []common.Hash{
+			crypto.Keccak256Hash([]byte("hello")),
+		},
+	}
+
+	ctx, sut := newSut(
+		t, &handler{pre, 0}, pre,
+		WithExtraPrecompile(
+			other,
+			func(env vm.PrecompileEnvironment, _ []byte) ([]byte, error) {
+				env.StateDB().AddLog(log)
+				return nil, nil
+			},
+		),
+	)
+
+	b := sut.newEnqueuedBlock(ctx, t, types.Transactions{
+		sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &other,
+			Gas:       1e6,
+			GasFeeCap: big.NewInt(100),
+		}),
+	})
+	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+
+	if diff := cmp.Diff([]*types.Log{log}, b.Receipts()[0].Logs); diff != "" {
+		t.Errorf("%T.Receipts[0].Logs diff from extra precompile (-want +got):\n%s", b, diff)
 	}
 }
