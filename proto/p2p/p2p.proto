@@ -517,6 +517,7 @@ message ReplicationResponse {
 }
 
 // BlockDigestRequest requests the block with the given sequence and digest.
+// They are used by simplex to fetch a specific block for a potentially equivocated round.
 message BlockDigestRequest {
   uint64 seq = 1;
   bytes digest = 2;
