@@ -1388,8 +1388,7 @@ func (e *Epoch) persistFinalization(finalization common.Finalization) error {
 		}
 
 		// We may have already replicated the sequences that follow the one we just committed.
-		// We must process them now or they would remain in the replication state until another
-		// replication message arrives.
+		// We process them now instead of waiting for a replication timeout to re-request them.
 		if err := e.processReplicationState(); err != nil {
 			e.haltedError = err
 			e.Logger.Error("Failed to process replication state", zap.Error(err))
