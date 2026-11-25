@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"testing"
 	"time"
@@ -35,6 +36,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
+
+	snowmanenginetest "github.com/ava-labs/avalanchego/snow/engine/snowman/enginetest"
 )
 
 var (
@@ -3344,4 +3347,350 @@ type mockPChainProgressUpdater struct {
 
 func (m *mockPChainProgressUpdater) SetProgress(height uint64) {
 	m.setProgressF(height)
+}
+
+// newFakeEngine registers an engine for [self] on [network], backed by the fake
+// [vm] and treating [peers] as its connected validators. Get requests are
+// served from [vm] through the standard getter, so a node only answers for the
+// blocks its own fake VM reports holding.
+func newFakeEngine(
+	t *testing.T,
+	network *snowmanenginetest.Network,
+	self ids.NodeID,
+	vm *snowmanenginetest.VM,
+	peers ...ids.NodeID,
+) *Engine {
+	require := require.New(t)
+
+	cfg := DefaultConfig(t)
+	for _, peer := range peers {
+		require.NoError(cfg.Validators.AddStaker(cfg.Ctx.SubnetID, peer, nil, ids.Empty, 1))
+		require.NoError(cfg.ConnectedValidators.Connected(t.Context(), peer, version.Current))
+	}
+	cfg.Validators.RegisterSetCallbackListener(cfg.Ctx.SubnetID, cfg.ConnectedValidators)
+	cfg.VM = vm
+	cfg.Sender = network.CreateSender(self)
+
+	snowGetHandler, err := getter.New(vm, cfg.Sender, cfg.Ctx.Log, time.Second, 2000, cfg.Ctx.Registerer)
+	require.NoError(err)
+	cfg.AllGetsServer = snowGetHandler
+
+	e, err := New(cfg)
+	require.NoError(err)
+	network.Register(self, e)
+	require.NoError(e.Start(t.Context(), 0))
+	return e
+}
+
+// TestEngineStopsBufferingBlocksTooFarAhead tests that the engine ingests only
+// blocks within [maxHeightAbovePreferred] of its last preferred block and within
+// [maxHeightAboveAccepted] of its last accepted block.
+func TestEngineStopsBufferingBlocksTooFarAhead(t *testing.T) {
+	testCases := []struct {
+		name        string
+		heightLimit int
+		// orphan: the first block's parent is unknown, so the preference never moves.
+		// Otherwise, every block is issued but none is accepted.
+		orphan bool
+	}{
+		{name: "above preferred", heightLimit: maxHeightAbovePreferred, orphan: true},
+		{name: "above accepted", heightLimit: maxHeightAboveAccepted, orphan: false},
+	}
+
+	for _, testCase := range testCases {
+		heightLimit := testCase.heightLimit
+
+		for _, test := range []struct {
+			name      string
+			numBlocks int
+		}{
+			{name: "fewer blocks than the limit", numBlocks: heightLimit / 2},
+			{name: "exactly the limit", numBlocks: heightLimit},
+			{name: "many times the limit", numBlocks: 3 * heightLimit},
+		} {
+			t.Run(testCase.name+"/"+test.name, func(t *testing.T) {
+				require := require.New(t)
+
+				chain := snowmantest.BuildDescendants(snowmantest.Genesis, test.numBlocks)
+				if testCase.orphan {
+					chain[0].ParentV = ids.GenerateTestID()
+				}
+				network := snowmanenginetest.NewNetwork(t)
+				nodeID := ids.GenerateTestNodeID()
+				peerID := ids.GenerateTestNodeID()
+
+				peerVM := snowmanenginetest.NewVM(t, chain)
+				newFakeEngine(t, network, peerID, peerVM, nodeID)
+
+				nodeVM := snowmanenginetest.NewVM(t, chain)
+				node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
+
+				// We don't want the node to accept any blocks, we want the blocks to be not decided yet, but the preference
+				// to increase, if possible
+				require.NoError(node.ConnectedValidators.Disconnected(t.Context(), peerID))
+
+				_, lastAcceptedHeight := node.Consensus.LastAccepted()
+
+				// A block is held if it is queued or processing.
+				highestHeld := func() uint64 {
+					var highest uint64
+					if node.Consensus.NumProcessing() > 0 {
+						_, highest = node.Consensus.Preference()
+					}
+					for _, queued := range node.pending {
+						highest = max(highest, queued.Height())
+					}
+					return highest
+				}
+
+				for i, blk := range chain {
+					require.NoError(node.PushQuery(t.Context(), peerID, uint32(i+1), blk.Bytes(), 0))
+				}
+
+				require.Equal(lastAcceptedHeight+uint64(min(test.numBlocks, heightLimit)), highestHeld())
+
+				held := len(node.pending) + node.Consensus.NumProcessing()
+				require.LessOrEqual(held, heightLimit)
+				require.LessOrEqual(node.blocked.NumDependencies(), heightLimit)
+
+				// Check the upper bounds don't hold vacuously.
+				atLeast := min(test.numBlocks, heightLimit) - 1
+				require.GreaterOrEqual(held, atLeast)
+				if testCase.orphan {
+					require.GreaterOrEqual(node.blocked.NumDependencies(), atLeast)
+				} else {
+					_, acceptedHeight := node.Consensus.LastAccepted()
+					require.Equal(lastAcceptedHeight, acceptedHeight)
+					require.Equal(min(test.numBlocks, heightLimit), node.Consensus.NumProcessing())
+				}
+
+				network.DeliverMessages()
+				require.Empty(node.pending)
+				require.Zero(node.blocked.NumDependencies())
+			})
+		}
+	}
+}
+
+// TestEngineRecoversFromIngestionCap tests that a node with
+// [maxHeightAboveAccepted] blocks processing above its
+// last accepted block still finalizes them and then catches up.
+func TestEngineRecoversFromIngestionCap(t *testing.T) {
+	const (
+		heightLimit = maxHeightAboveAccepted
+		chainLength = 3 * heightLimit
+	)
+
+	require := require.New(t)
+
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, chainLength)
+	tip := chain[len(chain)-1]
+
+	network := snowmanenginetest.NewNetwork(t)
+	nodeID := ids.GenerateTestNodeID()
+	peerID := ids.GenerateTestNodeID()
+
+	nodeVM := snowmanenginetest.NewVM(t, chain)
+	node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
+
+	// The peer has accepted the whole chain.
+	peerVM := snowmanenginetest.NewVM(t, acceptedCopies(chain))
+	peerCfg := DefaultConfig(t)
+	peerCfg.VM = peerVM
+	peerCfg.Sender = network.CreateSender(peerID)
+	peerGetHandler, err := getter.New(peerVM, peerCfg.Sender, peerCfg.Ctx.Log, time.Second, 2000, peerCfg.Ctx.Registerer)
+	require.NoError(err)
+	peerCfg.AllGetsServer = peerGetHandler
+	peer, err := New(peerCfg)
+	require.NoError(err)
+	var requestedHeights []uint64
+	network.Register(peerID, snowmanenginetest.WithQueryInterceptor(peer,
+		func(_ context.Context, _ ids.NodeID, _ uint32, requestedHeight uint64) error {
+			// The node must never poll for a block it would refuse to ingest.
+			_, lastAcceptedHeight := node.Consensus.LastAccepted()
+			require.LessOrEqual(requestedHeight, lastAcceptedHeight+heightLimit)
+			requestedHeights = append(requestedHeights, requestedHeight)
+			return nil
+		},
+	))
+	require.NoError(peer.Start(t.Context(), 0))
+
+	// While the peer pushes the chain to the node, the node sees its only
+	// validator as disconnected, so it issues every block without querying for it.
+	require.NoError(node.ConnectedValidators.Disconnected(t.Context(), peerID))
+	for i, blk := range chain[:heightLimit] {
+		require.NoError(node.PushQuery(t.Context(), peerID, uint32(i+1), blk.Bytes(), 0))
+	}
+	require.Equal(heightLimit, node.Consensus.NumProcessing())
+	require.Zero(node.polls.Len())
+
+	// Even though we push the next block, the node is at its ingestion cap and refuses to queue it.
+	require.NoError(node.PushQuery(t.Context(), peerID, heightLimit+1, chain[heightLimit].Bytes(), 0))
+	require.Equal(heightLimit, node.Consensus.NumProcessing())
+	require.Empty(node.pending)
+
+	// The validator reconnects and the node polls it. The poll asks for the
+	// block at the limit rather than the one above the preference, and its
+	// single vote finalizes the backlog.
+	require.NoError(node.ConnectedValidators.Connected(t.Context(), peerID, version.Current))
+	require.NoError(node.Gossip(t.Context()))
+	network.DeliverMessages()
+
+	// We polled only for the block at the limit, and nothing more.
+	require.Equal([]uint64{heightLimit}, requestedHeights)
+	acceptedID, _ := node.Consensus.LastAccepted()
+	require.Equal(chain[heightLimit-1].ID(), acceptedID) // We accepted all blocks up to the limit.
+
+	// With the backlog accepted the limit has moved, so the node can resume
+	// fetching and climbs the rest of the chain.
+	require.NoError(node.Gossip(t.Context()))
+	network.DeliverMessages()
+
+	acceptedID, _ = node.Consensus.LastAccepted()
+	require.Equal(tip.ID(), acceptedID)
+}
+
+// acceptedCopies returns a copy of each of [blks] in the accepted state, so a
+// fake VM can hold them as accepted without changing the status of [blks].
+func acceptedCopies(blks []*snowmantest.Block) []*snowmantest.Block {
+	copies := make([]*snowmantest.Block, len(blks))
+	for i, blk := range blks {
+		blkCopy := *blk
+		blkCopy.Status = snowtest.Accepted
+		copies[i] = &blkCopy
+	}
+	return copies
+}
+
+// TestEngineHeightLimits tests that the engine ignores blocks too far above its
+// progress, whether they are pushed or fetched, and never polls for a block it
+// would ignore.
+func TestEngineHeightLimits(t *testing.T) {
+	newBlock := func(height uint64, parentID ids.ID, status snowtest.Status) *snowmantest.Block {
+		id := ids.GenerateTestID()
+		return &snowmantest.Block{
+			Decidable:  snowtest.Decidable{IDV: id, Status: status},
+			ParentV:    parentID,
+			HeightV:    height,
+			TimestampV: snowmantest.GenesisTimestamp,
+			BytesV:     id[:],
+		}
+	}
+
+	tests := []struct {
+		name string
+		// height is the height of [blk], the block under test.
+		height uint64
+		// numProcessing is how many blocks are issued on top of genesis before
+		// [blk] arrives. The preferred height is numProcessing and the last accepted height stays 0.
+		numProcessing int
+		// wantIssued is whether [blk] is expected to be issued into pending.
+		wantIssued bool
+		// wantQueryHeight is the height the engine should ask in its last poll.
+		wantQueryHeight uint64
+	}{
+		{
+			name:            "at_preference_limit",
+			numProcessing:   1,
+			height:          1 + maxHeightAbovePreferred,
+			wantIssued:      true,
+			wantQueryHeight: 2,
+		},
+		{
+			name:            "past_preference_limit",
+			numProcessing:   1,
+			height:          2 + maxHeightAbovePreferred,
+			wantQueryHeight: 2,
+		},
+		{
+			name:            "at_accepted_limit",
+			numProcessing:   maxHeightAboveAccepted,
+			height:          maxHeightAboveAccepted,
+			wantIssued:      true,
+			wantQueryHeight: maxHeightAboveAccepted,
+		},
+		{
+			name:            "past_accepted_limit",
+			numProcessing:   maxHeightAboveAccepted,
+			height:          maxHeightAboveAccepted + 1,
+			wantQueryHeight: maxHeightAboveAccepted,
+		},
+	}
+
+	const (
+		pushed  bool = false
+		fetched      = true
+	)
+
+	methodNames := map[bool]string{
+		pushed:  "pushed",
+		fetched: "fetched",
+	}
+
+	for _, test := range tests {
+		for _, method := range []bool{pushed, fetched} {
+			t.Run(test.name+"/"+methodNames[method], func(t *testing.T) {
+				processing := snowmantest.BuildDescendants(snowmantest.Genesis, test.numProcessing)
+
+				// [blk]'s parent is unknown, so if it is issued it is pending.
+				blk := newBlock(test.height, ids.GenerateTestID(), snowtest.Undecided)
+				chain := append(slices.Clone(processing), blk)
+
+				var (
+					queryHeight  uint64
+					getRequestID uint32
+					requested    bool
+				)
+				sender := &enginetest.Sender{
+					T: t,
+					SendPushQueryF: func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, _ []byte, requestedHeight uint64) {
+						queryHeight = requestedHeight
+					},
+					SendPullQueryF: func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, _ ids.ID, requestedHeight uint64) {
+						queryHeight = requestedHeight
+					},
+					SendGetF: func(_ context.Context, _ ids.NodeID, requestID uint32, blkID ids.ID) {
+						if blkID == blk.ID() {
+							getRequestID, requested = requestID, true
+						}
+					},
+				}
+
+				peerID := ids.GenerateTestNodeID()
+				cfg := DefaultConfig(t)
+				require.NoError(t, cfg.Validators.AddStaker(cfg.Ctx.SubnetID, peerID, nil, ids.Empty, 1))
+				require.NoError(t, cfg.ConnectedValidators.Connected(t.Context(), peerID, version.Current))
+				cfg.Validators.RegisterSetCallbackListener(cfg.Ctx.SubnetID, cfg.ConnectedValidators)
+				cfg.VM = snowmanenginetest.NewVM(t, chain)
+				cfg.Sender = sender
+				e, err := New(cfg)
+				require.NoError(t, err)
+				require.NoError(t, e.Start(t.Context(), 0))
+
+				for i, processingBlk := range processing {
+					require.NoError(t, e.PushQuery(t.Context(), peerID, uint32(i), processingBlk.Bytes(), 0))
+				}
+				require.Equal(t, test.numProcessing, e.Consensus.NumProcessing())
+				require.Equal(t, test.wantQueryHeight, queryHeight)
+
+				if method == fetched {
+					// A vote for [blk] makes the engine request it, and the
+					// peer replies with it.
+					require.NoError(t, e.Chits(t.Context(), peerID, math.MaxUint32, blk.ID(), snowmantest.GenesisID, 0))
+					require.True(t, requested)
+					require.NoError(t, e.Put(t.Context(), peerID, getRequestID, blk.Bytes()))
+				} else {
+					require.NoError(t, e.PushQuery(t.Context(), peerID, uint32(len(processing)), blk.Bytes(), 0))
+				}
+
+				_, issued := e.pending[blk.ID()]
+				require.Equal(t, test.wantIssued, issued)
+				if !test.wantIssued {
+					// Nothing is left waiting on, or requesting, the ignored block.
+					require.False(t, e.blkReqs.HasValue(blk.ID()))
+					require.Zero(t, e.blocked.NumDependencies())
+				}
+			})
+		}
+	}
 }
