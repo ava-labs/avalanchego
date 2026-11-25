@@ -73,6 +73,12 @@ type config struct {
 	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
 	// for; nil follows the parent.
 	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
+	// BlockBuilderURL is the endpoint of an external block builder that
+	// proposes the leading transactions of blocks built by this node. Empty
+	// disables external block building. See [sae.ExternalBuilder].
+	BlockBuilderURL string `json:"block-builder-url"`
+	// BlockBuilderTimeout bounds each request to the external block builder.
+	BlockBuilderTimeout duration `json:"block-builder-timeout"`
 
 	// State & trie
 	Pruning           bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
@@ -242,7 +248,8 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			TxFeeCap:                     100,
 			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
 		},
-		Now: now,
+		ExternalBuilderTimeout: c.BlockBuilderTimeout.Duration,
+		Now:                    now,
 	}
 }
 

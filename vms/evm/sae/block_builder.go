@@ -53,6 +53,10 @@ type blockBuilderG[T hook.Transaction] struct {
 	exec    *saexec.Executor
 	mempool *txgossip.Set
 	source  saetypes.BlockSource
+
+	// external MAY be nil, in which case blocks are built from the mempool.
+	external        ExternalBuilder
+	externalTimeout time.Duration
 }
 
 func (b *blockBuilderG[_]) new(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {
@@ -69,6 +73,7 @@ func (b *blockBuilderG[_]) build(
 		bCtx,
 		parent,
 		b.mempool.TransactionsByPriority,
+		b.external,
 		b.hooks,
 		saeparams.TargetBlockBytes,
 	)
@@ -122,6 +127,7 @@ func (b *blockBuilderG[_]) rebuild(
 		bCtx,
 		parent,
 		func(txpool.PendingFilter) iter.Seq[*txgossip.LazyTransaction] { return slices.Values(txs) },
+		nil, // the block's own txs, not a new proposal
 		rebuilder,
 		saeparams.MaxBlockBytes,
 	)
@@ -140,11 +146,15 @@ var (
 //
 // blockByteBudget caps the cumulative serialized size of included
 // transactions and end-of-block ops.
+//
+// If external is non-nil, the block starts with the transactions it proposes,
+// if they can all be included (see [blockBuilderG.proposedTxs]).
 func (b *blockBuilderG[T]) buildWithTxs(
 	ctx context.Context,
 	bCtx *block.Context,
 	parent *blocks.Block,
 	pendingTxs func(txpool.PendingFilter) iter.Seq[*txgossip.LazyTransaction],
+	external ExternalBuilder,
 	builder hook.BlockBuilder[T],
 	blockByteBudget uint64,
 ) (*blocks.Block, error) {
@@ -250,10 +260,8 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	hdr.GasLimit = state.GasLimit()
 	hdr.BaseFee = state.BaseFee().ToBig()
 
-	var (
-		included      []*types.Transaction
-		includedBytes uint64
-	)
+	// Proposed transactions, if any, lead the block.
+	included, includedBytes := b.proposedTxs(ctx, external, hdr, state, blockByteBudget, log)
 	for ltx := range pendingTxs(txpool.PendingFilter{
 		BaseFee: state.BaseFee(),
 	}) {

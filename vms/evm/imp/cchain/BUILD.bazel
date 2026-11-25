@@ -76,6 +76,7 @@ go_library(
         "//vms/components/gas",
         "//vms/evm/adaptor",
         "//vms/evm/blocks",
+        "//vms/evm/externalbuilder",
         "//vms/evm/firewood",
         "//vms/evm/gastime",
         "//vms/evm/hook",

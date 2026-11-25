@@ -725,3 +725,42 @@ func TestCanExecuteTransactionHook(t *testing.T) {
 		})
 	}
 }
+
+func TestSnapshotRevert(t *testing.T) {
+	config := saetest.ChainConfig()
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(config))
+	sender := wallet.Addresses()[0]
+	sut := newSUT(t, saetest.MaxAllocFor(sender))
+
+	require.NoError(t, sut.StartBlock(&types.Header{
+		ParentHash: sut.genesis.Hash(),
+		Number:     big.NewInt(1),
+	}), "StartBlock()")
+
+	newTx := func() *types.Transaction {
+		return wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			GasFeeCap: big.NewInt(1),
+			Gas:       params.TxGas,
+			To:        &common.Address{},
+		})
+	}
+	require.NoError(t, sut.ApplyTx(newTx()), "ApplyTx()")
+
+	snap := sut.Snapshot()
+	balance := sut.State.db.GetBalance(sender)
+	require.NoError(t, sut.ApplyTx(newTx()), "ApplyTx() after Snapshot()")
+	require.NoError(t, sut.ApplyTx(newTx()), "ApplyTx() after Snapshot()")
+	sut.Revert(snap)
+
+	assert.Equal(t, uint64(1), sut.State.db.GetNonce(sender), "nonce after Revert()")
+	assert.Equal(t, balance, sut.State.db.GetBalance(sender), "balance after Revert()")
+	assert.Equal(t, params.TxGas, sut.GasUsed(), "GasUsed() after Revert()")
+
+	// The reverted nonces are available again.
+	wallet.DecrementNonce(t, 0)
+	wallet.DecrementNonce(t, 0)
+	require.NoError(t, sut.ApplyTx(newTx()), "ApplyTx() after Revert()")
+	bounds, err := sut.FinishBlock()
+	require.NoError(t, err, "FinishBlock()")
+	assert.Len(t, bounds.MinOpBurnerBalances, 2, "operations in block")
+}
