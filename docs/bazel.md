@@ -909,11 +909,11 @@ output tree and no disk action cache. Dependency-download caches can still be
 used: this policy concerns reuse of build outputs and test results, not
 downloaded inputs.
 
-The Linux pre-merge and scheduled workflows also build and smoke-test a
-[Bazel-built AvalancheGo image](./image-builds.md#bazel-built-avalanchego-image)
-under their respective cache policies. This is a CI validation image, not a
-published artifact. The artifact-build policy above applies when a Bazel build
-produces published artifacts.
+The amd64 kube e2e job builds and smoke-tests a [Bazel-built AvalancheGo
+image](./image-builds.md#bazel-built-avalanchego-image) in pre-merge and
+scheduled CI under their respective cache policies. This is a CI validation
+image, not a published artifact. The artifact-build policy above applies when a
+Bazel build produces published artifacts.
 
 The remote cache stores results from the cacheable pre-merge unit tests when
 CI provides the remote-cache URL and authorization header. This policy

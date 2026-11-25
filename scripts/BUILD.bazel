@@ -2,6 +2,7 @@ exports_files(
     [
         "tests.e2e.bazel.sh",
         "tests.e2e.existing.sh",
+        "tests.e2e.kube.bazel.sh",
         "tests.e2e.sh",
         "tests.load.bazel.sh",
         "tests.upgrade.bazel.sh",

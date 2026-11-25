@@ -7,6 +7,10 @@ case "$(uname -m)" in
   *) echo "unsupported host architecture: $(uname -m)" >&2; exit 1 ;;
 esac
 
+case "${BAZEL_IMAGE_RACE:-0}" in
+  0|1) ;;
+  *) echo 'BAZEL_IMAGE_RACE must be 0 or 1' >&2; exit 1 ;;
+esac
 image="${BAZEL_IMAGE:-avalanchego:bazel-local}"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 git_commit="${AVALANCHEGO_COMMIT:-$(git -C "${repo_root}" rev-parse HEAD)}"
@@ -64,6 +68,7 @@ docker buildx build --load --platform "${platform}" \
   --build-arg "BAZEL_BUILD_MODE=${build_mode}" \
   --build-arg "BAZEL_REPOSITORY_CACHE=${repository_cache}" \
   --build-arg "BAZEL_GO_MOD_CACHE=${go_mod_cache}" \
+  --build-arg "BAZEL_IMAGE_RACE=${BAZEL_IMAGE_RACE:-0}" \
   --build-arg "BAZEL_CACHE_NAMESPACE=${BAZEL_CACHE_NAMESPACE:-avalanchego-bazel}" \
   --build-arg BAZEL_INVOCATION_KEY="$(date +%s)-$$" \
   ${cache_args[@]+"${cache_args[@]}"} \

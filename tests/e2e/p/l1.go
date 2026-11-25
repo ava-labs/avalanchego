@@ -70,7 +70,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
-	ginkgo.It("creates and updates L1 validators", func() {
+	ginkgo.It("creates and updates L1 validators", ginkgo.Label("xsvm"), func() {
 		env := e2e.GetEnv(tc)
 		nodeURI := env.GetRandomNodeURI()
 

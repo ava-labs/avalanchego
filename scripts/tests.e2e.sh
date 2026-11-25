@@ -26,6 +26,17 @@ if [[ ! -f "${E2E_TARGET}" ]]; then
 fi
 
 E2E_ARGS=("${@}")
+if [[ -n "${E2E_SKIP_XSVM:-}" ]]; then
+  # A caller-supplied label filter would override this exclusion.
+  for arg in "${E2E_ARGS[@]}"; do
+    if [[ "${arg}" == --ginkgo.label-filter* ]]; then
+      echo 'E2E_SKIP_XSVM cannot be combined with --ginkgo.label-filter' >&2
+      exit 1
+    fi
+  done
+  echo 'Skipping XSVM setup and XSVM-dependent specs'
+  E2E_ARGS+=(--ginkgo.label-filter='!xsvm')
+fi
 
 # If not running in kubernetes, default to using a local avalanchego binary
 if [[ ! "${E2E_ARGS[*]}" =~ "--runtime=kube" && ! "${E2E_ARGS[*]}" =~ "--avalanchego-path" ]]; then
