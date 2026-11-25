@@ -893,16 +893,16 @@ func (e *Engine) sendQuery(
 	}
 
 	_, lastAcceptedHeight := e.Consensus.LastAccepted()
-	blockIngestionLimit := lastAcceptedHeight + maxHeightAboveAccepted
-	heightToAskAbout := nextHeightToPrefer
+	maxHeight := lastAcceptedHeight + maxHeightAboveAccepted
+	heightToQuery := nextHeightToPrefer
 
-	if nextHeightToPrefer > blockIngestionLimit {
-		heightToAskAbout = blockIngestionLimit
+	if nextHeightToPrefer > maxHeight {
+		heightToQuery = maxHeight
 		e.Ctx.Log.Debug("querying for block at a lower height than preferred",
 			zap.Stringer("blkID", blkID),
 			zap.Uint64("nextHeightToPrefer", nextHeightToPrefer),
-			zap.Uint64("blockIngestionLimit", blockIngestionLimit),
-			zap.Uint64("heightToAskAbout", heightToAskAbout),
+			zap.Uint64("maxHeight", maxHeight),
+			zap.Uint64("heightToQuery", heightToQuery),
 		)
 	}
 
@@ -919,9 +919,9 @@ func (e *Engine) sendQuery(
 
 	vdrSet := set.Of(vdrIDs...)
 	if push {
-		e.Sender.SendPushQuery(ctx, vdrSet, e.requestID, blkBytes, heightToAskAbout)
+		e.Sender.SendPushQuery(ctx, vdrSet, e.requestID, blkBytes, heightToQuery)
 	} else {
-		e.Sender.SendPullQuery(ctx, vdrSet, e.requestID, blkID, heightToAskAbout)
+		e.Sender.SendPullQuery(ctx, vdrSet, e.requestID, blkID, heightToQuery)
 	}
 }
 
