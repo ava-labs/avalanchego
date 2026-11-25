@@ -81,8 +81,8 @@ func (n *Network) Register(nodeID ids.NodeID, handler common.Handler) {
 func (n *Network) DeliverMessages() {
 	n.t.Helper()
 	defer func() {
-		// Make sure that the network has no more messages in the queue, or requests that waits for an answer.
-		require.False(n.t, len(n.queue) > 0 || len(n.awaiting) > 0)
+		require.Empty(n.t, n.queue)
+		require.Empty(n.t, n.awaiting)
 	}()
 	delivered := 0
 	for {
