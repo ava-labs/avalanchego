@@ -43,7 +43,7 @@ source "$AVALANCHE_PATH"/scripts/git_commit.sh
 source "$AVALANCHE_PATH"/scripts/image_tag.sh
 source "$AVALANCHE_PATH"/scripts/lib_go_module_cache.sh
 
-# Distinguishes variant builds (e.g. a custom firewood) from the standard images.
+# Distinguishes variant builds (e.g. a firewood build) from the standard images.
 commit_hash+="${IMAGE_TAG_SUFFIX:-}"
 image_tag+="${IMAGE_TAG_SUFFIX:-}"
 

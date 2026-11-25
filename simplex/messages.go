@@ -140,8 +140,10 @@ func newReplicationRequest(
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_ReplicationRequest{
 			ReplicationRequest: &p2p.ReplicationRequest{
-				Seqs:        replicationRequest.Seqs,
-				LatestRound: replicationRequest.LatestRound,
+				Seqs:               replicationRequest.Seqs,
+				LatestRound:        replicationRequest.LatestRound,
+				Rounds:             replicationRequest.Rounds,
+				LatestFinalizedSeq: replicationRequest.LatestFinalizedSeq,
 			},
 		},
 	}
@@ -152,8 +154,9 @@ func newReplicationResponse(
 	replicationResponse *common.VerifiedReplicationResponse,
 ) *p2p.Simplex {
 	data := replicationResponse.Data
-	latestRound := replicationResponse.LatestRound
 
+	// quorumRoundToP2P returns nil for the genesis finalization, which has no
+	// QC and therefore can't be sent. Such rounds are omitted from the response.
 	qrs := make([]*p2p.QuorumRound, 0, len(data))
 	for _, qr := range data {
 		p2pQR := quorumRoundToP2P(&qr)
@@ -163,20 +166,70 @@ func newReplicationResponse(
 		qrs = append(qrs, p2pQR)
 	}
 
-	var latestQR *p2p.QuorumRound
-	if latestRound != nil {
-		qr := quorumRoundToP2P(latestRound)
-		if qr == nil {
-			return nil
-		}
-		latestQR = qr
-	}
 	return &p2p.Simplex{
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_ReplicationResponse{
 			ReplicationResponse: &p2p.ReplicationResponse{
 				Data:        qrs,
-				LatestRound: latestQR,
+				LatestRound: maybeQuorumRoundToP2P(replicationResponse.LatestRound),
+				LatestSeq:   maybeQuorumRoundToP2P(replicationResponse.LatestFinalizedSeq),
+			},
+		},
+	}
+}
+
+// maybeQuorumRoundToP2P is like quorumRoundToP2P, but returns nil if [qr] is
+// nil.
+func maybeQuorumRoundToP2P(qr *common.VerifiedQuorumRound) *p2p.QuorumRound {
+	if qr == nil {
+		return nil
+	}
+	return quorumRoundToP2P(qr)
+}
+
+func newBlockDigestRequest(
+	chainID ids.ID,
+	blockDigestRequest *common.BlockDigestRequest,
+) *p2p.Simplex {
+	return &p2p.Simplex{
+		ChainId: chainID[:],
+		Message: &p2p.Simplex_BlockDigestRequest{
+			BlockDigestRequest: &p2p.BlockDigestRequest{
+				Seq:    blockDigestRequest.Seq,
+				Digest: blockDigestRequest.Digest[:],
+			},
+		},
+	}
+}
+
+func newAuxiliaryInfo(
+	chainID ids.ID,
+	auxInfo *common.AuxiliaryInfo,
+) *p2p.Simplex {
+	return &p2p.Simplex{
+		ChainId: chainID[:],
+		Message: &p2p.Simplex_AuxiliaryInfo{
+			AuxiliaryInfo: &p2p.AuxiliaryInfo{
+				Epoch:   auxInfo.Epoch,
+				Version: uint32(auxInfo.Version),
+				Data:    auxInfo.Data,
+			},
+		},
+	}
+}
+
+func newEpochTransitionApproval(
+	chainID ids.ID,
+	approval *common.ValidatorSetApproval,
+) *p2p.Simplex {
+	return &p2p.Simplex{
+		ChainId: chainID[:],
+		Message: &p2p.Simplex_EpochTransitionApproval{
+			EpochTransitionApproval: &p2p.ValidatorSetApproval{
+				NodeId:        approval.NodeID[:],
+				AuxInfoDigest: approval.AuxInfoDigest[:],
+				PChainHeight:  approval.PChainHeight,
+				Signature:     approval.Signature,
 			},
 		},
 	}

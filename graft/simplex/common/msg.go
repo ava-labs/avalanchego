@@ -495,6 +495,8 @@ type VerifiedFinalizedBlock struct {
 	Finalization  Finalization
 }
 
+// BlockDigestRequest requests the block with the given sequence and digest.
+// They are used by simplex to fetch a specific block for a potentially equivocated round.
 type BlockDigestRequest struct {
 	Seq    uint64
 	Digest Digest
