@@ -21,6 +21,7 @@
 - Fixed node shutdown leaving health check and bootstrapper timeout goroutines running. Shutdown now stops them, and waits up to 10 seconds for the health check goroutines to finish.
 - Fixed the C-Chain writing its local transaction journal, `transactions.rlp`, to the process working directory when `local-txs-enabled` is set. The journal is now disabled.
 - Fixed the C-Chain mempool accepting non-local transactions with a gas tip cap of 0. They now need a gas tip cap of at least 1 wei, matching the C-Chain before SAE.
+- Fixed a C-Chain `debug_traceBlock` panic when passed a synchronous block with a nil base fee and a non-zero transaction fee cap.
 
 ## [v1.15.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.3)
 

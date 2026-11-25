@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/saexec"
+	"github.com/ava-labs/avalanchego/vms/evm/worstcase"
 )
 
 var noopRelease tracers.StateReleaseFunc = func() {}
@@ -371,12 +372,22 @@ func (a *tracerAPI) TraceCall(ctx context.Context, args ethapi.TransactionArgs, 
 	return a.traceCall.TraceCall(ctx, args, blockNrOrHash, config)
 }
 
+// Errors returned for malformed blocks.
+var (
+	ErrMissingBaseFee    = errors.New("missing base fee")
+	ErrTxTypeUnsupported = errors.New("transaction type not supported")
+)
+
 // TraceBlock shadows [tracers.API.TraceBlock] to replace the caller-supplied
-// block's worst-case base fee with the executed base fee before delegating.
-// The block need not be canonical, but its parent MUST be.
+// block's worst-case base fee with the executed base fee before delegating. The
+// block need not be canonical, but its parent MUST be.
 //
 // A synchronous (pre-SAE) block is traced with the base fee as supplied, which
-// is the real fee paid by its transactions.
+// is the real fee paid by its transactions. For Cancun-active blocks, missing
+// excess blob gas is treated as zero, yielding a blob base fee of 1 wei and
+// matching canonical chain behavior.
+//
+// Transaction types not accepted by consensus are also rejected by tracing.
 func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *tracers.TraceConfig) ([]*tracers.TxTraceResult, error) {
 	block := new(types.Block)
 	if err := rlp.DecodeBytes(blob, block); err != nil {
@@ -385,11 +396,21 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 	if block.NumberU64() == 0 {
 		return nil, errors.New("genesis is not traceable") // Copied from [tracers.TraceBlock]
 	}
+	for _, tx := range block.Transactions() {
+		if worstcase.AcceptedTxTypes&(1<<tx.Type()) == 0 {
+			return nil, fmt.Errorf("%w: %d", ErrTxTypeUnsupported, tx.Type())
+		}
+	}
 
-	// A synchronous (pre-SAE) block carries the base fee its transactions
-	// actually paid, so it is traced as supplied.
-	resealed := block
-	if hdr := block.Header(); !hook.Synchronous(a.tracerBackend.Hooks(), hdr) {
+	var (
+		hdr = block.Header()
+		cfg = a.tracerBackend.ChainConfig()
+	)
+	if cfg.IsCancun(hdr.Number, hdr.Time) && hdr.ExcessBlobGas == nil {
+		hdr.ExcessBlobGas = new(uint64)
+	}
+	switch {
+	case !hook.Synchronous(a.tracerBackend.Hooks(), hdr):
 		parent, err := a.tracerBackend.restoreExecutedParent(ctx, block)
 		if err != nil {
 			return nil, fmt.Errorf("restoring parent block: %w", err)
@@ -399,9 +420,12 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 		gasClock := parent.ExecutedByGasTime()
 		gasClock.BeforeBlock(a.tracerBackend.Hooks().BlockTime(hdr))
 		hdr.BaseFee = gasClock.BaseFee().ToBig()
-		resealed = block.WithSeal(hdr)
+
+	case cfg.IsLondon(hdr.Number) && hdr.BaseFee == nil:
+		return nil, ErrMissingBaseFee
 	}
 
+	resealed := block.WithSeal(hdr)
 	api := tracers.NewAPI(&suppliedHashBackend{
 		tracerBackend: a.tracerBackend,
 		supplied:      block,

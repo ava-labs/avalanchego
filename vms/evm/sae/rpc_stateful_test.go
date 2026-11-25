@@ -39,11 +39,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
 	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/evm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest/escrow"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
+	saerpc "github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 	ethereum "github.com/ava-labs/libevm"
 )
 
@@ -1126,4 +1128,116 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 			want:   b.Header(),
 		})
 	})
+}
+
+// TestTraceBlockMalformedHeaderForTxs is a regression test demonstrating a
+// previous vulnerability in which a user-provided block could crash an RPC node
+// due to nil-pointer dereferencing of regular and/or blob base fees. When used
+// with a JS tracer, which spawns worker goroutines, the panic would not be
+// recovered by the RPC's HTTP handler.
+func TestTraceBlockMalformedHeaderForTxs(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+
+	async := unwrap(t, sut.buildAndParseBlock(t, sut.genesis)).Header()
+	async.BaseFee = nil
+	sync := types.CopyHeader(async)
+	hookstest.ConvertToSynchronous(sync)
+	syncWithBaseFee := types.CopyHeader(sync)
+	syncWithBaseFee.BaseFee = big.NewInt(0)
+
+	dynTx := &types.DynamicFeeTx{
+		To:        &common.Address{},
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1), // original attack vector
+	}
+	callBlobBaseFeeOp := &types.DynamicFeeTx{
+		To:        nil, // runs data as code
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(1),
+		Data:      []byte{byte(vm.BLOBBASEFEE)},
+	}
+	blobTx := &types.BlobTx{}
+
+	tests := []struct {
+		name    string
+		header  *types.Header
+		tx      types.TxData
+		wantErr testerr.Want
+	}{
+		{
+			name:    "async_nil_base_fee",
+			header:  async,
+			tx:      dynTx,
+			wantErr: nil, // async base fee is populated from the gas clock
+		},
+		{
+			name:    "sync_nil_base_fee",
+			header:  sync,
+			tx:      dynTx,
+			wantErr: testerr.Contains(saerpc.ErrMissingBaseFee.Error()),
+		},
+		{
+			name:    "async_nil_blob_gas",
+			header:  async,
+			tx:      callBlobBaseFeeOp,
+			wantErr: nil,
+		},
+		{
+			name:    "sync_nil_blob_gas",
+			header:  syncWithBaseFee,
+			tx:      callBlobBaseFeeOp,
+			wantErr: nil,
+		},
+		{
+			name:    "async_with_blob_tx",
+			header:  async,
+			tx:      blobTx,
+			wantErr: testerr.Contains(saerpc.ErrTxTypeUnsupported.Error()),
+		},
+		{
+			name:    "sync_with_blob_tx",
+			header:  sync,
+			tx:      blobTx,
+			wantErr: testerr.Contains(saerpc.ErrTxTypeUnsupported.Error()),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vector := encodeRLP(t, types.NewBlock(
+				tt.header,
+				types.Transactions{sut.wallet.SetNonceAndSign(t, 0, tt.tx)},
+				nil,
+				nil,
+				saetest.TrieHasher(),
+			))
+			sut.wallet.DecrementNonce(t, 0)
+
+			// Results of non-erroring traces are tested elsewhere.
+			ignoreResults := cmp.Comparer(func(_, _ json.RawMessage) bool { return true })
+
+			sut.testRPC(ctx, t, withCmpOpts(
+				[]rpcTest{
+					{
+						name:    "default_tracer",
+						method:  "debug_traceBlock",
+						args:    []any{hexutil.Bytes(vector)},
+						want:    json.RawMessage{},
+						wantErr: tt.wantErr,
+					},
+					{
+						name:   "js_tracer",
+						method: "debug_traceBlock",
+						args: []any{
+							hexutil.Bytes(vector),
+							tracers.TraceConfig{Tracer: new("opcountTracer")}, // arbitrary JS tracer
+						},
+						want:    json.RawMessage{},
+						wantErr: tt.wantErr,
+					},
+				},
+				ignoreResults,
+			)...)
+		})
+	}
 }
