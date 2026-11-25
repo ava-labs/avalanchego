@@ -37,6 +37,7 @@ go_library(
         "//vms/evm/saedb",
         "//vms/evm/saexec",
         "//vms/evm/txgossip",
+        "//vms/evm/worstcase",
         "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//accounts",
         "@com_github_ava_labs_libevm//common",

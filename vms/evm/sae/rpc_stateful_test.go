@@ -1192,13 +1192,13 @@ func TestRegression_TraceBlocksNilBaseFee(t *testing.T) {
 			name:    "async_with_blob_tx",
 			header:  async,
 			tx:      blobTx,
-			wantErr: testerr.Contains(saerpc.ErrBlobTxsUnsupported.Error()),
+			wantErr: testerr.Contains(saerpc.ErrTxTypeUnsupported.Error()),
 		},
 		{
 			name:    "sync_with_blob_tx",
 			header:  sync,
 			tx:      blobTx,
-			wantErr: testerr.Contains(saerpc.ErrBlobTxsUnsupported.Error()),
+			wantErr: testerr.Contains(saerpc.ErrTxTypeUnsupported.Error()),
 		},
 	}
 

@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/saexec"
+	"github.com/ava-labs/avalanchego/vms/evm/worstcase"
 )
 
 var noopRelease tracers.StateReleaseFunc = func() {}
@@ -373,8 +374,8 @@ func (a *tracerAPI) TraceCall(ctx context.Context, args ethapi.TransactionArgs, 
 
 // Errors returned for malformed blocks.
 var (
-	ErrMissingBaseFee     = errors.New("missing base fee")
-	ErrBlobTxsUnsupported = errors.New("blob transactions not supported")
+	ErrMissingBaseFee    = errors.New("missing base fee")
+	ErrTxTypeUnsupported = errors.New("transaction type not supported")
 )
 
 // TraceBlock shadows [tracers.API.TraceBlock] to replace the caller-supplied
@@ -394,8 +395,8 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 		return nil, errors.New("genesis is not traceable") // Copied from [tracers.TraceBlock]
 	}
 	for _, tx := range block.Transactions() {
-		if tx.Type() == types.BlobTxType {
-			return nil, ErrBlobTxsUnsupported
+		if worstcase.AcceptedTxTypes&(1<<tx.Type()) == 0 {
+			return nil, fmt.Errorf("%w: %d", ErrTxTypeUnsupported, tx.Type())
 		}
 	}
 

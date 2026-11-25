@@ -166,6 +166,12 @@ func (s *State) BaseFee() *uint256.Int {
 
 var errCostOverflow = errors.New("Cost() overflows uint256")
 
+// AcceptedTxTypes is a bitmap of acceptable transaction types.
+const AcceptedTxTypes = 0 |
+	1<<types.LegacyTxType |
+	1<<types.AccessListTxType |
+	1<<types.DynamicFeeTxType
+
 // ApplyTx validates the transaction both intrinsically and in the context of
 // worst-case gas assumptions of all previous operations. This provides an upper
 // bound on the total cost of the transaction such that a nil error returned by
@@ -180,10 +186,7 @@ var errCostOverflow = errors.New("Cost() overflows uint256")
 func (s *State) ApplyTx(tx *types.Transaction) error {
 	opts := &txpool.ValidationOptions{
 		Config: s.config,
-		Accept: 0 |
-			1<<types.LegacyTxType |
-			1<<types.AccessListTxType |
-			1<<types.DynamicFeeTxType,
+		Accept: AcceptedTxTypes,
 		// No byte-size limit needed as gas validation (intrinsic gas ≤
 		// tx gas ≤ block gas limit) already enforces an implicit size
 		// limit (2MB) on transactions.
