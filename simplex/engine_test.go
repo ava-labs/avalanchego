@@ -449,7 +449,7 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 		},
 		// --- ReplicationResponse ---
 		{
-			name: "ReplicationResponse with nil latest_round and latest_seq (allowed)",
+			name: "ReplicationResponse with nil latest_round and nil latest_seq (allowed)",
 			msg: &p2p.Simplex{
 				Message: &p2p.Simplex_ReplicationResponse{
 					ReplicationResponse: &p2p.ReplicationResponse{},
@@ -558,12 +558,24 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 			expectedErr: errInvalidDigestLength,
 		},
 		{
-			name: "BlockDigestRequest with invalid digest length",
+			name: "BlockDigestRequest with invalid digest length(too short)",
 			msg: &p2p.Simplex{
 				Message: &p2p.Simplex_BlockDigestRequest{
 					BlockDigestRequest: &p2p.BlockDigestRequest{
 						Seq:    1,
 						Digest: digest[:31],
+					},
+				},
+			},
+			expectedErr: errInvalidDigestLength,
+		},
+		{
+			name: "BlockDigestRequest with invalid digest length(too long)",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_BlockDigestRequest{
+					BlockDigestRequest: &p2p.BlockDigestRequest{
+						Seq:    1,
+						Digest: append(digest[:], byte(1), byte(2)),
 					},
 				},
 			},
@@ -887,6 +899,7 @@ func NewReplicationResponseMessage(qcBytes []byte) *p2p.Simplex {
 					},
 				},
 				LatestRound: &p2p.QuorumRound{Block: blockBytes},
+				LatestSeq:   &p2p.QuorumRound{Block: blockBytes},
 			},
 		},
 	}
@@ -1023,15 +1036,17 @@ func FuzzSimplexFinalizations(f *testing.F) {
 }
 
 func FuzzSimplexReplicationRequests(f *testing.F) {
-	f.Fuzz(func(t *testing.T, seq1, seq2, seq3, latestRound uint64) {
+	f.Fuzz(func(t *testing.T, seq1, seq2, seq3, latestRound, round1, round2, latestFinalizedSeq uint64) {
 		ctx := t.Context()
 		engine, configs := setupEngineForFuzz(t)
 
 		msg := &p2p.Simplex{
 			Message: &p2p.Simplex_ReplicationRequest{
 				ReplicationRequest: &p2p.ReplicationRequest{
-					Seqs:        []uint64{seq1, seq2, seq3},
-					LatestRound: latestRound,
+					Seqs:               []uint64{seq1, seq2, seq3},
+					LatestRound:        latestRound,
+					Rounds:             []uint64{round1, round2},
+					LatestFinalizedSeq: latestFinalizedSeq,
 				},
 			},
 		}
@@ -1047,6 +1062,16 @@ func FuzzSimplexReplicationResponses(f *testing.F) {
 		ctx := t.Context()
 		engine, configs := setupEngineForFuzz(t)
 
+		blockHeader := &p2p.BlockHeader{
+			Metadata: &p2p.ProtocolMetadata{
+				Version: version,
+				Epoch:   epoch,
+				Round:   round,
+				Seq:     seq,
+				Prev:    blockDigest,
+			},
+			Digest: blockDigest,
+		}
 		msg := &p2p.Simplex{
 			Message: &p2p.Simplex_ReplicationResponse{
 				ReplicationResponse: &p2p.ReplicationResponse{
@@ -1054,21 +1079,19 @@ func FuzzSimplexReplicationResponses(f *testing.F) {
 						{
 							Block: blockBytes,
 							Notarization: &p2p.QuorumCertificate{
-								BlockHeader: &p2p.BlockHeader{
-									Metadata: &p2p.ProtocolMetadata{
-										Version: version,
-										Epoch:   epoch,
-										Round:   round,
-										Seq:     seq,
-										Prev:    blockDigest,
-									},
-									Digest: blockDigest,
-								},
+								BlockHeader:       blockHeader,
 								QuorumCertificate: qc,
 							},
 						},
 					},
 					LatestRound: &p2p.QuorumRound{Block: blockBytes},
+					LatestSeq: &p2p.QuorumRound{
+						Block: blockBytes,
+						Finalization: &p2p.QuorumCertificate{
+							BlockHeader:       blockHeader,
+							QuorumCertificate: qc,
+						},
+					},
 				},
 			},
 		}
@@ -1118,6 +1141,63 @@ func FuzzSimplexEmptyNotarizations(f *testing.F) {
 				EmptyNotarization: &p2p.EmptyNotarization{
 					Metadata:          &p2p.EmptyVoteMetadata{Epoch: epoch, Round: round},
 					QuorumCertificate: qc,
+				},
+			},
+		}
+
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexBlockDigestRequests(f *testing.F) {
+	f.Fuzz(func(t *testing.T, seq uint64, blockDigest []byte) {
+		ctx := t.Context()
+		engine, configs := setupEngineForFuzz(t)
+
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_BlockDigestRequest{
+				BlockDigestRequest: &p2p.BlockDigestRequest{
+					Seq:    seq,
+					Digest: blockDigest,
+				},
+			},
+		}
+
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexAuxiliaryInfos(f *testing.F) {
+	f.Fuzz(func(t *testing.T, epoch uint64, version uint32, data []byte) {
+		ctx := t.Context()
+		engine, configs := setupEngineForFuzz(t)
+
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_AuxiliaryInfo{
+				AuxiliaryInfo: &p2p.AuxiliaryInfo{
+					Epoch:   epoch,
+					Version: version,
+					Data:    data,
+				},
+			},
+		}
+
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexEpochTransitionApprovals(f *testing.F) {
+	f.Fuzz(func(t *testing.T, nodeID, auxInfoDigest []byte, pChainHeight uint64, signature []byte) {
+		ctx := t.Context()
+		engine, configs := setupEngineForFuzz(t)
+
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_EpochTransitionApproval{
+				EpochTransitionApproval: &p2p.ValidatorSetApproval{
+					NodeId:        nodeID,
+					AuxInfoDigest: auxInfoDigest,
+					PChainHeight:  pChainHeight,
+					Signature:     signature,
 				},
 			},
 		}
