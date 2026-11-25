@@ -2184,7 +2184,8 @@ func (e *Epoch) processNotarizedBlock(block common.Block, notarization *common.N
 	if exists {
 		if round.notarization != nil || round.finalization != nil {
 			e.Logger.Debug("Round already notarized", zap.Uint64("round", md.Round))
-			return nil
+			// Keep processing the replication state, since rounds after this one may now be processable.
+			return e.processReplicationState()
 		}
 
 		roundDigest := round.block.BlockHeader().Digest
