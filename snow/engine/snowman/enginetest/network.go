@@ -239,18 +239,10 @@ func WithQueryInterceptor(h common.Handler, f queryInterceptor) common.Handler {
 	}
 }
 
-func WithGetInterceptor(h common.Handler, f getInterceptor) common.Handler {
-	return &handlerInterceptor{
-		Handler:      h,
-		interceptGet: f,
-	}
-}
-
 type handlerInterceptor struct {
 	common.Handler
 	interceptPullQuery pullQueryInterceptor
 	interceptPushQuery pushQueryInterceptor
-	interceptGet       getInterceptor
 }
 
 func (h *handlerInterceptor) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID, requestedHeight uint64) error {
@@ -269,15 +261,6 @@ func (h *handlerInterceptor) PushQuery(ctx context.Context, nodeID ids.NodeID, r
 		}
 	}
 	return h.Handler.PushQuery(ctx, nodeID, requestID, container, requestedHeight)
-}
-
-func (h *handlerInterceptor) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	if h.interceptGet != nil {
-		if err := h.interceptGet(ctx, nodeID, requestID, blkID); err != nil {
-			return err
-		}
-	}
-	return h.Handler.Get(ctx, nodeID, requestID, blkID)
 }
 
 type queryInterceptor func(
@@ -301,13 +284,6 @@ type pushQueryInterceptor func(
 	requestID uint32,
 	container []byte,
 	requestedHeight uint64,
-) error
-
-type getInterceptor func(
-	ctx context.Context,
-	nodeID ids.NodeID,
-	requestID uint32,
-	blkID ids.ID,
 ) error
 
 func sortedNodeIDs(nodeIDs set.Set[ids.NodeID]) []ids.NodeID {
