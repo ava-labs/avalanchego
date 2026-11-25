@@ -731,7 +731,7 @@ func (e *Engine) issueFrom(
 		if err != nil {
 			// We don't have the parent, so we need to request it from the peer.
 			e.sendRequest(ctx, nodeID, parentID, issuedMetric)
-			return nil
+			return nil //nolint:nilerr
 		}
 		blkID, blk = parentID, parent
 	}
