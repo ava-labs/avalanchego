@@ -3494,76 +3494,93 @@ func newFakeEngine(
 	return e
 }
 
-// TestEngineStopsBufferingBlocksTooFarAhead tests that the engine queues only
-// blocks within [maxHeightAboveAccepted] of its last
-// accepted block, however many blocks a peer pushes.
+// TestEngineStopsBufferingBlocksTooFarAhead tests that the engine ingests only
+// blocks within [maxHeightAbovePreferred] of its last preferred block and within
+// [maxHeightAboveAccepted] of its last accepted block.
 func TestEngineStopsBufferingBlocksTooFarAhead(t *testing.T) {
-	const heightLimit = maxHeightAboveAccepted
-
-	tests := []struct {
-		name      string
-		numBlocks int
+	testCases := []struct {
+		name        string
+		heightLimit int
+		// orphan: the first block's parent is unknown, so the preference never moves.
+		// Otherwise, every block is issued but none is accepted.
+		orphan bool
 	}{
-		{name: "fewer blocks than the limit", numBlocks: heightLimit / 2},
-		{name: "exactly the limit", numBlocks: heightLimit},
-		{name: "many times the limit", numBlocks: 3 * heightLimit},
+		{name: "above preferred", heightLimit: maxHeightAbovePreferred, orphan: true},
+		{name: "above accepted", heightLimit: maxHeightAboveAccepted, orphan: false},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
+	for _, testCase := range testCases {
+		heightLimit := testCase.heightLimit
 
-			chain := snowmantest.BuildDescendants(snowmantest.Genesis, test.numBlocks)
-			chain[0].ParentV = ids.GenerateTestID()
-			network := snowmanenginetest.NewNetwork(t)
-			nodeID := ids.GenerateTestNodeID()
-			peerID := ids.GenerateTestNodeID()
+		for _, test := range []struct {
+			name      string
+			numBlocks int
+		}{
+			{name: "fewer blocks than the limit", numBlocks: heightLimit / 2},
+			{name: "exactly the limit", numBlocks: heightLimit},
+			{name: "many times the limit", numBlocks: 3 * heightLimit},
+		} {
+			t.Run(testCase.name+"/"+test.name, func(t *testing.T) {
+				require := require.New(t)
 
-			// Neither the node nor the peer holds any block of [chain], so the only way
-			// the node learns about a block is from the message that carries it.
-			peerVM := snowmanenginetest.NewVM(t, chain)
-			newFakeEngine(t, network, peerID, peerVM, nodeID)
-
-			nodeVM := snowmanenginetest.NewVM(t, chain)
-			node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
-
-			_, lastAcceptedHeight := node.Consensus.LastAccepted()
-			highestAllowed := lastAcceptedHeight + heightLimit
-
-			var peakPending, peakBlockedDependencies int
-			for i, blk := range chain {
-				require.NoError(node.PushQuery(t.Context(), peerID, uint32(i+1), blk.Bytes(), 0))
-				peakPending = max(peakPending, len(node.pending))
-				peakBlockedDependencies = max(peakBlockedDependencies, node.blocked.NumDependencies())
-
-				for _, queued := range node.pending {
-					require.LessOrEqual(queued.Height(), highestAllowed)
+				chain := snowmantest.BuildDescendants(snowmantest.Genesis, test.numBlocks)
+				if testCase.orphan {
+					chain[0].ParentV = ids.GenerateTestID()
 				}
-			}
+				network := snowmanenginetest.NewNetwork(t)
+				nodeID := ids.GenerateTestNodeID()
+				peerID := ids.GenerateTestNodeID()
 
-			require.LessOrEqual(peakPending, heightLimit)
-			require.LessOrEqual(peakBlockedDependencies, heightLimit)
+				peerVM := snowmanenginetest.NewVM(t, chain)
+				newFakeEngine(t, network, peerID, peerVM, nodeID)
 
-			// The upper bounds above would also hold if the engine queued
-			// nothing at all, so check it doesn't hold vacuously.
-			atLeast := min(test.numBlocks, heightLimit) - 1
-			require.GreaterOrEqual(peakPending, atLeast)
-			require.GreaterOrEqual(peakBlockedDependencies, atLeast)
+				nodeVM := snowmanenginetest.NewVM(t, chain)
+				node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
 
-			// The block at the limit was queued and the one above it wasn't.
-			if test.numBlocks > heightLimit {
-				var highestQueued uint64
-				for _, queued := range node.pending {
-					highestQueued = max(highestQueued, queued.Height())
+				// We don't want the node to accept any blocks, we want the blocks to be pending but the preference
+				// to increase, if possible
+				require.NoError(node.ConnectedValidators.Disconnected(t.Context(), peerID))
+
+				_, lastAcceptedHeight := node.Consensus.LastAccepted()
+
+				// A block is held if it is queued or processing.
+				highestHeld := func() uint64 {
+					var highest uint64
+					if node.Consensus.NumProcessing() > 0 {
+						_, highest = node.Consensus.Preference()
+					}
+					for _, queued := range node.pending {
+						highest = max(highest, queued.Height())
+					}
+					return highest
 				}
-				require.Equal(highestAllowed, highestQueued)
-			}
 
-			network.DeliverMessages()
-			require.Empty(node.pending)
-			require.Zero(node.blocked.NumDependencies())
-			require.Zero(node.Consensus.NumProcessing())
-		})
+				for i, blk := range chain {
+					require.NoError(node.PushQuery(t.Context(), peerID, uint32(i+1), blk.Bytes(), 0))
+				}
+
+				require.Equal(lastAcceptedHeight+uint64(min(test.numBlocks, heightLimit)), highestHeld())
+
+				held := len(node.pending) + node.Consensus.NumProcessing()
+				require.LessOrEqual(held, heightLimit)
+				require.LessOrEqual(node.blocked.NumDependencies(), heightLimit)
+
+				// Check the upper bounds don't hold vacuously.
+				atLeast := min(test.numBlocks, heightLimit) - 1
+				require.GreaterOrEqual(held, atLeast)
+				if testCase.orphan {
+					require.GreaterOrEqual(node.blocked.NumDependencies(), atLeast)
+				} else {
+					_, acceptedHeight := node.Consensus.LastAccepted()
+					require.Equal(lastAcceptedHeight, acceptedHeight)
+					require.Equal(min(test.numBlocks, heightLimit), node.Consensus.NumProcessing())
+				}
+
+				network.DeliverMessages()
+				require.Empty(node.pending)
+				require.Zero(node.blocked.NumDependencies())
+			})
+		}
 	}
 }
 
