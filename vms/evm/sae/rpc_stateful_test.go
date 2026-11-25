@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -1209,16 +1208,13 @@ func TestTraceBlockMalformedHeaderForTxs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vector, err := rlp.EncodeToBytes(
-				types.NewBlock(
-					tt.header,
-					types.Transactions{sut.wallet.SetNonceAndSign(t, 0, tt.tx)},
-					nil,
-					nil,
-					saetest.TrieHasher(),
-				),
-			)
-			require.NoErrorf(t, err, "rlp.EncodeToBytes(types.NewBlock(...))")
+			vector := encodeRLP(t, types.NewBlock(
+				tt.header,
+				types.Transactions{sut.wallet.SetNonceAndSign(t, 0, tt.tx)},
+				nil,
+				nil,
+				saetest.TrieHasher(),
+			))
 			sut.wallet.DecrementNonce(t, 0)
 
 			// Results of non-erroring traces are tested elsewhere.
