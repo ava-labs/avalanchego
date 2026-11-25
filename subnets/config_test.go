@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -27,6 +28,9 @@ var validParameters = snowball.Parameters{
 }
 
 func TestValidParameters(t *testing.T) {
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+
 	tests := []struct {
 		name        string
 		s           Config
@@ -65,7 +69,7 @@ func TestValidParameters(t *testing.T) {
 				SimplexParameters: &simplex.Parameters{
 					MaxNetworkDelay:    1 * time.Second,
 					MaxRebroadcastWait: 1 * time.Second,
-					InitialValidators:  []simplex.ValidatorInfo{{NodeID: ids.GenerateTestNodeID(), PublicKey: []byte{0x01}}},
+					InitialValidators:  []simplex.ValidatorInfo{{NodeID: ids.GenerateTestNodeID(), PublicKey: sk.PublicKey().Compress()}},
 				},
 				ValidatorOnly: false,
 			},
