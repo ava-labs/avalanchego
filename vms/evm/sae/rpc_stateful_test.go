@@ -1142,12 +1142,8 @@ func TestTraceBlockMalformedHeaderForTxs(t *testing.T) {
 	async.BaseFee = nil
 	sync := types.CopyHeader(async)
 	hookstest.ConvertToSynchronous(sync)
-
-	withBaseFee := func(h *types.Header) *types.Header {
-		h = types.CopyHeader(h)
-		h.BaseFee = big.NewInt(0)
-		return h
-	}
+	syncWithBaseFee := types.CopyHeader(sync)
+	syncWithBaseFee.BaseFee = big.NewInt(0)
 
 	dynTx := &types.DynamicFeeTx{
 		To:        &common.Address{},
@@ -1188,7 +1184,7 @@ func TestTraceBlockMalformedHeaderForTxs(t *testing.T) {
 		},
 		{
 			name:    "sync_nil_blob_gas",
-			header:  withBaseFee(sync),
+			header:  syncWithBaseFee,
 			tx:      callBlobBaseFeeOp,
 			wantErr: nil,
 		},
