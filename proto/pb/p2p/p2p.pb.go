@@ -3375,6 +3375,7 @@ func (x *ReplicationResponse) GetLatestSeq() *QuorumRound {
 }
 
 // BlockDigestRequest requests the block with the given sequence and digest.
+// They are used by simplex to fetch a specific block for a potentially equivocated round.
 type BlockDigestRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Seq           uint64                 `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
