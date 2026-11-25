@@ -17,6 +17,7 @@ import (
 func CmpOpt() cmp.Option {
 	return cmputils.IfIn[tx.Tx](cmp.Options{
 		cmpopts.IgnoreUnexported(
+			tx.Tx{},
 			avax.UTXOID{},
 			secp256k1fx.OutputOwners{},
 		),

@@ -407,6 +407,33 @@ func TestApply_SortInvariant(t *testing.T) {
 	require.Equal(t, forwardRoot, backwardRoot, "Apply must be invariant to the order of txs")
 }
 
+// BenchmarkAtomicRequests parses a block's txs and merges their atomic
+// requests, which sorts the txs by ID. Parsing is included because that is how
+// [State.Apply] receives the txs of an accepted block.
+func BenchmarkAtomicRequests(b *testing.B) {
+	for _, numTxs := range []int{1, 10, 100} {
+		b.Run(fmt.Sprintf("txs=%d", numTxs), func(b *testing.B) {
+			var build builder
+			txs := make([]*tx.Tx, numTxs)
+			for i := range txs {
+				if i%2 == 0 {
+					txs[i] = build.newImport()
+				} else {
+					txs[i] = build.newExport()
+				}
+			}
+			extData, err := tx.MarshalSlice(txs)
+			require.NoError(b, err, "tx.MarshalSlice()")
+
+			for b.Loop() {
+				txs, _ := tx.ParseSlice(extData)
+				_, _ = atomicRequests(txs)
+			}
+			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*numTxs), "ns/tx")
+		})
+	}
+}
+
 // TestCrash verifies that crashes while applying are gracefully handled.
 func TestCrash(t *testing.T) {
 	var build builder

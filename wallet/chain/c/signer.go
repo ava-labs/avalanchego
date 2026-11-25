@@ -152,6 +152,13 @@ func SignUnsigned(ctx context.Context, signer Signer, utx tx.Unsigned) (*tx.Tx, 
 }
 
 func sign(t *tx.Tx, txSigners [][]keychain.Signer) error {
+	// Signing modifies t, so any ID or bytes cached before signing, such as
+	// after a partial signing, would be stale.
+	*t = tx.Tx{
+		Unsigned: t.Unsigned,
+		Creds:    t.Creds,
+	}
+
 	unsignedBytes, err := tx.UnsignedBytes(t.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
