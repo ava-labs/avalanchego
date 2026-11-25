@@ -386,6 +386,8 @@ var (
 // is the real fee paid by its transactions. For Cancun-active blocks, missing
 // excess blob gas is treated as zero, yielding a blob base fee of 1 wei and
 // matching canonical chain behavior.
+//
+// Transaction types not accepted by consensus are also rejected by tracing.
 func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *tracers.TraceConfig) ([]*tracers.TxTraceResult, error) {
 	block := new(types.Block)
 	if err := rlp.DecodeBytes(blob, block); err != nil {
