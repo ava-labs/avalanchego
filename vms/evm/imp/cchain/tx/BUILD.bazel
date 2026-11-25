@@ -23,6 +23,7 @@ go_library(
         "//graft/coreth/plugin/evm/customtypes",
         "//ids",
         "//snow",
+        "//upgrade",
         "//utils",
         "//utils/constants",
         "//utils/crypto/secp256k1",

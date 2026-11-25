@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -55,7 +56,7 @@ func init() {
 }
 
 type envConfig struct {
-	fork             upgradetest.Fork
+	fork             upgrade.Upgrade
 	isCustomFeeAsset bool
 	vmStaticConfig   *config.Config
 	vmDynamicConfig  *Config

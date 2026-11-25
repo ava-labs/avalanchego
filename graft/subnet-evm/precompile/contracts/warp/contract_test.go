@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
@@ -28,9 +28,9 @@ import (
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-var forks = []upgradetest.Fork{
-	upgradetest.Fortuna,
-	upgradetest.Latest,
+var forks = []upgrade.Upgrade{
+	upgrade.Fortuna,
+	upgrade.Latest,
 }
 
 func runTests(

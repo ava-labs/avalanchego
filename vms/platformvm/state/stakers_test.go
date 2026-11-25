@@ -212,7 +212,7 @@ func TestDiffStakersUpdateValidator(t *testing.T) {
 	modifiedStaker.Weight++
 	modifiedStaker.EndTime = endTime
 
-	diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
+	diff := diffStakers{}
 	require.False(existsInDiff(&diff, staker))
 
 	diff.DeleteValidator(staker)
@@ -235,7 +235,7 @@ func TestDiffStakersDeleteAddDeleteValidator(t *testing.T) {
 	v1Prime := *v1
 	v1Prime.Weight++
 
-	diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
+	diff := diffStakers{}
 
 	// Delete v1 (simulating removal of an existing validator from base state)
 	diff.DeleteValidator(v1)
@@ -269,7 +269,7 @@ func TestDiffStakersDeleteThenReAddSameValidator(t *testing.T) {
 	require := require.New(t)
 	v1 := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 
-	diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
+	diff := diffStakers{}
 
 	// Delete v1 (simulating removal of an existing validator from base state)
 	diff.DeleteValidator(v1)
@@ -529,7 +529,7 @@ func TestGetStakerIteratorDeleteAndPut(t *testing.T) {
 			base := newBaseStakers()
 			base.PutValidator(staker)
 
-			diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
+			diff := diffStakers{}
 			replacement := tt.makeReplacement(staker)
 
 			diff.DeleteValidator(staker)

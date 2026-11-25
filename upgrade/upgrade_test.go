@@ -52,6 +52,6 @@ func TestInvalidUpgrade(t *testing.T) {
 
 func TestLatestTime(t *testing.T) {
 	now := time.Now()
-	c := upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, now)
+	c := upgradetest.GetConfigWithUpgradeTime(Latest, now)
 	require.Equal(t, now, c.LatestTime())
 }

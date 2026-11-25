@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -114,7 +115,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, activeForkTime),
 					},
 				}
 			},
@@ -138,7 +139,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, activeForkTime),
 					},
 					Bootstrapped: &utils.Atomic[bool]{},
 				}
@@ -164,7 +165,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Cortina, activeForkTime),
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Cortina, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -190,7 +191,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -219,7 +220,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -248,7 +249,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -278,7 +279,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -311,7 +312,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -344,7 +345,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -379,7 +380,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -419,7 +420,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -465,7 +466,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, activeForkTime),
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -511,7 +512,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, activeForkTime),
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -590,7 +591,7 @@ func TestGetValidatorRules(t *testing.T) {
 					HeliconMinStakeDuration: heliconMinStakeDuration,
 					MaxStakeDuration:        maxStakeDuration,
 					MinDelegationFee:        minDelegationFee,
-					UpgradeConfig:           upgradetest.GetConfig(upgradetest.Granite),
+					UpgradeConfig:           upgradetest.GetConfig(upgrade.Granite),
 				},
 				Ctx: &snow.Context{
 					AVAXAssetID: avaxAssetID,
@@ -616,7 +617,7 @@ func TestGetValidatorRules(t *testing.T) {
 					HeliconMinStakeDuration: heliconMinStakeDuration,
 					MaxStakeDuration:        maxStakeDuration,
 					MinDelegationFee:        minDelegationFee,
-					UpgradeConfig:           upgradetest.GetConfig(upgradetest.Helicon),
+					UpgradeConfig:           upgradetest.GetConfig(upgrade.Helicon),
 				},
 				Ctx: &snow.Context{
 					AVAXAssetID: avaxAssetID,
@@ -721,7 +722,7 @@ func TestGetDelegatorRules(t *testing.T) {
 					MinStakeDuration:        minStakeDuration,
 					HeliconMinStakeDuration: heliconMinStakeDuration,
 					MaxStakeDuration:        maxStakeDuration,
-					UpgradeConfig:           upgradetest.GetConfig(upgradetest.Granite),
+					UpgradeConfig:           upgradetest.GetConfig(upgrade.Granite),
 				},
 				Ctx: &snow.Context{
 					AVAXAssetID: avaxAssetID,
@@ -746,7 +747,7 @@ func TestGetDelegatorRules(t *testing.T) {
 					MinStakeDuration:        minStakeDuration,
 					HeliconMinStakeDuration: heliconMinStakeDuration,
 					MaxStakeDuration:        maxStakeDuration,
-					UpgradeConfig:           upgradetest.GetConfig(upgradetest.Helicon),
+					UpgradeConfig:           upgradetest.GetConfig(upgrade.Helicon),
 				},
 				Ctx: &snow.Context{
 					AVAXAssetID: avaxAssetID,

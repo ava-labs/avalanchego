@@ -73,7 +73,6 @@ func TestBagAdd(t *testing.T) {
 	mode, freq := bag.Mode()
 	require.Equal(elt0, mode)
 	require.Zero(freq)
-	require.Empty(bag.Threshold())
 
 	bag.Add(elt0)
 
@@ -84,7 +83,6 @@ func TestBagAdd(t *testing.T) {
 	mode, freq = bag.Mode()
 	require.Equal(elt0, mode)
 	require.Equal(1, freq)
-	require.Len(bag.Threshold(), 1)
 
 	bag.Add(elt0)
 
@@ -95,7 +93,6 @@ func TestBagAdd(t *testing.T) {
 	mode, freq = bag.Mode()
 	require.Equal(elt0, mode)
 	require.Equal(2, freq)
-	require.Len(bag.Threshold(), 1)
 
 	bag.AddCount(elt1, 3)
 
@@ -106,41 +103,6 @@ func TestBagAdd(t *testing.T) {
 	mode, freq = bag.Mode()
 	require.Equal(elt1, mode)
 	require.Equal(3, freq)
-	require.Len(bag.Threshold(), 2)
-}
-
-func TestBagSetThreshold(t *testing.T) {
-	require := require.New(t)
-
-	elt0 := 0
-	elt1 := 1
-
-	bag := Bag[int]{}
-
-	bag.AddCount(elt0, 2)
-	bag.AddCount(elt1, 3)
-
-	bag.SetThreshold(0)
-
-	require.Equal(2, bag.Count(elt0))
-	require.Equal(3, bag.Count(elt1))
-	require.Equal(5, bag.Len())
-	require.Len(bag.List(), 2)
-	mode, freq := bag.Mode()
-	require.Equal(elt1, mode)
-	require.Equal(3, freq)
-	require.Len(bag.Threshold(), 2)
-
-	bag.SetThreshold(3)
-
-	require.Equal(2, bag.Count(elt0))
-	require.Equal(3, bag.Count(elt1))
-	require.Equal(5, bag.Len())
-	require.Len(bag.List(), 2)
-	mode, freq = bag.Mode()
-	require.Equal(elt1, mode)
-	require.Equal(3, freq)
-	require.Len(bag.Threshold(), 1)
 }
 
 func TestBagFilter(t *testing.T) {

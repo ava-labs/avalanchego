@@ -10,7 +10,6 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const minBagSize = 16
@@ -19,9 +18,6 @@ const minBagSize = 16
 type Bag[T comparable] struct {
 	counts map[T]int
 	size   int
-
-	threshold    int
-	metThreshold set.Set[T]
 }
 
 // Of returns a Bag initialized with [elts]
@@ -34,22 +30,6 @@ func Of[T comparable](elts ...T) Bag[T] {
 func (b *Bag[T]) init() {
 	if b.counts == nil {
 		b.counts = make(map[T]int, minBagSize)
-	}
-}
-
-// SetThreshold sets the number of times an element must be added to be contained in
-// the threshold set.
-func (b *Bag[_]) SetThreshold(threshold int) {
-	if b.threshold == threshold {
-		return
-	}
-
-	b.threshold = threshold
-	b.metThreshold.Clear()
-	for vote, count := range b.counts {
-		if count >= threshold {
-			b.metThreshold.Add(vote)
-		}
 	}
 }
 
@@ -72,10 +52,6 @@ func (b *Bag[T]) AddCount(elt T, count int) {
 	totalCount := b.counts[elt] + count
 	b.counts[elt] = totalCount
 	b.size += count
-
-	if totalCount >= b.threshold {
-		b.metThreshold.Add(elt)
-	}
 }
 
 // Count returns the number of [elt] in the bag.
@@ -114,11 +90,6 @@ func (b *Bag[T]) Mode() (T, int) {
 	}
 
 	return mode, modeFreq
-}
-
-// Threshold returns the elements that have been seen at least threshold times.
-func (b *Bag[T]) Threshold() set.Set[T] {
-	return b.metThreshold
 }
 
 // Returns a bag with the elements of this bag that return true for [filterFunc],

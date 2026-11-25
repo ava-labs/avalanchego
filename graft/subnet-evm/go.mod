@@ -11,7 +11,7 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/avalanchego v1.15.4
 	github.com/ava-labs/avalanchego/graft/evm v1.15.4
-	github.com/ava-labs/firewood-go/ffi v0.9.0
+	github.com/ava-labs/firewood-go/ffi v0.9.1
 	github.com/ava-labs/libevm v1.13.15-0.20261111112450-a335c2ecf4df
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-cmd/cmd v1.4.3
@@ -208,8 +208,8 @@ tool (
 	go.uber.org/mock/mockgen
 )
 
-replace github.com/ava-labs/avalanchego => ../../
-
-replace github.com/ava-labs/avalanchego/graft/evm => ../evm
-
-replace github.com/ava-labs/avalanchego/graft/coreth => ../coreth
+replace (
+	github.com/ava-labs/avalanchego => ../../
+	github.com/ava-labs/avalanchego/graft/coreth => ../coreth
+	github.com/ava-labs/avalanchego/graft/evm => ../evm
+)

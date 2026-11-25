@@ -1,0 +1,15 @@
+name: Label PRs by changed paths
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  label:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read # Required to read .github/labeler.yml
+      pull-requests: write # Required to add and remove PR labels
+    steps:
+      - uses: actions/labeler@v7
+        with:
+          sync-labels: true
