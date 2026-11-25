@@ -1131,7 +1131,12 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 	})
 }
 
-func TestRegression_TraceBlocksNilBaseFee(t *testing.T) {
+// TestTraceBlockMalformedHeaderForTxs is a regression test demonstrating a
+// previous vulnerability in which a user-provided block could crash an RPC node
+// due to nil-pointer dereferencing of regular and/or blob base fees. When used
+// with a JS tracer, which spawns worker goroutines, the panic would not be
+// recovered by the RPC's HTTP handler.
+func TestTraceBlockMalformedHeaderForTxs(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
 	async := unwrap(t, sut.buildAndParseBlock(t, sut.genesis)).Header()
