@@ -2009,3 +2009,46 @@ func TestReplicationRedeliversRestoredFinalization(t *testing.T) {
 	require.NoError(t, e.HandleMessage(replicateSeq(blocks[1]), nodes[1]))
 	storage.WaitForBlockCommit(1)
 }
+
+// TestReplicationContinuesPastAlreadyNotarizedRound tests that a replicated round we have already notarized
+// does not prevent the node from processing the replicated rounds that follow it.
+func TestReplicationContinuesPastAlreadyNotarizedRound(t *testing.T) {
+	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	blocks := createBlocks(t, nodes, 2)
+	quorum := common.Quorum(len(nodes))
+
+	bb := testutil.NewTestBlockBuilder()
+	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), bb)
+	conf.ReplicationEnabled = true
+
+	e, err := simplex.NewEpoch(conf)
+	require.NoError(t, err)
+	t.Cleanup(e.Stop)
+	require.NoError(t, e.Start())
+
+	// Notarize round 0, which moves the node to round 1.
+	block0, notarization0 := advanceRound(t, e, bb, true, false, &blocks[0].Finalization.Finalization.ProtocolMetadata)
+	require.Equal(t, blocks[0].VerifiedBlock.BlockHeader().Digest, block0.BlockHeader().Digest)
+	require.Equal(t, uint64(1), e.Metadata().Round)
+
+	notarization1, err := testutil.NewNotarization(e.Logger, &testutil.TestSignatureAggregator{N: len(nodes)}, blocks[1].VerifiedBlock, nodes[:quorum])
+	require.NoError(t, err)
+	round1 := common.QuorumRound{
+		Block:        blocks[1].VerifiedBlock.(*testutil.TestBlock),
+		Notarization: &notarization1,
+	}
+
+	// Replicate round 0, which we have already notarized, together with round 1.
+	// Round 0 is processed first, and must not stop round 1 from being processed.
+	require.NoError(t, e.HandleMessage(&common.Message{
+		ReplicationResponse: &common.ReplicationResponse{
+			LatestRound: &round1,
+			Data: []common.QuorumRound{
+				{Block: block0.(*testutil.TestBlock), Notarization: notarization0},
+				round1,
+			},
+		},
+	}, nodes[1]))
+
+	testutil.WaitToEnterRoundWithTimeout(t, e, 2, testutil.DefaultTimeout)
+}
