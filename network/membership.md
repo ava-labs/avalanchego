@@ -26,7 +26,8 @@ How a member such as rpc-01 gets its certificate and node ID:
    (`root.crt`) offline. Every node of the subnet sets `membershipCAPath` to
    `root.crt` in its subnet config. Use a root per subnet: a root trusted by
    several subnets admits each one's members to all of them.
-2. **Issuing CA → Root CA, once.** The Issuing CA creates its key and a
+2. **Issuing CA → Root CA, once.** The Issuing CA creates its key (ECDSA
+   P-256, RSA-2048 or RSA-4096: peers ignore a chain through any other) and a
    certificate signing request (CSR) and sends the CSR. The root signs it and
    sends back `issuing-ca.crt`.
 3. **rpc-01 → Issuing CA.** rpc-01 creates its staking key (`staker.key`:
@@ -47,19 +48,13 @@ How a member such as rpc-01 gets its certificate and node ID:
    its key and a self-signed one fails the chain. rpc-01 reads its own node ID
    from `info.getNodeID`.
 
-A member sends its leaf and the intermediate as its staking certificate. The
-node ID is a hash of the leaf, so every renewal is a new node ID. Validators
-keep their own certificates, since a validator's node ID is its P-Chain
-identity.
+Validators keep their own self-signed certificates, since a validator's node ID is its
+P-Chain identity. If the intermediate leaks, the root revokes it and the
+non-validators are reissued from a new one, with no change to any node's
+`membershipCA`.
 
-We recommend a root per subnet. Nothing in a certificate names a subnet, so a
-certificate is a member of every subnet whose `membershipCA` holds a CA in its
-certificate chain. The root stays offline: if the intermediate leaks, the root
-revokes it and non-validators are reissued from a new one, with no change to
-any node's `membershipCA`.
-
-Two new settings in the subnet config set the roots and revocation lists, each
-as a PEM file path or inline PEM text:
+The subnet config sets the roots and revocation lists, each as a PEM file path
+or inline PEM text:
 
 ```json
 {
@@ -73,8 +68,9 @@ as a PEM file path or inline PEM text:
   rotation.
 - `membershipCRLPath` / `membershipCRL`: optional revocation lists (X.509 CRLs).
 
-The node does not check list signatures; the operator verifies both files before installing them. It refuses only a file with no certificate
-or list, a list that does not parse, or a file cut off mid-block.
+The node does not check list signatures; the operator verifies both files
+before installing them. A file with no certificate or list, a list that does
+not parse, or a block cut short or damaged fails the start.
 
 A peer is a member of a tracked subnet if it validates the subnet, is listed in
 `allowedNodes`, or its certificate chain verifies against the subnet's
@@ -131,6 +127,6 @@ decides this from its own config.
   membership from its own config, so a node without it drops a member's
   blockchain messages. If that node does not validate the primary network and
   runs `network-require-validator-to-connect`, it also drops the connection.
-- **Moving a node from `allowedNodes` to a certificate changes its node ID.**
-  Anything keyed by it, such as `--bootstrap-ids`, `allowedNodes` or
-  monitoring, needs updating.
+- **Moving a node from `allowedNodes` to a certificate changes its node ID**,
+  and so does every renewal after that. Anything keyed by it, such as
+  `--bootstrap-ids`, `allowedNodes` or monitoring, needs updating.

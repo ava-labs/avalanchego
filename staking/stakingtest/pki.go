@@ -25,9 +25,6 @@ func NewPKI(t *testing.T) (root, intermediate *CA) {
 
 // NodeChain issues a node certificate from [ca] and returns the chain that node
 // presents during the TLS handshake: the leaf first, then its issuing CA.
-//
-// A negative [validity] yields an already-expired leaf, which is how the
-// expiry cases are built.
 func NodeChain(t *testing.T, ca *CA, commonName string, validity time.Duration) []*x509.Certificate {
 	t.Helper()
 

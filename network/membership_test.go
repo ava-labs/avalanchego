@@ -53,25 +53,11 @@ func newTestPKI(t *testing.T) testPKI {
 	}
 }
 
-func membershipCAConfig(t *testing.T, rootPEM []byte) subnets.Config {
-	t.Helper()
-
+func membershipCAConfig(rootPEM []byte) subnets.Config {
 	return subnets.Config{
 		ValidatorOnly: true,
 		MembershipCA:  []string{string(rootPEM)},
 	}
-}
-
-// trackedSubnetsOf returns the subnets a node with [configs] tracks: every
-// subnet it holds a config for, except the primary network.
-func trackedSubnetsOf(configs map[ids.ID]subnets.Config) set.Set[ids.ID] {
-	tracked := set.NewSet[ids.ID](len(configs))
-	for subnetID := range configs {
-		if subnetID != constants.PrimaryNetworkID {
-			tracked.Add(subnetID)
-		}
-	}
-	return tracked
 }
 
 func mustNewMembership(t *testing.T, configs map[ids.ID]subnets.Config) *membership {
@@ -101,7 +87,11 @@ func newMembershipTestNetwork(t *testing.T, subnetConfigs map[ids.ID]subnets.Con
 	cfg.SubnetConfigs = subnetConfigs
 	// Node config produces exactly this relationship: a config per tracked
 	// subnet, plus the primary network.
-	cfg.TrackedSubnets = trackedSubnetsOf(cfg.SubnetConfigs)
+	for subnetID := range subnetConfigs {
+		if subnetID != constants.PrimaryNetworkID {
+			cfg.TrackedSubnets.Add(subnetID)
+		}
+	}
 
 	ipTracker, err := newIPTracker(
 		cfg.TrackedSubnets,
@@ -135,8 +125,8 @@ func TestMembershipTracking(t *testing.T) {
 
 	m := mustNewMembership(t, map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
-		subnetID:                   membershipCAConfig(t, pki.rootPEM),
-		otherSubnetID:              membershipCAConfig(t, otherPKI.rootPEM),
+		subnetID:                   membershipCAConfig(pki.rootPEM),
+		otherSubnetID:              membershipCAConfig(otherPKI.rootPEM),
 	})
 
 	require.False(m.IsCertified(subnetID, pki.nodeID))
@@ -177,7 +167,7 @@ func TestAllowConnectionKeepsMembers(t *testing.T) {
 		subnetValidator = ids.GenerateTestNodeID()
 	)
 
-	subnetConfig := membershipCAConfig(t, pki.rootPEM)
+	subnetConfig := membershipCAConfig(pki.rootPEM)
 	subnetConfig.AllowedNodes = set.Of(allowed)
 	n := newMembershipTestNetwork(t, map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
@@ -246,7 +236,7 @@ func memberNodeConfig(t *testing.T, ca *stakingtest.CA, base Config) *Config {
 // TestConnectionGrantsMembership drives two real networks through a TLS
 // handshake and checks that the certificate chain the member sends survives it:
 // the non-validator is admitted under network-require-validator-to-connect on
-// its certificate alone.
+// its certificate alone, and its record goes when the connection does.
 func TestConnectionGrantsMembership(t *testing.T) {
 	require := require.New(t)
 
@@ -258,7 +248,7 @@ func TestConnectionGrantsMembership(t *testing.T) {
 	base.TrackedSubnets = set.Of(subnetID)
 	base.SubnetConfigs = map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
-		subnetID:                   membershipCAConfig(t, root.CertPEM()),
+		subnetID:                   membershipCAConfig(root.CertPEM()),
 	}
 
 	// The validator keeps its self-signed certificate; only the non-validator
@@ -333,4 +323,10 @@ func TestConnectionGrantsMembership(t *testing.T) {
 	}
 
 	require.True(validatorNet.membership.IsCertified(subnetID, memberConfig.MyNodeID))
+
+	// A reconnect must verify its chain afresh rather than inherit this record.
+	memberNet.StartClose()
+	require.Eventually(func() bool {
+		return validatorNet.membership.certified(memberConfig.MyNodeID) == nil
+	}, 10*time.Second, 10*time.Millisecond)
 }

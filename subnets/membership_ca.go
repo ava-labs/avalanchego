@@ -27,9 +27,8 @@ const (
 )
 
 var (
-	ErrNoMembershipCACertificates = errors.New("membership CA holds no certificates")
-
-	errTruncatedPEM = errors.New("holds a PEM block that begins and does not end")
+	errNoMembershipCACertificates = errors.New("membership CA holds no certificates")
+	errTruncatedPEM               = errors.New("holds a PEM block that begins and does not end")
 )
 
 // MembershipCA holds the roots a peer's staking certificate chain may verify
@@ -52,7 +51,7 @@ func (c *MembershipCA) CRLs() []*x509.RevocationList {
 
 // ParseMembershipCA builds a MembershipCA from PEM certificate blocks, skipping
 // anything else as crypto/x509 does. The operator verifies the file before
-// installing it, so only a truncated file, or one without a certificate, is
+// installing it, so only a file damaged since, or one without a certificate, is
 // refused.
 func ParseMembershipCA(pemBytes []byte) (*MembershipCA, error) {
 	if err := checkPEMComplete(pemBytes); err != nil {
@@ -60,7 +59,7 @@ func ParseMembershipCA(pemBytes []byte) (*MembershipCA, error) {
 	}
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(pemBytes) {
-		return nil, ErrNoMembershipCACertificates
+		return nil, errNoMembershipCACertificates
 	}
 	return &MembershipCA{roots: roots}, nil
 }
@@ -76,7 +75,7 @@ func checkPEMComplete(pemBytes []byte) error {
 
 // Certify reports whether [chain], leaf first, chains to a root through no
 // revoked certificate, and when that membership expires: the latest expiry
-// among the chains that verify. A nil MembershipCA verifies nothing.
+// among the chains that verify.
 func (c *MembershipCA) Certify(chain []*x509.Certificate) (time.Time, bool) {
 	var (
 		expiresAt time.Time
@@ -128,7 +127,7 @@ func (c *MembershipCA) isRevoked(verifiedChain []*x509.Certificate) bool {
 // revocation.
 func (c *MembershipCA) verifiedChains(chain []*x509.Certificate) [][]*x509.Certificate {
 	// Without roots, crypto/x509 would verify against the system's instead.
-	if c == nil || c.roots == nil || len(chain) == 0 || len(chain) > maxMembershipChainLen {
+	if c.roots == nil || len(chain) == 0 || len(chain) > maxMembershipChainLen {
 		return nil
 	}
 	for _, cert := range chain {

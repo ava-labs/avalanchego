@@ -131,10 +131,10 @@ while openssl x509 -noout -subject -fingerprint -sha256 -ext basicConstraints; d
 
 It prints one subject and fingerprint per root, which must match step 1
 everywhere, and each must show `CA:TRUE`. A certificate without it, such as a
-leaf pasted in by mistake, loads but verifies nothing, and the node does not
-refuse it. `CN=Issuing CA` means the intermediate was installed instead, which
-breaks intermediate rotation. After a restart the node logs
-`membership CA loaded` for the subnet.
+leaf pasted in by mistake, still loads: it admits its own holder even after the
+intermediate above it is revoked or expires. `CN=Issuing CA` means the
+intermediate was installed instead, which breaks intermediate rotation. After a
+restart the node logs `membership CA loaded` for the subnet.
 
 ## 4. Enrol a node
 
@@ -335,7 +335,7 @@ in one file with the new intermediate's list if there is one
 | Warning `staking certificate is revoked by membership CRL` | The node's certificate is on the list | The inventory; reissue it if that was a mistake |
 | Warning `staking certificate membership expires soon` | The leaf or intermediate expires within 30 days | Renew ([step 5](#5-renew-a-certificate)) or rotate the intermediate |
 | No `membership CA loaded` line | No `membershipCAPath`/`membershipCA`, a misspelt key, or the subnet is not tracked | The subnet config and `--track-subnets` |
-| The node refuses to start on `membershipCAPath` | No certificate in the file, or the file was cut short | The command in [step 3](#3-install-the-root-on-every-node); copy the file again |
+| The node refuses to start on `membershipCAPath` | No certificate in the file, or the file was cut short or damaged | The command in [step 3](#3-install-the-root-on-every-node); copy the file again |
 | The node refuses to start on `membershipCRLPath`/`membershipCRL` | No list in the file, a list that does not parse, a partitioned list, or a file cut short | Rebuild it as in [7a](#7a-revoke-a-node-certificate) |
 | The node refuses to start parsing its own certificate | The leaf is over 2 KiB | `openssl x509 -in staker.crt -outform DER \| wc -c` |
 | No warning, but the subnet's chain never bootstraps | The validators trust a different root, or their root is not `CA:TRUE` | Compare the output of [step 3](#3-install-the-root-on-every-node) across nodes |

@@ -192,8 +192,7 @@ func (m *membership) logOwnCertificate(log logging.Logger, tlsConfig *tls.Config
 		return
 	}
 
-	// A revocation list names the serial; hex of the bytes matches OpenSSL.
-	serial := fmt.Sprintf("%X", chain[0].SerialNumber.Bytes())
+	serial := serialHex(chain[0])
 	certified := m.findCertifiedSubnets(chain)
 	if len(certified) == 0 {
 		for subnetID, ca := range m.cas {
@@ -225,6 +224,12 @@ func (m *membership) logOwnCertificate(log logging.Logger, tlsConfig *tls.Config
 		}
 		log.Info("staking certificate chains to membership CA", fields...)
 	}
+}
+
+// serialHex is how a revocation list names [cert]: hex of the serial's bytes,
+// as OpenSSL prints it.
+func serialHex(cert *x509.Certificate) string {
+	return fmt.Sprintf("%X", cert.SerialNumber.Bytes())
 }
 
 // IsCertified implements [subnets.MembershipChecker].

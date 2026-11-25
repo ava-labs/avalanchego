@@ -11,10 +11,10 @@ import (
 )
 
 var (
-	ErrMembershipCAWhenNotValidatorOnly = errors.New("membershipCAPath and membershipCA can only be set when ValidatorOnly is true")
-	ErrTooManyMembershipCASources       = errors.New("only one of membershipCAPath or membershipCA can be set")
-	ErrMembershipCRLWithoutMembershipCA = errors.New("membershipCRLPath and membershipCRL can only be set with membershipCAPath or membershipCA")
-	ErrTooManyMembershipCRLSources      = errors.New("only one of membershipCRLPath or membershipCRL can be set")
+	errMembershipCAWhenNotValidatorOnly = errors.New("membershipCAPath and membershipCA can only be set when ValidatorOnly is true")
+	errTooManyMembershipCASources       = errors.New("only one of membershipCAPath or membershipCA can be set")
+	errMembershipCRLWithoutMembershipCA = errors.New("membershipCRLPath and membershipCRL can only be set with membershipCAPath or membershipCA")
+	errTooManyMembershipCRLSources      = errors.New("only one of membershipCRLPath or membershipCRL can be set")
 )
 
 // LoadMembershipCA parses MembershipCAPath or MembershipCA into the roots that
@@ -65,15 +65,15 @@ func readMembershipPEM(path string, inline []string) ([]byte, error) {
 func (c *Config) validMembership() error {
 	switch {
 	case c.hasMembershipCA() && !c.ValidatorOnly:
-		return ErrMembershipCAWhenNotValidatorOnly
+		return errMembershipCAWhenNotValidatorOnly
 	case c.MembershipCAPath != "" && len(c.MembershipCA) > 0:
-		return ErrTooManyMembershipCASources
+		return errTooManyMembershipCASources
 	case c.MembershipCRLPath != "" && len(c.MembershipCRL) > 0:
-		return ErrTooManyMembershipCRLSources
+		return errTooManyMembershipCRLSources
 	// A list does nothing without the CA it is checked against, so it is
 	// almost always a CA key that is missing or misspelled.
 	case c.hasMembershipCRL() && !c.hasMembershipCA():
-		return ErrMembershipCRLWithoutMembershipCA
+		return errMembershipCRLWithoutMembershipCA
 	default:
 		return nil
 	}

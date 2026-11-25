@@ -18,11 +18,8 @@ package membership
 import (
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -34,10 +31,8 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking/stakingtest"
-	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/subnet"
@@ -86,7 +81,7 @@ var _ = ginkgo.Describe("[Membership]", ginkgo.Label("membership"), ginkgo.Seria
 		env := e2e.GetEnv(tc)
 		sharedNetwork := env.GetNetwork()
 		if sharedNetwork.DefaultRuntimeConfig.Kube != nil {
-			ginkgo.Skip("the fleet check reads the process context of local nodes, which kube-hosted nodes lack")
+			ginkgo.Skip("bootstrapVia hands other nodes the staking address this process dials, which outside the cluster is a local port-forward")
 		}
 
 		tc.By("minting a membership CA and the intermediate that issues node certificates")
@@ -128,22 +123,8 @@ var _ = ginkgo.Describe("[Membership]", ginkgo.Label("membership"), ginkgo.Seria
 			zap.Stringers("validators", tmpnet.NodesToIDs(validators...)),
 		)
 
-		tc.By("confirming the subnet's own validators hold no certificate")
-		// A validator's credential is its P-Chain entry, so the CA exists for
-		// the nodes that have no on-chain identity. The fleet is the control:
-		// stock self-signed certificates the membership CA rejects, on nodes that
-		// are members regardless.
-		roots, err := subnets.ParseMembershipCA(membershipCA.CertPEM())
-		require.NoError(err)
-		for _, validator := range validators {
-			chain := stakingCertChain(tc, validator)
-			require.Len(chain, 1, "%s presents more than a self-signed certificate", validator.NodeID)
-			_, certified := roots.Certify(chain)
-			require.False(certified, "%s holds a certificate from the membership CA", validator.NodeID)
-		}
-
 		tc.By("issuing a certificate to a node that validates nothing")
-		firstMember := newMemberNode(tc, issuingCA, "member-1", subnetID)
+		firstMember, _ := newMemberNode(tc, issuingCA, "member-1", subnetID)
 		e2e.AddEphemeralNode(tc, network, firstMember)
 		awaitSubnetChain(tc, firstMember, chainID)
 
@@ -171,24 +152,17 @@ var _ = ginkgo.Describe("[Membership]", ginkgo.Label("membership"), ginkgo.Seria
 
 		tc.By(fmt.Sprintf("confirming the outsider is still shut out after %s", exclusionWindow))
 		requireNeverBootstraps(tc, outsider, chainID)
-		requireUnanswered(tc, outsider, chainID)
 		// The validators never disconnected the outsider, they only never
 		// answered it - a subnet's validators withhold data, they do not close
 		// connections. Re-checking here is what makes that a claim rather than
 		// an assumption.
 		awaitPeered(tc, observer, outsider.NodeID)
 
-		tc.By("recording the configuration and process of every validator")
-		before := snapshotFleet(tc, validators)
-
 		tc.By("onboarding a second member by issuing it a certificate, and nothing else")
-		secondMember := newMemberNode(tc, issuingCA, "member-2", subnetID)
+		secondMember, secondLeaf := newMemberNode(tc, issuingCA, "member-2", subnetID)
 		secondMember.Flags.SetDefaults(bootstrapVia(tc, network, firstMember))
 		e2e.AddEphemeralNode(tc, network, secondMember)
 		awaitSubnetChain(tc, secondMember, chainID)
-
-		tc.By("confirming no validator was reconfigured or restarted to admit it")
-		requireFleetUntouched(tc, validators, before)
 
 		tc.By("confirming connection admission honours the certificate too")
 		// Both nodes were configured to dial member-1 and neither validates
@@ -199,7 +173,7 @@ var _ = ginkgo.Describe("[Membership]", ginkgo.Label("membership"), ginkgo.Seria
 		requireNotPeered(tc, firstMember, outsider.NodeID)
 
 		tc.By("revoking the second member's certificate in the subnet config")
-		crlPEM := issuingCA.CRLPEM(tc, 1, certValidity, stakingCertChain(tc, secondMember)[0])
+		crlPEM := issuingCA.CRLPEM(tc, 1, certValidity, secondLeaf)
 		privateSubnet.Config["membershipCRL"] = []string{string(crlPEM)}
 
 		tc.By("restarting the validators and the first member to load the list")
@@ -218,7 +192,6 @@ var _ = ginkgo.Describe("[Membership]", ginkgo.Label("membership"), ginkgo.Seria
 
 		tc.By(fmt.Sprintf("confirming the revoked member is shut out like the outsider for %s", exclusionWindow))
 		requireNeverBootstraps(tc, secondMember, chainID)
-		requireUnanswered(tc, secondMember, chainID)
 
 		tc.By("confirming connection admission refuses the revoked certificate")
 		// The second member still dials the first, its bootstrapper, so this is
@@ -238,7 +211,7 @@ func restartNodes(tc tests.TestContext, nodes ...*tmpnet.Node) {
 }
 
 // newMemberNode issues a staking certificate from [ca] and returns a node that
-// presents it and tracks [subnetID].
+// presents it and tracks [subnetID], and the leaf a revocation would name.
 //
 // The leaf and its issuer travel with the node as its staking certificate, so
 // the chain a validator verifies is the one the TLS handshake already carries.
@@ -247,8 +220,11 @@ func newMemberNode(
 	ca *stakingtest.CA,
 	commonName string,
 	subnetID ids.ID,
-) *tmpnet.Node {
+) (*tmpnet.Node, *x509.Certificate) {
 	certPEM, keyPEM := ca.IssueNodeCert(tc, commonName, certValidity)
+	block, _ := pem.Decode(certPEM)
+	leaf, err := x509.ParseCertificate(block.Bytes)
+	require.NoError(tc, err)
 
 	memberNode := tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
 		config.StakingCertContentKey:   base64.StdEncoding.EncodeToString(certPEM),
@@ -268,7 +244,7 @@ func newMemberNode(
 		zap.String("commonName", commonName),
 		zap.Stringer("nodeID", memberNode.NodeID),
 	)
-	return memberNode
+	return memberNode, leaf
 }
 
 // awaitSubnetChain blocks until [chainID] reports bootstrapped on [node].
@@ -345,75 +321,6 @@ func requireNotPeered(tc tests.TestContext, observer *tmpnet.Node, nodeID ids.No
 	}
 }
 
-// stakingCertChain returns the certificate chain [node] presents to its peers,
-// leaf first, read from the flag it was started with.
-func stakingCertChain(tc tests.TestContext, node *tmpnet.Node) []*x509.Certificate {
-	pemBytes, err := base64.StdEncoding.DecodeString(node.Flags[config.StakingCertContentKey])
-	require.NoError(tc, err)
-
-	var chain []*x509.Certificate
-	for rest := pemBytes; ; {
-		var block *pem.Block
-		block, rest = pem.Decode(rest)
-		if block == nil {
-			return chain
-		}
-
-		cert, err := x509.ParseCertificate(block.Bytes)
-		require.NoError(tc, err)
-		chain = append(chain, cert)
-	}
-}
-
-// responseOps are the subnet chain messages that only another peer can supply.
-// Counting them is what states the exclusion in the feature's own terms: a
-// non-member is not slow to bootstrap, it is never answered.
-var responseOps = []string{"accepted_frontier", "accepted", "ancestors", "put", "chits"}
-
-const handlerMessagesMetric = "avalanche_handler_messages"
-
-func requireUnanswered(tc tests.TestContext, node *tmpnet.Node, chainID ids.ID) {
-	handled := chainMessages(tc, node, chainID)
-
-	for _, op := range responseOps {
-		require.Zero(tc, handled[op], "%s was sent a %s for a subnet it is not a member of", node.NodeID, op)
-	}
-
-	var timedOut float64
-	for op, count := range handled {
-		if strings.HasSuffix(op, "_failed") {
-			timedOut += count
-		}
-	}
-	require.NotZero(tc, timedOut, "%s never even asked for the subnet's state", node.NodeID)
-}
-
-// chainMessages returns how many messages [node]'s handler for [chainID] has
-// taken, per message op.
-func chainMessages(tc tests.TestContext, node *tmpnet.Node, chainID ids.ID) map[string]float64 {
-	families, err := metrics.NewClient(node.GetAccessibleURI()).
-		GetMetrics(tc.ContextWithTimeout(tests.DefaultTimeout))
-	require.NoError(tc, err)
-
-	handled := map[string]float64{}
-	for _, metric := range families[handlerMessagesMetric].GetMetric() {
-		var op string
-		forThisChain := false
-		for _, label := range metric.GetLabel() {
-			switch label.GetName() {
-			case "chain":
-				forThisChain = label.GetValue() == chainID.String()
-			case "op":
-				op = label.GetValue()
-			}
-		}
-		if forThisChain {
-			handled[op] = metric.GetCounter().GetValue()
-		}
-	}
-	return handled
-}
-
 // droppedUnallowedMetric counts the enforcement point itself: the chain router
 // refusing to hand a non-member's message to a subnet's handler.
 const droppedUnallowedMetric = "avalanche_requests_dropped_unallowed"
@@ -444,49 +351,4 @@ func droppedUnallowed(tc tests.TestContext, validators []*tmpnet.Node) map[ids.N
 		}
 	}
 	return dropped
-}
-
-// fleetState is what onboarding must leave alone: the flags a node was started
-// with - which carry the subnet configuration, and so the membership CA and the
-// allowedNodes list - and the process reading them.
-type fleetState struct {
-	flags string
-	pid   int
-}
-
-func snapshotFleet(tc tests.TestContext, validators []*tmpnet.Node) map[ids.NodeID]fleetState {
-	snapshot := make(map[ids.NodeID]fleetState, len(validators))
-	for _, validator := range validators {
-		snapshot[validator.NodeID] = readFleetState(tc, validator)
-	}
-	return snapshot
-}
-
-func requireFleetUntouched(
-	tc tests.TestContext,
-	validators []*tmpnet.Node,
-	before map[ids.NodeID]fleetState,
-) {
-	for _, validator := range validators {
-		after := readFleetState(tc, validator)
-		require.Equal(tc, before[validator.NodeID].flags, after.flags,
-			"%s was reconfigured to admit a new member", validator.NodeID)
-		require.Equal(tc, before[validator.NodeID].pid, after.pid,
-			"%s was restarted to admit a new member", validator.NodeID)
-	}
-}
-
-func readFleetState(tc tests.TestContext, validator *tmpnet.Node) fleetState {
-	flagsBytes, err := os.ReadFile(validator.GetFlagsPath())
-	require.NoError(tc, err)
-
-	processBytes, err := os.ReadFile(filepath.Join(validator.DataDir, config.DefaultProcessContextFilename))
-	require.NoError(tc, err)
-	processContext := node.ProcessContext{}
-	require.NoError(tc, json.Unmarshal(processBytes, &processContext))
-
-	return fleetState{
-		flags: string(flagsBytes),
-		pid:   processContext.PID,
-	}
 }

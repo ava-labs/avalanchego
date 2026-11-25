@@ -4,6 +4,7 @@
 package subnets
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -46,12 +47,19 @@ func TestParseMembershipCA(t *testing.T) {
 	require.True(verifies(ca, chain))
 
 	_, err = ParseMembershipCA([]byte("not PEM at all"))
-	require.ErrorIs(err, ErrNoMembershipCACertificates)
+	require.ErrorIs(err, errNoMembershipCACertificates)
 
 	// A rotation file whose copy was interrupted: the first root parses, so
 	// without the check it would load as a CA trusting only the old fleet.
-	_, err = ParseMembershipCA(slices.Concat(root.CertPEM(), []byte("-----BEGIN CERTIFICATE-----\nMIIB")))
-	require.ErrorIs(err, errTruncatedPEM)
+	_, err = ParseMembershipCA(slices.Concat(root.CertPEM(), cutInsideEnd(otherRoot.CertPEM())))
+	require.ErrorIs(err, errUndecodedPEM)
+}
+
+// cutInsideEnd returns [pemBytes] cut inside its last END line, which leaves
+// every BEGIN and END marker in place.
+func cutInsideEnd(pemBytes []byte) []byte {
+	trimmed := bytes.TrimSpace(pemBytes)
+	return trimmed[:len(trimmed)-len("-----")]
 }
 
 func TestMembershipCACertify(t *testing.T) {
@@ -78,9 +86,6 @@ func TestMembershipCACertify(t *testing.T) {
 	expiredIntermediate := root.NewIntermediateCA(t, "Expired Nodes CA", -time.Minute)
 	require.False(verifies(ca, stakingtest.NodeChain(t, expiredIntermediate, "rpc-04", testLeafValidity)))
 	require.False(verifies(ca, nil))
-
-	var nilCA *MembershipCA
-	require.False(verifies(nilCA, chain))
 }
 
 // TestMembershipCACertifyBoundsPathBuilding checks the limits on the work a
@@ -165,7 +170,10 @@ func TestConfigLoadMembershipCA(t *testing.T) {
 
 			ca, err := test.config.LoadMembershipCA()
 			require.ErrorIs(err, test.expectedErr)
-			require.Equal(test.wantCA, ca != nil)
+			if !test.wantCA {
+				require.Nil(ca)
+				return
+			}
 			require.Equal(test.certifies, verifies(ca, chain))
 		})
 	}

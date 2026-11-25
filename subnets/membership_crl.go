@@ -15,9 +15,8 @@ import (
 const crlPEMType = "X509 CRL"
 
 var (
-	ErrNoMembershipCRLs       = errors.New("membership CRL holds no revocation lists")
-	ErrMalformedMembershipCRL = errors.New("malformed membership CRL")
-
+	errNoMembershipCRLs               = errors.New("membership CRL holds no revocation lists")
+	errMalformedMembershipCRL         = errors.New("malformed membership CRL")
 	errCriticalMembershipCRLExtension = errors.New("list has a critical extension, such as a partition or delta marker")
 )
 
@@ -32,7 +31,7 @@ func ParseMembershipCAWithCRL(caPEM, crlPEM []byte) (*MembershipCA, error) {
 		return nil, err
 	}
 	if err := checkPEMComplete(crlPEM); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrMalformedMembershipCRL, err)
+		return nil, fmt.Errorf("%w: %w", errMalformedMembershipCRL, err)
 	}
 
 	ca.revoked = make(map[string]set.Set[string])
@@ -42,7 +41,7 @@ func ParseMembershipCAWithCRL(caPEM, crlPEM []byte) (*MembershipCA, error) {
 		}
 		list, err := parseRevocationList(block.Bytes)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrMalformedMembershipCRL, err)
+			return nil, fmt.Errorf("%w: %w", errMalformedMembershipCRL, err)
 		}
 		issuer := string(list.RawIssuer)
 		serials := ca.revoked[issuer]
@@ -53,7 +52,7 @@ func ParseMembershipCAWithCRL(caPEM, crlPEM []byte) (*MembershipCA, error) {
 		ca.crls = append(ca.crls, list)
 	}
 	if len(ca.crls) == 0 {
-		return nil, ErrNoMembershipCRLs
+		return nil, errNoMembershipCRLs
 	}
 	return ca, nil
 }

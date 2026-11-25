@@ -118,15 +118,15 @@ func TestParseMembershipCAWithCRLRefuses(t *testing.T) {
 
 	// Dropped without the check, the newest list would re-admit everyone on it.
 	newest := crlPEM(t, intermediate, 2, leaf)
-	_, err := ParseMembershipCAWithCRL(root.CertPEM(), slices.Concat(crlPEM(t, intermediate, 1, leaf), newest[:len(newest)/2]))
-	require.ErrorIs(err, errTruncatedPEM)
+	_, err := ParseMembershipCAWithCRL(root.CertPEM(), slices.Concat(crlPEM(t, intermediate, 1, leaf), cutInsideEnd(newest)))
+	require.ErrorIs(err, errUndecodedPEM)
 
 	_, err = ParseMembershipCAWithCRL(root.CertPEM(), intermediate.CertPEM())
-	require.ErrorIs(err, ErrNoMembershipCRLs)
+	require.ErrorIs(err, errNoMembershipCRLs)
 
 	garbage := pem.EncodeToMemory(&pem.Block{Type: crlPEMType, Bytes: []byte("not a list")})
 	_, err = ParseMembershipCAWithCRL(root.CertPEM(), garbage)
-	require.ErrorIs(err, ErrMalformedMembershipCRL)
+	require.ErrorIs(err, errMalformedMembershipCRL)
 
 	// A partitioned list carries a critical issuing distribution point. Every
 	// critical extension is refused alike, so one stands for the rest.

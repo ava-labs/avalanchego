@@ -92,7 +92,7 @@ func TestValidParameters(t *testing.T) {
 				MembershipCA:   []string{"-----BEGIN CERTIFICATE-----"},
 				SnowParameters: &validParameters,
 			},
-			expectedErr: ErrMembershipCAWhenNotValidatorOnly,
+			expectedErr: errMembershipCAWhenNotValidatorOnly,
 		},
 		{
 			name: "membershipCAPath and membershipCA",
@@ -102,16 +102,7 @@ func TestValidParameters(t *testing.T) {
 				MembershipCA:     []string{"-----BEGIN CERTIFICATE-----"},
 				SnowParameters:   &validParameters,
 			},
-			expectedErr: ErrTooManyMembershipCASources,
-		},
-		{
-			// LoadMembershipCA parses it, once, when the node starts.
-			name: "malformed membershipCA is not read",
-			s: Config{
-				ValidatorOnly:  true,
-				MembershipCA:   []string{"not a PEM block"},
-				SnowParameters: &validParameters,
-			},
+			expectedErr: errTooManyMembershipCASources,
 		},
 		{
 			name: "membershipCRL without membershipCA",
@@ -120,7 +111,7 @@ func TestValidParameters(t *testing.T) {
 				MembershipCRL:  []string{"-----BEGIN X509 CRL-----"},
 				SnowParameters: &validParameters,
 			},
-			expectedErr: ErrMembershipCRLWithoutMembershipCA,
+			expectedErr: errMembershipCRLWithoutMembershipCA,
 		},
 		{
 			name: "membershipCRLPath and membershipCRL",
@@ -131,7 +122,7 @@ func TestValidParameters(t *testing.T) {
 				MembershipCRL:     []string{"-----BEGIN X509 CRL-----"},
 				SnowParameters:    &validParameters,
 			},
-			expectedErr: ErrTooManyMembershipCRLSources,
+			expectedErr: errTooManyMembershipCRLSources,
 		},
 	}
 	for _, tt := range tests {

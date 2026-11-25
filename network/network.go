@@ -1127,7 +1127,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("subnetID", subnetID),
 			// What a revocation list would have to name to evict this peer.
-			zap.String("serial", fmt.Sprintf("%X", chain[0].SerialNumber.Bytes())),
+			zap.String("serial", serialHex(chain[0])),
 			zap.String("expiresAt", expiresAt.UTC().Format(time.RFC3339)),
 		)
 	}

@@ -72,8 +72,8 @@ Root certificates, as a PEM file (`membershipCAPath`) or inline PEM text
 (`membershipCA`); set at most one, and only with `validatorOnly`. A peer whose
 staking certificate chain verifies against one of them is a **member** of this
 Subnet, like its validators and the nodes in `allowedNodes`. Listing several
-roots stages a root rotation. A file with no certificate, or one that was cut
-short, fails the start.
+roots stages a root rotation. A file with no certificate, or with a block cut
+short or damaged, fails the start.
 
 ```json
 {
