@@ -403,18 +403,14 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 	}
 
 	var (
-		hdr    = block.Header()
-		isSync = hook.Synchronous(a.tracerBackend.Hooks(), hdr)
-		cfg    = a.tracerBackend.ChainConfig()
+		hdr = block.Header()
+		cfg = a.tracerBackend.ChainConfig()
 	)
 	if cfg.IsCancun(hdr.Number, hdr.Time) && hdr.ExcessBlobGas == nil {
 		hdr.ExcessBlobGas = new(uint64)
 	}
-	if isSync {
-		if cfg.IsLondon(hdr.Number) && hdr.BaseFee == nil {
-			return nil, ErrMissingBaseFee
-		}
-	} else {
+	switch {
+	case !hook.Synchronous(a.tracerBackend.Hooks(), hdr):
 		parent, err := a.tracerBackend.restoreExecutedParent(ctx, block)
 		if err != nil {
 			return nil, fmt.Errorf("restoring parent block: %w", err)
@@ -424,9 +420,12 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 		gasClock := parent.ExecutedByGasTime()
 		gasClock.BeforeBlock(a.tracerBackend.Hooks().BlockTime(hdr))
 		hdr.BaseFee = gasClock.BaseFee().ToBig()
-	}
-	resealed := block.WithSeal(hdr)
 
+	case cfg.IsLondon(hdr.Number) && hdr.BaseFee == nil:
+		return nil, ErrMissingBaseFee
+	}
+
+	resealed := block.WithSeal(hdr)
 	api := tracers.NewAPI(&suppliedHashBackend{
 		tracerBackend: a.tracerBackend,
 		supplied:      block,
