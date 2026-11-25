@@ -293,12 +293,8 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, b
 
 func (e *Engine) isBlockTooFarAhead(blk snowman.Block, nodeID ids.NodeID, requestID uint32) bool {
 	_, lastAcceptedHeight := e.Consensus.LastAccepted()
-	maxHeight, err := math.Add(lastAcceptedHeight, maxHeightAboveAccepted)
-	if err != nil {
-		e.Ctx.Log.Debug("overflow calculating max allowed block ingestion height",
-			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight), zap.Error(err))
-		return false
-	}
+
+	maxHeight := lastAcceptedHeight + maxHeightAboveAccepted
 
 	if h := blk.Height(); h > maxHeight {
 		e.Ctx.Log.Debug("skipping block ingestion",
@@ -957,20 +953,10 @@ func (e *Engine) sendQuery(
 	}
 
 	_, lastAcceptedHeight := e.Consensus.LastAccepted()
-
-	blockIngestionLimit, blockIngestionLimitOverflowErr := math.Add(lastAcceptedHeight, maxHeightAboveAccepted)
-	if blockIngestionLimitOverflowErr != nil {
-		e.Ctx.Log.Debug("Overflow when computing block ingestion limit",
-			zap.Stringer("blkID", blkID),
-			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
-			zap.Error(blockIngestionLimitOverflowErr),
-		)
-		// If the addition overflowed, it means that lastAcceptedHeight is near maxuint64.
-		// In this case, we can safely query for the next height to prefer, as it is not too far ahead of our last accepted height.
-	}
-
+	blockIngestionLimit := lastAcceptedHeight + maxHeightAboveAccepted
 	heightToAskAbout := nextHeightToPrefer
-	if nextHeightToPrefer > blockIngestionLimit && blockIngestionLimitOverflowErr == nil {
+
+	if nextHeightToPrefer > blockIngestionLimit {
 		heightToAskAbout = blockIngestionLimit
 		e.Ctx.Log.Debug("querying for block at a lower height than preferred",
 			zap.Stringer("blkID", blkID),

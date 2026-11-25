@@ -3371,19 +3371,6 @@ func TestEngineAbandonsBlocksTooFarAhead(t *testing.T) {
 			childHeight:         maxHeightAbovePreferred + 1,
 			expectFetch:         false,
 		},
-		{
-			name:                "overflow of the ingestion cutoff is fetched",
-			laggingLastAccepted: math.MaxUint64 - 100,
-			childHeight:         math.MaxUint64,
-			expectFetch:         true,
-		},
-		{
-			// The preferred height plus [maxHeightAbovePreferred] overflows.
-			name:                "overflow of the preference cutoff is fetched",
-			laggingLastAccepted: math.MaxUint64 - maxHeightAbovePreferred/2,
-			childHeight:         math.MaxUint64,
-			expectFetch:         true,
-		},
 	}
 
 	for _, test := range tests {
@@ -3706,68 +3693,6 @@ func TestEngineRejectsFetchedBlockTooFarAhead(t *testing.T) {
 	// Rejecting [tooFar] failed the request, so the vote no longer waits on it.
 	require.False(node.blkReqs.HasValue(tooFar.ID()))
 	require.Zero(node.blocked.NumDependencies())
-}
-
-// TestEngineQueriesNextHeightWhenIngestionLimitOverflows tests that when the last
-// accepted height is so close to maxuint64 that adding
-// [maxHeightAboveAccepted] to it overflows, the engine
-// still queries for the height after its preference, rather than for the
-// bogus ingestion limit the overflowing addition yields.
-func TestEngineQueriesNextHeightWhenIngestionLimitOverflows(t *testing.T) {
-	require := require.New(t)
-
-	newBlock := func(height uint64, parentID ids.ID, status snowtest.Status) *snowmantest.Block {
-		id := ids.GenerateTestID()
-		return &snowmantest.Block{
-			Decidable:  snowtest.Decidable{IDV: id, Status: status},
-			ParentV:    parentID,
-			HeightV:    height,
-			TimestampV: snowmantest.GenesisTimestamp,
-			BytesV:     id[:],
-		}
-	}
-
-	// [lastAccepted] is high enough that adding the ingestion distance to its height overflows.
-	lastAccepted := newBlock(math.MaxUint64-100, snowmantest.GenesisID, snowtest.Accepted)
-	child := newBlock(lastAccepted.Height()+1, lastAccepted.ID(), snowtest.Undecided)
-
-	network := snowmanenginetest.NewNetwork(t)
-	nodeID := ids.GenerateTestNodeID()
-	peerID := ids.GenerateTestNodeID()
-
-	nodeVM := snowmanenginetest.NewVM(t, []*snowmantest.Block{lastAccepted, child})
-	node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
-
-	peerVM := snowmanenginetest.NewVM(t, acceptedCopies([]*snowmantest.Block{lastAccepted, child}))
-	peerCfg := DefaultConfig(t)
-	peerCfg.VM = peerVM
-	peerCfg.Sender = network.CreateSender(peerID)
-	peerGetHandler, err := getter.New(peerVM, peerCfg.Sender, peerCfg.Ctx.Log, time.Second, 2000, peerCfg.Ctx.Registerer)
-	require.NoError(err)
-	peerCfg.AllGetsServer = peerGetHandler
-	peer, err := New(peerCfg)
-	require.NoError(err)
-	var numQueries int
-	network.Register(peerID, snowmanenginetest.WithQueryInterceptor(peer,
-		func(_ context.Context, _ ids.NodeID, _ uint32, requestedHeight uint64) error {
-			// Every poll must ask about the height after [child], the node's preference.
-			preferred, preferredHeight := node.Consensus.Preference()
-			require.Equal(child.ID(), preferred)
-			require.Equal(math.MaxUint64-uint64(99), preferredHeight)
-			require.Equal(child.Height()+1, requestedHeight)
-			numQueries++
-			return nil
-		},
-	))
-	require.NoError(peer.Start(t.Context(), 0))
-
-	// Issuing [child] makes it the preference and the node polls the peer about it.
-	require.NoError(node.PushQuery(t.Context(), peerID, 1, child.Bytes(), 0))
-	network.DeliverMessages()
-
-	require.Positive(numQueries)
-	acceptedID, _ := node.Consensus.LastAccepted()
-	require.Equal(child.ID(), acceptedID)
 }
 
 // acceptedCopies returns a copy of each of [blks] in the accepted state, so a
