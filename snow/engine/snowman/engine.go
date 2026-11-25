@@ -293,14 +293,14 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, b
 
 func (e *Engine) isBlockTooFarAhead(blk snowman.Block, nodeID ids.NodeID, requestID uint32) bool {
 	_, lastAcceptedHeight := e.Consensus.LastAccepted()
-	maxAllowedBlockIngestionHeight, err := math.Add(lastAcceptedHeight, maxHeightAboveAccepted)
+	maxHeight, err := math.Add(lastAcceptedHeight, maxHeightAboveAccepted)
 	if err != nil {
 		e.Ctx.Log.Debug("overflow calculating max allowed block ingestion height",
 			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight), zap.Error(err))
 		return false
 	}
 
-	if h := blk.Height(); h > maxAllowedBlockIngestionHeight {
+	if h := blk.Height(); h > maxHeight {
 		e.Ctx.Log.Debug("skipping block ingestion",
 			zap.String("reason", "block height too far ahead of last accepted height"),
 			zap.Stringer("nodeID", nodeID),
@@ -308,7 +308,7 @@ func (e *Engine) isBlockTooFarAhead(blk snowman.Block, nodeID ids.NodeID, reques
 			zap.Stringer("blkID", blk.ID()),
 			zap.Uint64("blkHeight", h),
 			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
-			zap.Uint64("maxAllowedBlockIngestionHeight", maxAllowedBlockIngestionHeight),
+			zap.Uint64("maxHeight", maxHeight),
 		)
 		return true
 	}
