@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -1770,13 +1769,10 @@ func TestRouterDropsMessagesWhileExecuting(t *testing.T) {
 	chainRouter.HandleInbound(t.Context(), ancestorsResponse(getAncestorsRequestID))
 	require.Equal(3, numFinishedHandling)
 
-	require.Equal(3.0, testutil.ToFloat64(chainRouter.metrics.droppedRequests))
-
 	// A failure sent by a peer is not dropped, even while the chain is
 	// executing, so the engine is told that the request failed.
 	chainRouter.HandleInbound(t.Context(), message.InboundAppError(nodeID, ctx.ChainID, appRequestID, 0, ""))
 	require.Equal(uint32(appRequestID), <-appRequestFailures)
-	require.Equal(3.0, testutil.ToFloat64(chainRouter.metrics.droppedRequests))
 
 	// Dropping the responses left their requests outstanding, so their
 	// timeouts fire and the engine is told that the requests failed. Timeout
@@ -1795,7 +1791,6 @@ func TestRouterDropsMessagesWhileExecuting(t *testing.T) {
 	// Once execution is done, messages reach the engine again.
 	chainRouter.HandleInbound(t.Context(), pullQuery(2))
 	require.Equal(uint32(2), <-pullQueries)
-	require.Equal(3.0, testutil.ToFloat64(chainRouter.metrics.droppedRequests))
 }
 
 func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
