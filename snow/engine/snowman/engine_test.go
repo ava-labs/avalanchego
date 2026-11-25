@@ -3425,7 +3425,7 @@ func TestEngineStopsBufferingBlocksTooFarAhead(t *testing.T) {
 				nodeVM := snowmanenginetest.NewVM(t, chain)
 				node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
 
-				// We don't want the node to accept any blocks, we want the blocks to be pending but the preference
+				// We don't want the node to accept any blocks, we want the blocks to be not decided yet, but the preference
 				// to increase, if possible
 				require.NoError(node.ConnectedValidators.Disconnected(t.Context(), peerID))
 

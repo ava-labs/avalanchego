@@ -1173,7 +1173,9 @@ func (e *Engine) getProcessingAncestor(initialVote ids.ID) (ids.ID, bool) {
 
 // shouldIssueBlock returns true if the provided block should be enqueued for
 // issuance. If the block is already decided, already enqueued, or has already
-// been issued, this function will return false.
+// been issued, this function will return false. It also returns false if the
+// block is more than [maxHeightAboveAccepted] above the last accepted block or
+// more than [maxHeightAbovePreferred] above the preferred block.
 func (e *Engine) shouldIssueBlock(blk snowman.Block) bool {
 	if e.isDecided(blk) {
 		return false
@@ -1190,17 +1192,15 @@ func (e *Engine) shouldIssueBlock(blk snowman.Block) bool {
 	_, lastAcceptedHeight := e.Consensus.LastAccepted()
 	_, preferredHeight := e.Consensus.Preference()
 
-	maxAcceptedHeight := lastAcceptedHeight + maxHeightAboveAccepted
-	maxPreferredHeight := preferredHeight + maxHeightAbovePreferred
-
-	if height > maxAcceptedHeight || height > maxPreferredHeight {
+	// The block isn't decided, so [height] > [lastAcceptedHeight] and the
+	// subtractions can't underflow.
+	if height-lastAcceptedHeight > maxHeightAboveAccepted ||
+		(height > preferredHeight && height-preferredHeight > maxHeightAbovePreferred) {
 		e.Ctx.Log.Debug("not issuing block too far ahead",
 			zap.Stringer("blkID", blkID),
 			zap.Uint64("height", height),
 			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
 			zap.Uint64("preferredHeight", preferredHeight),
-			zap.Uint64("maxAcceptedHeight", maxAcceptedHeight),
-			zap.Uint64("maxPreferredHeight", maxPreferredHeight),
 		)
 		return false
 	}
