@@ -30,9 +30,9 @@ var ErrNotContiguous = errors.New("accepted blocks must be contiguous")
 type VM struct {
 	blocktest.VM
 
-	// VerifyF, if non-nil, is called by a block's Verify after the VM checked
+	// Verify, if non-nil, is called by a block's Verify after the VM checked
 	// that the block's parent is known. A non-nil error fails verification.
-	VerifyF func(*snowmantest.Block) error
+	Verify func(*snowmantest.Block) error
 
 	byBytes          map[string]*snowmantest.Block
 	verified         map[ids.ID]*snowmantest.Block // verified and undecided
@@ -149,8 +149,8 @@ func (b *block) Verify(ctx context.Context) error {
 	if !parentAccepted && !parentVerified {
 		return ErrUnknownParent
 	}
-	if b.vm.VerifyF != nil {
-		if err := b.vm.VerifyF(b.Block); err != nil {
+	if b.vm.Verify != nil {
+		if err := b.vm.Verify(b.Block); err != nil {
 			return err
 		}
 	}
