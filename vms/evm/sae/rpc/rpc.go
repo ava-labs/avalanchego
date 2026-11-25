@@ -123,7 +123,6 @@ func New(chain Chain, config Config) (*Provider, error) {
 
 	replaySlots := max(1, runtime.GOMAXPROCS(0)-1)
 	chainIdx := chainIndexer{chain}
-	override := bloomOverrider{chain}
 
 	back := &backend{
 		chain,
@@ -135,7 +134,7 @@ func New(chain Chain, config Config) (*Provider, error) {
 		price,
 		chain.Mempool(),
 		chainIdx,
-		override,
+		newCachedBloomOverrider(chain),
 		make(chan struct{}, replaySlots),
 		newBloomIndexer(
 			// TODO(alarso16): if we are state syncing, we need to provide the
@@ -143,7 +142,7 @@ func New(chain Chain, config Config) (*Provider, error) {
 			// [core.ChainIndexer.AddCheckpoint].
 			chain.DB(),
 			chainIdx,
-			override,
+			bloomOverrider{chain},
 			config.BlocksPerBloomSection,
 		),
 	}
