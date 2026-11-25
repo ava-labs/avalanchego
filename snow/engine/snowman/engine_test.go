@@ -3350,7 +3350,7 @@ func (m *mockPChainProgressUpdater) SetProgress(height uint64) {
 }
 
 // TestEngineAbandonsBlocksTooFarAhead tests when the engine decides to fetch a missing parent block or abandon it.
-// If the parent block is further than [maxAllowedBlockPreferenceHeightDistanceIngestion] in height from the last accepted block,
+// If the parent block is further than [maxHeightAbovePreferred] in height from the last accepted block,
 // it should abandon the block and not fetch it. Else, it should fetch it. In case of an overflow it should still fetch it.
 func TestEngineAbandonsBlocksTooFarAhead(t *testing.T) {
 	tests := []struct {
@@ -3362,13 +3362,13 @@ func TestEngineAbandonsBlocksTooFarAhead(t *testing.T) {
 		{
 			name:                "at the cutoff is fetched",
 			laggingLastAccepted: 0,
-			childHeight:         maxAllowedBlockPreferenceHeightDistanceIngestion,
+			childHeight:         maxHeightAbovePreferred,
 			expectFetch:         true,
 		},
 		{
 			name:                "just past the cutoff is abandoned",
 			laggingLastAccepted: 0,
-			childHeight:         maxAllowedBlockPreferenceHeightDistanceIngestion + 1,
+			childHeight:         maxHeightAbovePreferred + 1,
 			expectFetch:         false,
 		},
 		{
@@ -3378,9 +3378,9 @@ func TestEngineAbandonsBlocksTooFarAhead(t *testing.T) {
 			expectFetch:         true,
 		},
 		{
-			// The preferred height plus [maxAllowedBlockPreferenceHeightDistanceIngestion] overflows.
+			// The preferred height plus [maxHeightAbovePreferred] overflows.
 			name:                "overflow of the preference cutoff is fetched",
-			laggingLastAccepted: math.MaxUint64 - maxAllowedBlockPreferenceHeightDistanceIngestion/2,
+			laggingLastAccepted: math.MaxUint64 - maxHeightAbovePreferred/2,
 			childHeight:         math.MaxUint64,
 			expectFetch:         true,
 		},
@@ -3508,10 +3508,10 @@ func newFakeEngine(
 }
 
 // TestEngineStopsBufferingBlocksTooFarAhead tests that the engine queues only
-// blocks within [maxAllowedBlockAcceptedHeightDistanceIngestion] of its last
+// blocks within [maxHeightAboveAccepted] of its last
 // accepted block, however many blocks a peer pushes.
 func TestEngineStopsBufferingBlocksTooFarAhead(t *testing.T) {
-	const heightLimit = maxAllowedBlockAcceptedHeightDistanceIngestion
+	const heightLimit = maxHeightAboveAccepted
 
 	tests := []struct {
 		name      string
@@ -3581,11 +3581,11 @@ func TestEngineStopsBufferingBlocksTooFarAhead(t *testing.T) {
 }
 
 // TestEngineRecoversFromIngestionCap tests that a node with
-// [maxAllowedBlockAcceptedHeightDistanceIngestion] blocks processing above its
+// [maxHeightAboveAccepted] blocks processing above its
 // last accepted block still finalizes them and then catches up.
 func TestEngineRecoversFromIngestionCap(t *testing.T) {
 	const (
-		heightLimit = maxAllowedBlockAcceptedHeightDistanceIngestion
+		heightLimit = maxHeightAboveAccepted
 		chainLength = 3 * heightLimit
 	)
 
@@ -3659,10 +3659,10 @@ func TestEngineRecoversFromIngestionCap(t *testing.T) {
 }
 
 // TestEngineRejectsFetchedBlockTooFarAhead tests that a block more than
-// [maxAllowedBlockAcceptedHeightDistanceIngestion] above the last accepted block
+// [maxHeightAboveAccepted] above the last accepted block
 // is rejected when it arrives in reply to a Get.
 func TestEngineRejectsFetchedBlockTooFarAhead(t *testing.T) {
-	const heightLimit = maxAllowedBlockAcceptedHeightDistanceIngestion
+	const heightLimit = maxHeightAboveAccepted
 
 	require := require.New(t)
 
@@ -3710,7 +3710,7 @@ func TestEngineRejectsFetchedBlockTooFarAhead(t *testing.T) {
 
 // TestEngineQueriesNextHeightWhenIngestionLimitOverflows tests that when the last
 // accepted height is so close to maxuint64 that adding
-// [maxAllowedBlockAcceptedHeightDistanceIngestion] to it overflows, the engine
+// [maxHeightAboveAccepted] to it overflows, the engine
 // still queries for the height after its preference, rather than for the
 // bogus ingestion limit the overflowing addition yields.
 func TestEngineQueriesNextHeightWhenIngestionLimitOverflows(t *testing.T) {

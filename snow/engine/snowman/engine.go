@@ -34,17 +34,14 @@ import (
 )
 
 const (
-	// maxAllowedBlockPreferenceHeightDistanceIngestion limits how far ahead (by height) a block may be
-	// from the last preferred height before the engine stops fetching missing ancestors for it.
-	// This limits how far we can replicate blocks that we're not sure about their acceptance before we cascade abandon them.
-	maxAllowedBlockPreferenceHeightDistanceIngestion = 100
-	// maxAllowedBlockAcceptedHeightDistanceIngestion limits how far ahead (by height) a block may be
-	// from the last accepted height.
-	// This prevents us from replicating blocks that are too far ahead and therefore can be replicated later,
-	// once we've accepted more blocks.
-	maxAllowedBlockAcceptedHeightDistanceIngestion = 1000
-	nonVerifiedCacheSize                           = 64 * units.MiB
-	errInsufficientStake                           = "insufficient connected stake"
+	// Limiting the issuance of blocks significantly far ahead of the current
+	// consensus state ensures fast finalization even when our node is lagging.
+	maxHeightAbovePreferred = 100
+	maxHeightAboveAccepted  = 1000
+	// nonVerifiedCacheSize is the maximum size of unverifiedBlockCache.
+	nonVerifiedCacheSize = 64 * units.MiB
+
+	errInsufficientStake = "insufficient connected stake"
 )
 
 var _ common.Engine = (*Engine)(nil)
@@ -296,7 +293,7 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, b
 
 func (e *Engine) isBlockTooFarAhead(blk snowman.Block, nodeID ids.NodeID, requestID uint32) bool {
 	_, lastAcceptedHeight := e.Consensus.LastAccepted()
-	maxAllowedBlockIngestionHeight, err := math.Add(lastAcceptedHeight, maxAllowedBlockAcceptedHeightDistanceIngestion)
+	maxAllowedBlockIngestionHeight, err := math.Add(lastAcceptedHeight, maxHeightAboveAccepted)
 	if err != nil {
 		e.Ctx.Log.Debug("overflow calculating max allowed block ingestion height",
 			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight), zap.Error(err))
@@ -798,7 +795,7 @@ func (e *Engine) issueFrom(
 // missing parent of a block at [childHeight].
 func (e *Engine) shouldFetchParent(childHeight uint64, parentID ids.ID) bool {
 	_, lastPreferredHeight := e.Consensus.Preference()
-	if maxPreferredHeightAllowedToFetch, err := math.Add(lastPreferredHeight, maxAllowedBlockPreferenceHeightDistanceIngestion); err == nil && maxPreferredHeightAllowedToFetch < childHeight {
+	if maxPreferredHeightAllowedToFetch, err := math.Add(lastPreferredHeight, maxHeightAbovePreferred); err == nil && maxPreferredHeightAllowedToFetch < childHeight {
 		e.Ctx.Log.Debug("not fetching block because it is too far ahead of our last preferred height",
 			zap.Stringer("blkID", parentID),
 			zap.Uint64("childHeight", childHeight),
@@ -961,7 +958,7 @@ func (e *Engine) sendQuery(
 
 	_, lastAcceptedHeight := e.Consensus.LastAccepted()
 
-	blockIngestionLimit, blockIngestionLimitOverflowErr := math.Add(lastAcceptedHeight, maxAllowedBlockAcceptedHeightDistanceIngestion)
+	blockIngestionLimit, blockIngestionLimitOverflowErr := math.Add(lastAcceptedHeight, maxHeightAboveAccepted)
 	if blockIngestionLimitOverflowErr != nil {
 		e.Ctx.Log.Debug("Overflow when computing block ingestion limit",
 			zap.Stringer("blkID", blkID),
