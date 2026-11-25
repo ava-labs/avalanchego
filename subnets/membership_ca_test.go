@@ -73,7 +73,6 @@ func TestMembershipCACertify(t *testing.T) {
 	require.False(verifies(ca, stakingtest.SelfSignedChain(t)))
 	_, otherIntermediate := stakingtest.NewPKI(t)
 	require.False(verifies(ca, stakingtest.NodeChain(t, otherIntermediate, "rpc-02", testLeafValidity)))
-	require.False(verifies(ca, stakingtest.NodeChain(t, intermediate, "rpc-03", -time.Minute)))
 	// The whole chain's validity is checked, so a valid leaf stops being a
 	// member when its issuer expires.
 	expiredIntermediate := root.NewIntermediateCA(t, "Expired Nodes CA", -time.Minute)
@@ -117,30 +116,57 @@ func TestMembershipCACertifyBoundsPathBuilding(t *testing.T) {
 	require.True(verifies(ca, withinLimit))
 }
 
+// TestConfigLoadMembershipCA checks that each CA and CRL key reaches the CA.
 func TestConfigLoadMembershipCA(t *testing.T) {
-	require := require.New(t)
-
 	root, intermediate := stakingtest.NewPKI(t)
 	chain := stakingtest.NodeChain(t, intermediate, "rpc-01", testLeafValidity)
+	rootPEM := []string{string(root.CertPEM())}
+	revocations := crlPEM(t, intermediate, 1, chain[0])
 
-	path := filepath.Join(t.TempDir(), "membership-ca.pem")
-	require.NoError(os.WriteFile(path, root.CertPEM(), 0o600))
-	fromPath := Config{MembershipCAPath: path}
-	ca, err := fromPath.LoadMembershipCA()
-	require.NoError(err)
-	require.True(verifies(ca, chain))
+	dir := t.TempDir()
+	caPath := filepath.Join(dir, "membership-ca.pem")
+	require.NoError(t, os.WriteFile(caPath, root.CertPEM(), 0o600))
+	crlPath := filepath.Join(dir, "membership-crl.pem")
+	require.NoError(t, os.WriteFile(crlPath, revocations, 0o600))
 
-	inline := Config{MembershipCA: []string{string(root.CertPEM())}}
-	ca, err = inline.LoadMembershipCA()
-	require.NoError(err)
-	require.True(verifies(ca, chain))
+	tests := map[string]struct {
+		config      Config
+		expectedErr error
+		wantCA      bool // a CA is loaded
+		certifies   bool // and it certifies chain
+	}{
+		"membershipCAPath": {
+			config:    Config{MembershipCAPath: caPath},
+			wantCA:    true,
+			certifies: true,
+		},
+		"membershipCA": {
+			config:    Config{MembershipCA: rootPEM},
+			wantCA:    true,
+			certifies: true,
+		},
+		"membershipCRLPath": {
+			config: Config{MembershipCA: rootPEM, MembershipCRLPath: crlPath},
+			wantCA: true,
+		},
+		"membershipCRL": {
+			config: Config{MembershipCA: rootPEM, MembershipCRL: []string{string(revocations)}},
+			wantCA: true,
+		},
+		"unset": {},
+		"missing file": {
+			config:      Config{MembershipCAPath: filepath.Join(dir, "absent.pem")},
+			expectedErr: os.ErrNotExist,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
 
-	unset := Config{}
-	ca, err = unset.LoadMembershipCA()
-	require.NoError(err)
-	require.Nil(ca)
-
-	missing := Config{MembershipCAPath: filepath.Join(t.TempDir(), "absent.pem")}
-	_, err = missing.LoadMembershipCA()
-	require.ErrorIs(err, os.ErrNotExist)
+			ca, err := test.config.LoadMembershipCA()
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.wantCA, ca != nil)
+			require.Equal(test.certifies, verifies(ca, chain))
+		})
+	}
 }

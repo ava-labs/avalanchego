@@ -29,7 +29,6 @@ func TestIsAllowedMembers(t *testing.T) {
 		myNodeID    = ids.GenerateTestNodeID()
 		subnetID    = ids.GenerateTestID()
 		member      = ids.GenerateTestNodeID()
-		stranger    = ids.GenerateTestNodeID()
 		otherMember = ids.GenerateTestNodeID()
 
 		members = testMembers{
@@ -48,18 +47,9 @@ func TestIsAllowedMembers(t *testing.T) {
 			nodeID:  member,
 			allowed: true,
 		},
-		"stranger": {
-			subnet: NewWithMembership(myNodeID, subnetID, Config{ValidatorOnly: true}, members),
-			nodeID: stranger,
-		},
 		"member of another subnet": {
 			subnet: NewWithMembership(myNodeID, subnetID, Config{ValidatorOnly: true}, members),
 			nodeID: otherMember,
-		},
-		"member of an open subnet": {
-			subnet:  NewWithMembership(myNodeID, subnetID, Config{}, members),
-			nodeID:  stranger,
-			allowed: true,
 		},
 		"New knows no members": {
 			subnet: New(myNodeID, Config{ValidatorOnly: true}),

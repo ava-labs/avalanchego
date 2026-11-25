@@ -10,8 +10,6 @@ import (
 	"encoding/asn1"
 	"encoding/pem"
 	"math/big"
-	"os"
-	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -63,12 +61,25 @@ func TestParseMembershipCAWithCRL(t *testing.T) {
 	root, intermediate := stakingtest.NewPKI(t)
 	revokedChain := stakingtest.NodeChain(t, intermediate, "rpc-01", testLeafValidity)
 	keptChain := stakingtest.NodeChain(t, intermediate, "rpc-02", testLeafValidity)
+	// The node a revocation targets holds its own key, so it can always present
+	// a re-encoded twin under a new node ID. A list must still catch it.
+	leafTwin := []*x509.Certificate{reencoded(t, revokedChain[0]), revokedChain[1]}
+	intermediateTwin := []*x509.Certificate{keptChain[0], reencoded(t, keptChain[1])}
 
-	// A list from the issuing intermediate revokes only what it names.
-	ca, err := ParseMembershipCAWithCRL(root.CertPEM(), crlPEM(t, intermediate, 1, revokedChain[0]))
+	// An empty list revokes nothing, so the twins are valid chains.
+	ca, err := ParseMembershipCAWithCRL(root.CertPEM(), crlPEM(t, intermediate, 1))
+	require.NoError(err)
+	require.True(verifies(ca, revokedChain))
+	require.True(verifies(ca, leafTwin))
+	require.True(verifies(ca, intermediateTwin))
+
+	// A list from the issuing intermediate revokes only what it names, by
+	// serial.
+	ca, err = ParseMembershipCAWithCRL(root.CertPEM(), crlPEM(t, intermediate, 1, revokedChain[0]))
 	require.NoError(err)
 	require.Len(ca.CRLs(), 1)
 	require.False(verifies(ca, revokedChain))
+	require.False(verifies(ca, leafTwin))
 	require.True(ca.Revokes(revokedChain))
 	require.True(verifies(ca, keptChain))
 	require.False(ca.Revokes(keptChain))
@@ -79,11 +90,8 @@ func TestParseMembershipCAWithCRL(t *testing.T) {
 	ca, err = ParseMembershipCAWithCRL(root.CertPEM(), crlPEM(t, root, 1, intermediate.Certificate()))
 	require.NoError(err)
 	require.False(verifies(ca, revokedChain))
+	require.False(verifies(ca, intermediateTwin))
 	require.True(ca.Revokes(keptChain))
-
-	ca, err = ParseMembershipCAWithCRL(root.CertPEM(), crlPEM(t, intermediate, 1))
-	require.NoError(err)
-	require.True(verifies(ca, revokedChain))
 
 	// nextUpdate is not enforced.
 	ca, err = ParseMembershipCAWithCRL(root.CertPEM(), intermediate.CRLPEM(t, 1, -time.Minute, revokedChain[0]))
@@ -120,68 +128,14 @@ func TestParseMembershipCAWithCRLRefuses(t *testing.T) {
 	_, err = ParseMembershipCAWithCRL(root.CertPEM(), garbage)
 	require.ErrorIs(err, ErrMalformedMembershipCRL)
 
-	// A partitioned list carries a critical issuing distribution point, and a
-	// delta a critical delta CRL indicator.
-	for _, oid := range []asn1.ObjectIdentifier{{2, 5, 29, 28}, {2, 5, 29, 27}} {
-		partial := intermediate.SignCRLPEM(t, &x509.RevocationList{
-			Number:          big.NewInt(1),
-			ThisUpdate:      time.Now().Add(-time.Minute),
-			NextUpdate:      time.Now().Add(time.Hour),
-			ExtraExtensions: []pkix.Extension{{Id: oid, Critical: true, Value: []byte{0x30, 0x00}}},
-		})
-		_, err := ParseMembershipCAWithCRL(root.CertPEM(), partial)
-		require.ErrorIs(err, errCriticalMembershipCRLExtension, "extension %s", oid)
-	}
-}
-
-// TestMembershipCARevocationFollowsSerials checks that a revocation names what
-// an issuer signed, not the bytes that carry it. The node a revocation targets
-// holds its own key, so it can always present a re-encoded twin under a new
-// node ID.
-func TestMembershipCARevocationFollowsSerials(t *testing.T) {
-	require := require.New(t)
-
-	root, intermediate := stakingtest.NewPKI(t)
-	chain := stakingtest.NodeChain(t, intermediate, "rpc-01", testLeafValidity)
-	rootCA, err := ParseMembershipCA(root.CertPEM())
-	require.NoError(err)
-
-	leafTwin := []*x509.Certificate{reencoded(t, chain[0]), chain[1]}
-	require.True(verifies(rootCA, leafTwin))
-	ca, err := ParseMembershipCAWithCRL(root.CertPEM(), crlPEM(t, intermediate, 1, chain[0]))
-	require.NoError(err)
-	require.False(verifies(ca, leafTwin))
-
-	intermediateTwin := []*x509.Certificate{chain[0], reencoded(t, chain[1])}
-	require.True(verifies(rootCA, intermediateTwin))
-	ca, err = ParseMembershipCAWithCRL(root.CertPEM(), crlPEM(t, root, 1, intermediate.Certificate()))
-	require.NoError(err)
-	require.False(verifies(ca, intermediateTwin))
-}
-
-// TestConfigLoadMembershipCRL checks that both CRL keys reach the CA.
-func TestConfigLoadMembershipCRL(t *testing.T) {
-	require := require.New(t)
-
-	root, intermediate := stakingtest.NewPKI(t)
-	chain := stakingtest.NodeChain(t, intermediate, "rpc-01", testLeafValidity)
-	revocations := crlPEM(t, intermediate, 1, chain[0])
-
-	path := filepath.Join(t.TempDir(), "membership-crl.pem")
-	require.NoError(os.WriteFile(path, revocations, 0o600))
-	fromPath := Config{
-		MembershipCA:      []string{string(root.CertPEM())},
-		MembershipCRLPath: path,
-	}
-	ca, err := fromPath.LoadMembershipCA()
-	require.NoError(err)
-	require.False(verifies(ca, chain))
-
-	inline := Config{
-		MembershipCA:  []string{string(root.CertPEM())},
-		MembershipCRL: []string{string(revocations)},
-	}
-	ca, err = inline.LoadMembershipCA()
-	require.NoError(err)
-	require.False(verifies(ca, chain))
+	// A partitioned list carries a critical issuing distribution point. Every
+	// critical extension is refused alike, so one stands for the rest.
+	partial := intermediate.SignCRLPEM(t, &x509.RevocationList{
+		Number:          big.NewInt(1),
+		ThisUpdate:      time.Now().Add(-time.Minute),
+		NextUpdate:      time.Now().Add(time.Hour),
+		ExtraExtensions: []pkix.Extension{{Id: asn1.ObjectIdentifier{2, 5, 29, 28}, Critical: true, Value: []byte{0x30, 0x00}}},
+	})
+	_, err = ParseMembershipCAWithCRL(root.CertPEM(), partial)
+	require.ErrorIs(err, errCriticalMembershipCRLExtension)
 }

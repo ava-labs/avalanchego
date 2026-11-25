@@ -57,10 +57,7 @@ go_library(
 
 go_test(
     name = "config_test",
-    srcs = [
-        "config_test.go",
-        "subnet_membership_test.go",
-    ],
+    srcs = ["config_test.go"],
     embed = [":config"],
     deps = [
         "//chains",

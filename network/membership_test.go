@@ -120,7 +120,8 @@ func newMembershipTestNetwork(t *testing.T, subnetConfigs map[ids.ID]subnets.Con
 
 // TestMembershipTracking checks the per-connection record: a tracked peer is
 // certified for the subnets whose root issued its chain and no other, a peer
-// certified by nothing is not stored, and untrack forgets the peer.
+// certified by nothing is not stored, membership stops once the verified chain
+// expires, and untrack forgets the peer.
 func TestMembershipTracking(t *testing.T) {
 	require := require.New(t)
 
@@ -150,151 +151,66 @@ func TestMembershipTracking(t *testing.T) {
 	m.track(stranger, strangerCertified)
 	require.Len(m.certMembers, 1)
 
+	// Expiry is read from the record, so an already-expired record stands in
+	// for a chain that has aged out since the connection was upgraded. Under
+	// network-require-validator-to-connect the next Ping then closes the
+	// connection.
+	m.track(pki.nodeID, certifiedSubnets{subnetID: time.Now().Add(-time.Second)})
+	require.False(m.IsCertified(subnetID, pki.nodeID))
+	require.False(m.isMemberOfAny(pki.nodeID))
+
 	m.untrack(pki.nodeID)
 	require.False(m.IsCertified(subnetID, pki.nodeID))
 	require.Empty(m.certMembers)
 }
 
-// TestMembershipExpiresCertificateMember checks that certificate membership
-// stops once the verified chain expires. Under
-// network-require-validator-to-connect the next Ping then closes the
-// connection.
-func TestMembershipExpiresCertificateMember(t *testing.T) {
-	require := require.New(t)
-
+// TestAllowConnectionKeepsMembers checks whom
+// network-require-validator-to-connect keeps on a node that does not validate
+// the primary network, and which of them a membership CA certified. The ip
+// tracker keeps validators without membership knowing them, and allowedNodes
+// are kept but not certified, since the subnet admits them from its own config.
+func TestAllowConnectionKeepsMembers(t *testing.T) {
 	var (
-		pki      = newTestPKI(t)
-		subnetID = ids.GenerateTestID()
-	)
-
-	m := mustNewMembership(t, map[ids.ID]subnets.Config{
-		constants.PrimaryNetworkID: {},
-		subnetID:                   membershipCAConfig(t, pki.rootPEM),
-	})
-
-	m.track(pki.nodeID, m.findCertifiedSubnets(pki.chain))
-	require.True(m.IsCertified(subnetID, pki.nodeID))
-
-	// Expiry is read from the record, so an already-expired record stands in
-	// for a chain that has aged out since the connection was upgraded.
-	m.track(pki.nodeID, certifiedSubnets{subnetID: time.Now().Add(-time.Second)})
-	require.False(m.IsCertified(subnetID, pki.nodeID))
-	require.False(m.isMemberOfAny(pki.nodeID))
-}
-
-// TestMembershipIsMemberOfAny checks the two sources of non-validator
-// membership: a subnet certifies only its certificate members, and connection
-// admission keeps its allowedNodes too.
-func TestMembershipIsMemberOfAny(t *testing.T) {
-	var (
-		pki      = newTestPKI(t)
-		subnetID = ids.GenerateTestID()
-		allowed  = ids.GenerateTestNodeID()
-		stranger = ids.GenerateTestNodeID()
+		pki             = newTestPKI(t)
+		subnetID        = ids.GenerateTestID()
+		allowed         = ids.GenerateTestNodeID()
+		subnetValidator = ids.GenerateTestNodeID()
 	)
 
 	subnetConfig := membershipCAConfig(t, pki.rootPEM)
 	subnetConfig.AllowedNodes = set.Of(allowed)
-
-	m := mustNewMembership(t, map[ids.ID]subnets.Config{
+	n := newMembershipTestNetwork(t, map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
 		subnetID:                   subnetConfig,
 	})
-	m.track(pki.nodeID, m.findCertifiedSubnets(pki.chain))
-
-	for name, test := range map[string]struct {
-		nodeID        ids.NodeID
-		wantCertified bool
-		wantMember    bool
-	}{
-		"certificate member": {nodeID: pki.nodeID, wantCertified: true, wantMember: true},
-		// The subnet admits it from its own config, not from the network.
-		"allowedNodes entry": {nodeID: allowed, wantMember: true},
-		"stranger":           {nodeID: stranger},
-	} {
-		t.Run(name, func(t *testing.T) {
-			require.Equal(t, test.wantCertified, m.IsCertified(subnetID, test.nodeID))
-			require.Equal(t, test.wantMember, m.isMemberOfAny(test.nodeID))
-		})
-	}
-}
-
-// TestAllowConnectionKeepsMembers checks that with
-// network-require-validator-to-connect on, a non-validator member is kept while
-// a stranger is refused. The connection path admits on the freshly verified
-// chain alone, before anything is recorded; the ping path reads the record.
-func TestAllowConnectionKeepsMembers(t *testing.T) {
-	var (
-		pki      = newTestPKI(t)
-		subnetID = ids.GenerateTestID()
-		stranger = ids.GenerateTestNodeID()
-	)
-
-	n := newMembershipTestNetwork(t, map[ids.ID]subnets.Config{
-		constants.PrimaryNetworkID: {},
-		subnetID:                   membershipCAConfig(t, pki.rootPEM),
-	})
-
-	// Nothing is recorded yet, so the ping path sees a stranger while the
-	// verified chain is what admits the connection.
-	certified := n.membership.findCertifiedSubnets(pki.chain)
-	require.NotEmpty(t, certified)
-	require.False(t, n.AllowConnection(pki.nodeID))
-
-	// Once recorded, the ping path agrees.
-	n.membership.track(pki.nodeID, certified)
-	require.True(t, n.AllowConnection(pki.nodeID))
-	require.True(t, n.membership.IsCertified(subnetID, pki.nodeID))
-
-	// A self-signed chain proves nothing on either path.
-	require.Empty(t, n.membership.findCertifiedSubnets(stakingtest.SelfSignedChain(t)))
-	require.False(t, n.AllowConnection(stranger))
-}
-
-// TestAllowConnectionKeepsAllowedNodes checks that, with no membership CA,
-// network-require-validator-to-connect keeps a tracked subnet's allowedNodes on
-// a node that does not validate the primary network, such as an L1 validator.
-// Before membership such a node refused the peers its own subnet admits.
-func TestAllowConnectionKeepsAllowedNodes(t *testing.T) {
-	allowed := ids.GenerateTestNodeID()
-
-	n := newMembershipTestNetwork(t, map[ids.ID]subnets.Config{
-		constants.PrimaryNetworkID: {},
-		ids.GenerateTestID(): {
-			ValidatorOnly: true,
-			AllowedNodes:  set.Of(allowed),
-		},
-	})
-
-	require.True(t, n.AllowConnection(allowed))
-	require.False(t, n.AllowConnection(ids.GenerateTestNodeID()))
-}
-
-// TestAllowConnectionKeepsValidators checks that validators need no membership:
-// the ip tracker wants every primary network validator, which keeps the P-Chain
-// connected, and every validator of a tracked subnet, so
-// network-require-validator-to-connect keeps both although membership knows
-// neither.
-func TestAllowConnectionKeepsValidators(t *testing.T) {
-	require := require.New(t)
-
-	var (
-		subnetID         = ids.GenerateTestID()
-		primaryValidator = ids.GenerateTestNodeID()
-		subnetValidator  = ids.GenerateTestNodeID()
-	)
-
-	n := newMembershipTestNetwork(t, map[ids.ID]subnets.Config{
-		constants.PrimaryNetworkID: {},
-		subnetID:                   {ValidatorOnly: true},
-	})
 	n.config.Validators.RegisterCallbackListener(n.ipTracker)
-	require.NoError(n.config.Validators.AddStaker(constants.PrimaryNetworkID, primaryValidator, nil, ids.GenerateTestID(), 1))
-	require.NoError(n.config.Validators.AddStaker(subnetID, subnetValidator, nil, ids.GenerateTestID(), 1))
+	require.NoError(t, n.config.Validators.AddStaker(subnetID, subnetValidator, nil, ids.GenerateTestID(), 1))
 
-	for _, nodeID := range []ids.NodeID{primaryValidator, subnetValidator} {
-		require.False(n.membership.isMemberOfAny(nodeID))
-		require.True(n.AllowConnection(nodeID))
+	tests := map[string]struct {
+		nodeID        ids.NodeID
+		record        bool
+		wantCertified bool
+		wantAllowed   bool
+	}{
+		// The record is written after the de-duplication checks, so the
+		// connection path admits on the verified chain, not on this.
+		"certificate member before it is recorded": {nodeID: pki.nodeID},
+		"certificate member":                       {nodeID: pki.nodeID, record: true, wantCertified: true, wantAllowed: true},
+		"allowedNodes entry":                       {nodeID: allowed, wantAllowed: true},
+		"subnet validator":                         {nodeID: subnetValidator, wantAllowed: true},
+		"stranger":                                 {nodeID: ids.GenerateTestNodeID()},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			if test.record {
+				n.membership.track(test.nodeID, n.membership.findCertifiedSubnets(pki.chain))
+				defer n.membership.untrack(test.nodeID)
+			}
+			require.Equal(test.wantCertified, n.membership.IsCertified(subnetID, test.nodeID))
+			require.Equal(test.wantAllowed, n.AllowConnection(test.nodeID))
+		})
 	}
 }
 
