@@ -236,6 +236,12 @@ func New(
 		logger.Warn("sybil control is not enforced")
 		n.vdrs = newOverriddenManager(constants.PrimaryNetworkID, n.vdrs)
 	}
+	if l1 := n.Config.IsolatedL1; l1 != nil {
+		// No P-chain will populate the validators, so use the static set.
+		if err := l1.RegisterValidators(n.vdrs); err != nil {
+			return nil, fmt.Errorf("couldn't add isolated L1 validators: %w", err)
+		}
+	}
 	if err := n.initResourceManager(); err != nil {
 		return nil, fmt.Errorf("problem initializing resource manager: %w", err)
 	}
@@ -1181,6 +1187,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Tracer:                                  n.tracer,
 			ChainDataDir:                            n.Config.ChainDataDir,
 			Subnets:                                 subnets,
+			IsolatedL1:                              n.Config.IsolatedL1,
 		},
 	)
 	if err != nil {
@@ -1542,10 +1549,16 @@ func (n *Node) initHealthAPI() error {
 		localUpgradeTime     = n.Config.UpgradeConfig.LatestTime()
 		localUpgradeTimeUnix = uint64(localUpgradeTime.Unix())
 		lastLogTime          time.Time
+		// An isolated L1 has no Primary Network validators, so its own
+		// validators are compared instead.
+		upgradeCheckSubnetID = constants.PrimaryNetworkID
 	)
+	if l1 := n.Config.IsolatedL1; l1 != nil {
+		upgradeCheckSubnetID = l1.Chain.SubnetID
+	}
 	futureUpgradeCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
 		var (
-			currentValidators = n.vdrs.GetMap(constants.PrimaryNetworkID)
+			currentValidators = n.vdrs.GetMap(upgradeCheckSubnetID)
 			totalWeight       uint64
 		)
 		for _, vdr := range currentValidators {

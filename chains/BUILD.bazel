@@ -4,6 +4,7 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "chains",
     srcs = [
+        "isolated_l1.go",
         "linearizable_vm.go",
         "manager.go",
         "registrant.go",
@@ -54,6 +55,7 @@ go_library(
         "//utils/buffer",
         "//utils/constants",
         "//utils/crypto/bls",
+        "//utils/hashing",
         "//utils/lock",
         "//utils/logging",
         "//utils/metric",
@@ -75,12 +77,17 @@ go_library(
 
 go_test(
     name = "chains_test",
-    srcs = ["subnets_test.go"],
+    srcs = [
+        "isolated_l1_test.go",
+        "subnets_test.go",
+    ],
     embed = [":chains"],
     deps = [
         "//ids",
+        "//snow/validators",
         "//subnets",
         "//utils/constants",
+        "//utils/crypto/bls/signer/localsigner",
         "@com_github_stretchr_testify//require",
     ],
 )

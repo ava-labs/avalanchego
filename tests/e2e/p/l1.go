@@ -6,7 +6,6 @@ package p
 import (
 	"context"
 	"errors"
-	"math"
 	"slices"
 	"time"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/subnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/buffer"
@@ -33,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -94,15 +93,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		genesisKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 
-		genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{
-			Timestamp: time.Now().Unix(),
-			Allocations: []genesis.Allocation{
-				{
-					Address: genesisKey.Address(),
-					Balance: math.MaxUint64,
-				},
-			},
-		})
+		genesisBytes, err := subnet.NewXSVMGenesis(genesisKey)
 		require.NoError(err)
 
 		var subnetID ids.ID
