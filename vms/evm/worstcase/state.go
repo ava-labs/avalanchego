@@ -37,7 +37,8 @@ import (
 //  1. [State.StartBlock] for each block to be included.
 //  2. [State.GasLimit] and [State.BaseFee] to query the block's parameters.
 //  3. [State.ApplyTx] or [State.Apply] for each [types.Transaction] or
-//     [hook.Op] to include in the block, respectively.
+//     [hook.Op] to include in the block, respectively. Use [State.ReplayTx]
+//     instead of [State.ApplyTx] for blocks that consensus already accepted.
 //  4. [State.GasUsed] to query the total gas used in the block.
 //  5. [State.FinishBlock] to finalize the block's gas time.
 //  6. Repeat from step 1 for the next block.
@@ -55,6 +56,7 @@ type State struct {
 
 	qSize, blockSize, maxBlockSize gas.Gas
 
+	settled             hook.SettledView
 	baseFee             *uint256.Int
 	curr                *types.Header
 	signer              types.Signer
@@ -78,10 +80,21 @@ func NewState(
 	if err != nil {
 		return nil, err
 	}
+	// A separate state, so admission never sees worst-case debits.
+	settledState, err := opener.StateDB(settled.PostExecutionStateRoot())
+	if err != nil {
+		return nil, err
+	}
+	hdr := settled.Header()
 	return &State{
-		hooks:              hooks,
-		config:             config,
-		db:                 db,
+		hooks:  hooks,
+		config: config,
+		db:     db,
+		settled: hook.SettledView{
+			Header: hdr,
+			Rules:  config.Rules(hdr.Number, true, hdr.Time),
+			State:  settledState,
+		},
 		clock:              settled.ExecutedByGasTime(),
 		expectedParentHash: settled.Hash(),
 	}, nil
@@ -178,6 +191,27 @@ var errCostOverflow = errors.New("Cost() overflows uint256")
 //
 // TODO: Consider exporting txToOp and expecting users to call Apply directly.
 func (s *State) ApplyTx(tx *types.Transaction) error {
+	from, err := s.checkTx(tx)
+	if err != nil {
+		return err
+	}
+	if err := s.hooks.AdmitTransaction(from, tx, s.settled); err != nil {
+		return fmt.Errorf("transaction blocked by AdmitTransaction hook: %w", err)
+	}
+	return s.applyTx(from, tx)
+}
+
+// ReplayTx is equivalent to [State.ApplyTx] without the admission hook. Each
+// accepted block was admitted against its own settled state when verified.
+func (s *State) ReplayTx(tx *types.Transaction) error {
+	from, err := s.checkTx(tx)
+	if err != nil {
+		return err
+	}
+	return s.applyTx(from, tx)
+}
+
+func (s *State) checkTx(tx *types.Transaction) (common.Address, error) {
 	opts := &txpool.ValidationOptions{
 		Config: s.config,
 		Accept: 0 |
@@ -191,12 +225,12 @@ func (s *State) ApplyTx(tx *types.Transaction) error {
 		MinTip:  big.NewInt(0),
 	}
 	if err := txpool.ValidateTransaction(tx, s.curr, s.signer, opts); err != nil {
-		return fmt.Errorf("validating transaction: %w", err)
+		return common.Address{}, fmt.Errorf("validating transaction: %w", err)
 	}
 
 	from, err := types.Sender(s.signer, tx)
 	if err != nil {
-		return fmt.Errorf("determining sender: %w", err)
+		return common.Address{}, fmt.Errorf("determining sender: %w", err)
 	}
 
 	// While EOA enforcement is not possible to guarantee in worst-case
@@ -205,13 +239,12 @@ func (s *State) ApplyTx(tx *types.Transaction) error {
 	// TODO: We must still handle non-EOA issuance later during actual
 	// execution.
 	if codeHash := s.db.GetCodeHash(from); codeHash != (common.Hash{}) && codeHash != types.EmptyCodeHash {
-		return fmt.Errorf("%w: address %v, codehash: %s", core.ErrSenderNoEOA, from.Hex(), codeHash)
+		return common.Address{}, fmt.Errorf("%w: address %v, codehash: %s", core.ErrSenderNoEOA, from.Hex(), codeHash)
 	}
+	return from, nil
+}
 
-	if err := s.hooks.CanExecuteTransaction(from, tx.To(), s.db); err != nil {
-		return fmt.Errorf("transaction blocked by CanExecuteTransaction hook: %w", err)
-	}
-
+func (s *State) applyTx(from common.Address, tx *types.Transaction) error {
 	op, err := txToOp(from, tx, s.baseFee)
 	if err != nil {
 		return fmt.Errorf("converting transaction to operation: %w", err)

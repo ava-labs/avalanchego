@@ -1412,3 +1412,48 @@ func TestExecuteReturnsStateDBError(t *testing.T) {
 		})
 	}
 }
+
+func TestExecuteHookErrorsAreFatal(t *testing.T) {
+	errHook := errors.New("hook failure")
+	tests := []struct {
+		name      string
+		startErr  error
+		finishErr error
+	}{
+		{
+			name:     "start executing block",
+			startErr: errHook,
+		},
+		{
+			name:      "finish executing block",
+			finishErr: errHook,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hooks := defaultHooks()
+			hooks.StartExecutingBlockFn = func(
+				params.Rules,
+				*state.StateDB,
+				*types.Header,
+				*types.Block,
+			) error {
+				return tt.startErr
+			}
+			hooks.FinishExecutingBlockFn = func(
+				*state.StateDB,
+				*types.Block,
+				types.Receipts,
+			) error {
+				return tt.finishErr
+			}
+			_, sut := newSUT(t, withHooks(hooks))
+			b := sut.chain.NewBlock(t, nil)
+			stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
+			require.NoError(t, err, "Executor.StateDB(parent root)")
+
+			_, err = Execute(b, stateDB, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger)
+			require.ErrorIs(t, err, errFatal, "Execute()")
+		})
+	}
+}
