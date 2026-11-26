@@ -5,6 +5,8 @@ go_library(
     name = "subnets",
     srcs = [
         "config.go",
+        "membership_ca.go",
+        "membership_crl.go",
         "no_op_allower.go",
         "subnet.go",
     ],
@@ -15,6 +17,7 @@ go_library(
         "//snow/consensus/simplex",
         "//snow/consensus/snowball",
         "//snow/engine/common",
+        "//staking",
         "//utils/set",
     ],
 )
@@ -23,6 +26,8 @@ go_test(
     name = "subnets_test",
     srcs = [
         "config_test.go",
+        "membership_ca_test.go",
+        "membership_crl_test.go",
         "subnet_test.go",
     ],
     embed = [":subnets"],
@@ -30,6 +35,7 @@ go_test(
         "//ids",
         "//snow/consensus/simplex",
         "//snow/consensus/snowball",
+        "//staking/stakingtest",
         "//utils/set",
         "@com_github_stretchr_testify//require",
     ],
