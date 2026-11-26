@@ -117,9 +117,19 @@ decides this from its own config.
   path building checks signatures with. The worst case is about 1.5 ms per
   membership CA per handshake with P-256 and 2.5 ms with RSA-4096. Inbound
   upgrades are rate limited per IP and in total.
-- **The node counts what it drops.** The chain router's `dropped_unallowed`
-  counter counts messages dropped because the sender is not allowed on the
-  subnet.
+- **The node reports its membership state.** At startup it logs each loaded
+  membership CA with the SHA-256 of what it read (`sha256` for the CA file,
+  `crlSHA256` for the CRL file), and each list's issuer and number. It also
+  checks its own certificate chain, warning if it does not verify or expires
+  within 30 days. Each certified peer is logged at debug level with the serial
+  a list would have to name. The chain router's `dropped_unallowed` counter
+  counts messages dropped because the sender is not allowed on the subnet.
+- **The operator can check what a node loaded.** The hashes cover the exact
+  bytes read, so they match `sha256sum` of the intended file only if the node
+  read it unchanged: a cut, a dropped list or any edit, whitespace included,
+  changes them. Inline entries are hashed joined with newlines, as
+  `jq -j '.membershipCAContent | join("\n")' <SubnetID>.json | sha256sum`
+  prints.
 
 ## Deployment
 
