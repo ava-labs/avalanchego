@@ -60,6 +60,7 @@ type (
 	sutConfig struct {
 		genesis  core.Genesis
 		upgrades extras.UpgradeConfig
+		vmConfig config
 		clock    *saetest.Clock
 	}
 	sutOption = options.Option[sutConfig]
@@ -68,6 +69,15 @@ type (
 func withMaxAllocFor(addrs ...common.Address) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		maps.Copy(c.genesis.Alloc, saetest.MaxAllocFor(addrs...))
+	})
+}
+
+func withAccount(addr common.Address, acc types.Account) sutOption {
+	if acc.Balance == nil {
+		acc.Balance = big.NewInt(0)
+	}
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc[addr] = acc
 	})
 }
 
@@ -90,8 +100,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
 	cfg := options.ApplyTo(&sutConfig{
-		genesis: *testGenesis(),
-		clock:   saetest.NewClock(testStartTime, time.Millisecond),
+		genesis:  *testGenesis(),
+		vmConfig: defaultConfig(),
+		clock:    saetest.NewClock(testStartTime, time.Millisecond),
 	}, opts...)
 	vm := &VM{
 		now: cfg.clock.Now,
@@ -107,6 +118,8 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
 	upgradeBytes, err := json.Marshal(cfg.upgrades)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.upgrades)
+	configBytes, err := json.Marshal(cfg.vmConfig)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.vmConfig)
 
 	appSender := saetest.NewSender(tb, set.Of(snowCtx.NodeID))
 
@@ -115,6 +128,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		DB:       memdb.New(),
 		Genesis:  genesisBytes,
 		Upgrades: upgradeBytes,
+		Config:   configBytes,
 		Sender:   appSender,
 		State:    snow.NormalOp,
 	})

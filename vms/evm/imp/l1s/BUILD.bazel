@@ -4,6 +4,8 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "l1s",
     srcs = [
+        "config.go",
+        "deprecated.go",
         "factory.go",
         "genesis.go",
         "hooks.go",
@@ -27,6 +29,7 @@ go_library(
         "//snow/engine/snowman/block",
         "//upgrade",
         "//utils/logging",
+        "//utils/set",
         "//vms",
         "//vms/components/gas",
         "//vms/evm/adaptor",
@@ -37,10 +40,10 @@ go_library(
         "//vms/evm/imp/blackhole",
         "//vms/evm/imp/l1s/hookadaptor",
         "//vms/evm/imp/saeheader",
+        "//vms/evm/imp/vmconfig",
         "//vms/evm/network",
         "//vms/evm/sae",
         "//vms/evm/sae/rpc",
-        "//vms/evm/saedb",
         "//vms/evm/types",
         "//x/blockdb",
         "@com_github_ava_labs_firewood_go_ffi//:ffi",
@@ -48,7 +51,6 @@ go_library(
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
-        "@com_github_ava_labs_libevm//core/txpool/legacypool",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//libevm",
@@ -56,12 +58,15 @@ go_library(
         "@com_github_ava_labs_libevm//trie",
         "@com_github_ava_labs_libevm//triedb",
         "@com_github_holiman_uint256//:uint256",
+        "@org_uber_go_zap//:zap",
     ],
 )
 
 go_test(
     name = "l1s_test",
     srcs = [
+        "config_test.go",
+        "deprecated_test.go",
         "genesis_test.go",
         "rpc_test.go",
         "vm_test.go",
@@ -94,6 +99,7 @@ go_test(
         "//vms/evm/blocks",
         "//vms/evm/cmputils",
         "//vms/evm/imp/vmtest",
+        "//vms/evm/sae/rpc",
         "//vms/evm/saetest",
         "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//common",
@@ -112,5 +118,6 @@ go_test(
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",
+        "@org_uber_go_zap//:zap",
     ],
 )
