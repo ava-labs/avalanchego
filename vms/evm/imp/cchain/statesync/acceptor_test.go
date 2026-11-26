@@ -24,13 +24,13 @@ func TestShutdownCancelsMidSync(t *testing.T) {
 		summary: *saestatesync.NewSummary(common.Hash{0xde, 0xad}, commitInterval),
 	}
 	mode, err := sut.AcceptSummary(t.Context(), s)
-	require.NoErrorf(t, err, "%T.AcceptSummary()", sut.Handler)
-	require.Equalf(t, block.StateSyncStatic, mode, "%T.AcceptSummary()", sut.Handler)
+	require.NoErrorf(t, err, "%T.AcceptSummary()", sut.Acceptor)
+	require.Equalf(t, block.StateSyncStatic, mode, "%T.AcceptSummary()", sut.Acceptor)
 
-	require.NoErrorf(t, sut.Shutdown(t.Context()), "%T.Shutdown()", sut.Handler)
+	require.NoErrorf(t, sut.Shutdown(t.Context()), "%T.Shutdown()", sut.Acceptor)
 
 	msg, err := sut.WaitForEvent(t.Context())
-	require.NoErrorf(t, err, "%T.WaitForEvent()", sut.Handler)
+	require.NoErrorf(t, err, "%T.WaitForEvent()", sut.Acceptor)
 	require.Equal(t, enginecommon.StateSyncDone, msg, "WaitForEvent()")
-	require.ErrorIsf(t, sut.SyncError(), context.Canceled, "%T.Error()", sut.Handler)
+	require.ErrorIsf(t, sut.SyncError(), context.Canceled, "%T.Error()", sut.Acceptor)
 }

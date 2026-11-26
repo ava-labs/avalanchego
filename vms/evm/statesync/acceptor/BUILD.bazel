@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "acceptor",
+    srcs = ["acceptor.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/statesync/acceptor",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//utils",
+        "//vms/evm/adaptor",
+    ],
+)
+
+go_test(
+    name = "acceptor_test",
+    srcs = ["acceptor_test.go"],
+    embed = [":acceptor"],
+    deps = [
+        "//database",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//vms/evm/adaptor",
+        "//vms/evm/statesync",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_stretchr_testify//require",
+    ],
+)
