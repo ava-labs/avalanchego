@@ -238,7 +238,7 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing outbound message throttler failed with: %w", err)
 	}
 
-	membership, err := newMembership(log, config.SubnetConfigs)
+	membership, err := newMembership(log, config.TLSConfig, config.SubnetConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("initializing membership failed with: %w", err)
 	}
@@ -1122,6 +1122,15 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 	}
 
 	n.membership.track(nodeID, certified)
+	for subnetID, expiresAt := range certified {
+		n.peerConfig.Log.Debug("peer certified by membership CA",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("subnetID", subnetID),
+			// What a revocation list would have to name to evict this peer.
+			zap.String("serial", serialHex(chain[0])),
+			zap.String("expiresAt", expiresAt.UTC().Format(time.RFC3339)),
+		)
+	}
 
 	n.peerConfig.Log.Verbo("starting handshake",
 		zap.Stringer("nodeID", nodeID),

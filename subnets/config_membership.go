@@ -4,6 +4,7 @@
 package subnets
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -17,30 +18,46 @@ var (
 	errTooManyMembershipCRLSources      = errors.New("only one of membershipCRLPath or membershipCRLContent can be set")
 )
 
+// MembershipDigests is the SHA-256 of the PEM a membership CA was loaded from,
+// so an operator can check that a node read the files they installed. A file's
+// digest is what sha256sum prints for it; inline entries are hashed joined
+// with newlines, as they are parsed.
+type MembershipDigests struct {
+	CA [sha256.Size]byte
+	// CRL is zero when the Subnet sets no revocation lists.
+	CRL [sha256.Size]byte
+}
+
 // LoadMembershipCA parses MembershipCAPath or MembershipCAContent into the
 // roots that a peer's certificate chain must verify against to be a member of
 // this Subnet, and applies MembershipCRLPath or MembershipCRLContent to them.
-// It returns nil when the Subnet declares no membership CA.
+// It returns nil when the Subnet declares no membership CA, and the digests of
+// what it read otherwise.
 //
 // [c] must have passed [Config.ValidParameters], which settles which keys may
 // be set together; this only reads and parses them.
-func (c *Config) LoadMembershipCA() (*MembershipCA, error) {
+func (c *Config) LoadMembershipCA() (*MembershipCA, MembershipDigests, error) {
+	var digests MembershipDigests
 	if !c.hasMembershipCA() {
-		return nil, nil
+		return nil, digests, nil
 	}
 
 	caPEM, err := readMembershipPEM(c.MembershipCAPath, c.MembershipCAContent)
 	if err != nil {
-		return nil, fmt.Errorf("reading membershipCAPath: %w", err)
+		return nil, digests, fmt.Errorf("reading membershipCAPath: %w", err)
 	}
+	digests.CA = sha256.Sum256(caPEM)
 	if !c.hasMembershipCRL() {
-		return ParseMembershipCA(caPEM)
+		ca, err := ParseMembershipCA(caPEM)
+		return ca, digests, err
 	}
 	crlPEM, err := readMembershipPEM(c.MembershipCRLPath, c.MembershipCRLContent)
 	if err != nil {
-		return nil, fmt.Errorf("reading membershipCRLPath: %w", err)
+		return nil, digests, fmt.Errorf("reading membershipCRLPath: %w", err)
 	}
-	return ParseMembershipCAWithCRL(caPEM, crlPEM)
+	digests.CRL = sha256.Sum256(crlPEM)
+	ca, err := ParseMembershipCAWithCRL(caPEM, crlPEM)
+	return ca, digests, err
 }
 
 func (c *Config) hasMembershipCA() bool {

@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"os"
 	"path/filepath"
@@ -141,7 +142,8 @@ func TestMembershipCACertifyBoundsPathBuilding(t *testing.T) {
 	require.True(verifies(ca, withinLimit))
 }
 
-// TestConfigLoadMembershipCA checks that each CA and CRL key reaches the CA.
+// TestConfigLoadMembershipCA checks that each CA and CRL key reaches the CA,
+// and that the digests are of the bytes read.
 func TestConfigLoadMembershipCA(t *testing.T) {
 	root, intermediate := stakingtest.NewPKI(t)
 	chain := stakingtest.NodeChain(t, intermediate, "rpc-01", testLeafValidity)
@@ -159,6 +161,7 @@ func TestConfigLoadMembershipCA(t *testing.T) {
 		expectedErr error
 		wantCA      bool // a CA is loaded
 		certifies   bool // and it certifies chain
+		withCRL     bool // and it read revocations
 	}{
 		"membershipCAPath": {
 			config:    Config{MembershipCAPath: caPath},
@@ -171,12 +174,14 @@ func TestConfigLoadMembershipCA(t *testing.T) {
 			certifies: true,
 		},
 		"membershipCRLPath": {
-			config: Config{MembershipCAContent: rootPEM, MembershipCRLPath: crlPath},
-			wantCA: true,
+			config:  Config{MembershipCAContent: rootPEM, MembershipCRLPath: crlPath},
+			wantCA:  true,
+			withCRL: true,
 		},
 		"membershipCRLContent": {
-			config: Config{MembershipCAContent: rootPEM, MembershipCRLContent: []string{string(revocations)}},
-			wantCA: true,
+			config:  Config{MembershipCAContent: rootPEM, MembershipCRLContent: []string{string(revocations)}},
+			wantCA:  true,
+			withCRL: true,
 		},
 		"unset": {},
 		"missing file": {
@@ -188,13 +193,19 @@ func TestConfigLoadMembershipCA(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 
-			ca, err := test.config.LoadMembershipCA()
+			ca, digests, err := test.config.LoadMembershipCA()
 			require.ErrorIs(err, test.expectedErr)
 			if !test.wantCA {
 				require.Nil(ca)
 				return
 			}
 			require.Equal(test.certifies, verifies(ca, chain))
+			require.Equal(sha256.Sum256(root.CertPEM()), digests.CA)
+			var wantCRL [sha256.Size]byte
+			if test.withCRL {
+				wantCRL = sha256.Sum256(revocations)
+			}
+			require.Equal(wantCRL, digests.CRL)
 		})
 	}
 }
