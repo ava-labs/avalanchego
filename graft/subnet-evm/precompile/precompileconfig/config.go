@@ -79,4 +79,6 @@ type ChainConfig interface {
 	AllowedFeeRecipients() bool
 	// IsDurango returns true if the time is after Durango.
 	IsDurango(time uint64) bool
+	// IsIgloo returns true if the time is after Igloo.
+	IsIgloo(time uint64) bool
 }

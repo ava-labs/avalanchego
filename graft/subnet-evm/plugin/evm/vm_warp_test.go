@@ -762,7 +762,10 @@ func testReceiveWarpMessage(
 
 	// Require the block was built with a successful predicate result
 	ethBlock := block2.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
-	headerPredicateResultsBytes := customheader.PredicateBytesFromExtra(ethBlock.Extra())
+	headerPredicateResultsBytes := customheader.PredicateBytesFromExtra(
+		vm.chainConfigExtra().GetAvalancheRules(ethBlock.Time()),
+		ethBlock.Extra(),
+	)
 	blockResults, err := predicate.ParseBlockResults(headerPredicateResultsBytes)
 	require.NoError(err)
 
@@ -949,7 +952,7 @@ func testSignatureRequestsToVM(t *testing.T, scheme string) {
 }
 
 func TestClearWarpDB(t *testing.T) {
-	ctx, db, genesisBytes := setupGenesis(t, upgrade.Latest)
+	ctx, db, genesisBytes := setupGenesis(t, latestFork)
 	vm := &VM{}
 	require.NoError(t, vm.Initialize(t.Context(), ctx, db, genesisBytes, []byte{}, []byte{}, []*commonEng.Fx{}, &enginetest.Sender{}))
 
@@ -973,7 +976,7 @@ func TestClearWarpDB(t *testing.T) {
 	// Restart VM with the same database default should not prune the warp db
 	vm = &VM{}
 	// we need new context since the previous one has registered metrics.
-	ctx, _, _ = setupGenesis(t, upgrade.Latest)
+	ctx, _, _ = setupGenesis(t, latestFork)
 	require.NoError(t, vm.Initialize(t.Context(), ctx, db, genesisBytes, []byte{}, []byte{}, []*commonEng.Fx{}, &enginetest.Sender{}))
 
 	// check messages are still present
@@ -988,7 +991,7 @@ func TestClearWarpDB(t *testing.T) {
 	// restart the VM with pruning enabled
 	vm = &VM{}
 	config := `{"prune-warp-db-enabled": true}`
-	ctx, _, _ = setupGenesis(t, upgrade.Latest)
+	ctx, _, _ = setupGenesis(t, latestFork)
 	require.NoError(t, vm.Initialize(t.Context(), ctx, db, genesisBytes, []byte{}, []byte(config), []*commonEng.Fx{}, &enginetest.Sender{}))
 
 	it := vm.warpDB.NewIterator()

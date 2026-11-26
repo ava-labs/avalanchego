@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
@@ -162,7 +161,7 @@ func testStateSyncToggleEnabledToDisabled(t *testing.T, scheme string) {
 			t.Context(),
 			vmSetup.syncerVM.ctx,
 			vmSetup.syncerDB,
-			[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Latest])),
+			[]byte(toGenesisJSON(paramstest.ForkToChainConfig[latestFork])),
 			nil,
 			[]byte(stateSyncDisabledConfigJSON),
 			[]*commonEng.Fx{},
@@ -246,7 +245,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		test.syncableInterval, test.syncableInterval, test.syncableInterval,
 	)
 	serverVM := newVM(t, testVMConfig{
-		genesisJSON: toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Latest]),
+		genesisJSON: toGenesisJSON(paramstest.ForkToChainConfig[latestFork]),
 		configJSON:  getConfig(test.stateScheme, serverConfigJSON),
 	})
 
@@ -304,7 +303,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		test.stateSyncMinBlocks, 4, test.syncableInterval,
 	)
 	syncerVM := newVM(t, testVMConfig{
-		genesisJSON: toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Latest]),
+		genesisJSON: toGenesisJSON(paramstest.ForkToChainConfig[latestFork]),
 		configJSON:  getConfig(test.stateScheme, stateSyncEnabledJSON),
 		isSyncing:   true,
 	})

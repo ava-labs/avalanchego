@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -28,8 +29,10 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
@@ -57,12 +60,12 @@ var (
 	testAllocFund = big.NewInt(1_000_000_000_000_000_000)
 )
 
-func mustMarshal(v any) []byte {
+func marshalJSON(v any) string {
 	b, err := json.Marshal(v)
 	if err != nil {
 		panic(err)
 	}
-	return b
+	return string(b)
 }
 
 type genesisOption = options.Option[ethcore.Genesis]
@@ -102,7 +105,7 @@ func testGenesis(opts ...genesisOption) *ethcore.Genesis {
 }
 
 func testGenesisJSON(opts ...genesisOption) string {
-	return string(mustMarshal(testGenesis(opts...)))
+	return marshalJSON(testGenesis(opts...))
 }
 
 func withGenesis(fn func(*ethcore.Genesis)) genesisOption {
@@ -112,9 +115,9 @@ func withGenesis(fn func(*ethcore.Genesis)) genesisOption {
 // overridesJSON returns upgrade bytes that override the network upgrades
 // with u.
 func overridesJSON(u extras.NetworkUpgrades) string {
-	return string(mustMarshal(extras.UpgradeConfig{
+	return marshalJSON(extras.UpgradeConfig{
 		NetworkUpgradeOverrides: &u,
-	}))
+	})
 }
 
 func withInitialMinDelay(delayMS uint64) genesisOption {
@@ -129,9 +132,9 @@ func withFeeConfig(c commontype.FeeConfig) genesisOption {
 	})
 }
 
-// withAllGenesisPrecompiles enables every registered precompile at the given
-// timestamp, with non-trivial initial state where supported.
-func withAllGenesisPrecompiles(timestamp uint64) genesisOption {
+// withPreIglooGenesisPrecompiles enables every precompile available before
+// Igloo at the given timestamp, with non-trivial initial state where possible.
+func withPreIglooGenesisPrecompiles(timestamp uint64) genesisOption {
 	// The native minter also mints to [testAllocAddr], making the
 	// state root depend on the allocation being applied after activation.
 	return withGenesis(func(g *ethcore.Genesis) {
@@ -159,6 +162,8 @@ func withAllGenesisPrecompiles(timestamp uint64) genesisOption {
 func TestParseGenesis(t *testing.T) {
 	var (
 		latest = &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgrade.Latest)}
+		// helicon leaves Igloo unscheduled.
+		helicon = &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgrade.Helicon)}
 		// Mainnet has non-zero network upgrade times.
 		mainnet            = &snow.Context{NetworkUpgrades: upgrade.Mainnet}
 		zeroGraniteGenesis = testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
@@ -322,6 +327,27 @@ func TestParseGenesis(t *testing.T) {
 			upgradeBytes: "not json",
 			wantErr:      errIsType[*json.SyntaxError](),
 		},
+		{
+			name: "gaspricemanager_genesis_before_igloo",
+			ctx:  helicon,
+			genesis: testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
+				l1params.GetExtra(g.Config).GenesisPrecompiles = extras.Precompiles{
+					gaspricemanager.ConfigKey: gaspricemanager.NewConfig(new(testGenesisTime), nil, nil, nil, nil),
+				}
+			})),
+			wantErr: testerr.Contains("cannot activate before Igloo"),
+		},
+		{
+			name:    "gaspricemanager_upgrade_before_igloo",
+			ctx:     helicon,
+			genesis: testGenesisJSON(),
+			upgradeBytes: marshalJSON(extras.UpgradeConfig{
+				PrecompileUpgrades: []extras.PrecompileUpgrade{{
+					Config: gaspricemanager.NewConfig(new(testGenesisTime+1), nil, nil, nil, nil),
+				}},
+			}),
+			wantErr: testerr.Contains("cannot activate before Igloo"),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -354,7 +380,8 @@ func TestParseGenesis(t *testing.T) {
 
 // TestGenesisBlockMatchesSubnetEVM ensures that the genesis block, and thus
 // the genesis hash, is identical to the one subnet-evm produces for the same
-// genesis. Existing L1s MUST retain their genesis hash.
+// genesis. Existing L1s MUST retain their genesis hash. Subnet-EVM doesn't
+// support Igloo, so only earlier upgrades are compared.
 //
 // TODO(alarso16): Delete this test when graft/subnet-evm is being deleted.
 func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
@@ -364,7 +391,7 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 		genesis  string
 	}
 	var specs []spec
-	for fork := upgrade.NoUpgrades; fork <= upgrade.Latest; fork++ {
+	for fork := range upgrade.Igloo {
 		specs = append(specs, spec{
 			name:     fork.String(),
 			upgrades: fork,
@@ -383,30 +410,30 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 		},
 		spec{
 			name:     "initial_min_delay",
-			upgrades: upgrade.Latest,
+			upgrades: upgrade.Helicon,
 			genesis:  testGenesisJSON(withInitialMinDelay(1_500)),
 		},
 		spec{
 			// subnet-evm commits the genesis state with deleteEmptyObjects=false.
 			name:     "empty_account",
-			upgrades: upgrade.Latest,
+			upgrades: upgrade.Helicon,
 			genesis: testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
 				g.Alloc[common.Address{0xe0}] = types.Account{Balance: new(big.Int)}
 			})),
 		},
 		spec{
 			name:     "precompiles",
-			upgrades: upgrade.Latest,
-			genesis:  testGenesisJSON(withAllGenesisPrecompiles(testGenesisTime)),
+			upgrades: upgrade.Helicon,
+			genesis:  testGenesisJSON(withPreIglooGenesisPrecompiles(testGenesisTime)),
 		},
 		spec{
 			name:     "precompiles_after_genesis",
-			upgrades: upgrade.Latest,
-			genesis:  testGenesisJSON(withAllGenesisPrecompiles(testGenesisTime + 1)),
+			upgrades: upgrade.Helicon,
+			genesis:  testGenesisJSON(withPreIglooGenesisPrecompiles(testGenesisTime + 1)),
 		},
 		spec{
 			name:     "header_fields",
-			upgrades: upgrade.Latest,
+			upgrades: upgrade.Helicon,
 			genesis: testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
 				g.Nonce = 42
 				g.ExtraData = []byte("extra")
@@ -439,6 +466,28 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 	}
 }
 
+// TestGenesisBlockRLPRoundTrip asserts that the genesis header MUST decode to
+// itself. RLP decodes an unset optional field followed by a set one as zero, so
+// every such field MUST be set.
+func TestGenesisBlockRLPRoundTrip(t *testing.T) {
+	for fork := range upgrade.Latest + 1 {
+		t.Run(fork.String(), func(t *testing.T) {
+			ctx := &snow.Context{NetworkUpgrades: upgradetest.GetConfig(fork)}
+			g, err := parseGenesis(ctx, []byte(testGenesisJSON()), nil)
+			require.NoError(t, err, "parseGenesis(...)")
+			block, err := g.block()
+			require.NoError(t, err, "%T.block()", g)
+
+			want := block.Header()
+			b, err := rlp.EncodeToBytes(want)
+			require.NoError(t, err, "rlp.EncodeToBytes()")
+			got := new(types.Header)
+			require.NoError(t, rlp.DecodeBytes(b, got), "rlp.DecodeBytes()")
+			require.Equal(t, customtypes.GetHeaderExtra(want), customtypes.GetHeaderExtra(got), "decoded header extra")
+		})
+	}
+}
+
 // This test is intentionally a change detector: the genesis hash is part of
 // consensus, so any change would break deployed networks.
 func TestHistoricalGenesisHashes(t *testing.T) {
@@ -465,8 +514,8 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 		upgrade.Granite: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
 		upgrade.Helicon: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
 
-		// TODO(alarso16): Add SAE required fields
-		upgrade.Igloo: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
+		// Added the SAE fields.
+		upgrade.Igloo: "0x8afed61aa179a138084218c162f3b50b5664f0e1d4bfb4c2655ca581889eeabc",
 	}
 	_ = hashes[upgrade.Latest] // Enforce completeness at compile time.
 

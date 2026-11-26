@@ -70,10 +70,10 @@ func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
 }
 
-// ShouldCreditBaseFeeToCoinbase is unused, as subnet-evm never calls libevm's
-// implementation of core for message or transaction execution.
-func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
-	return (ethparams.NOOPHooks{}).ShouldCreditBaseFeeToCoinbase()
+// ShouldCreditBaseFeeToCoinbase returns true before Igloo, when the coinbase
+// received the full effective gas price. From Igloo, the base fee is burned.
+func (r RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
+	return !r.IsIgloo
 }
 
 // AccessListGas computes the intrinsic gas for an access list.
@@ -117,17 +117,17 @@ func (r RulesExtra) precompileOverrideBuiltin(addr common.Address) (libevm.Preco
 
 func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.PrecompiledContract {
 	run := func(env vm.PrecompileEnvironment, input []byte, suppliedGas uint64) ([]byte, uint64, error) {
+		rules := GetRulesExtra(env.Rules()).AvalancheRules
 		header := env.BlockHeader()
 		accessibleState := accessibleState{
 			env: env,
 			blockContext: &precompileBlockContext{
 				number:           env.BlockNumber(),
 				time:             env.BlockTime(),
-				predicateResults: customtypes.PredicateResults(header, customheader.PredicateBytesFromExtra(header.Extra)),
+				predicateResults: customtypes.PredicateResults(header, customheader.PredicateBytesFromExtra(rules, header.Extra)),
 			},
 		}
 
-		rules := GetRulesExtra(env.Rules()).AvalancheRules
 		switch call := env.IncomingCallType(); {
 		case call != vm.DelegateCall && call != vm.CallCode: // Others always allowed
 		case rules.IsGranite:

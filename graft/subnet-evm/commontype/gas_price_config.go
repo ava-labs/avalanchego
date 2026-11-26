@@ -12,18 +12,15 @@ import (
 
 const MinTargetGas uint64 = 1_000_000
 
-// DefaultGasPriceConfig returns a default gas price config for the dynamic
-// gas limit mechanism.
-//
-// The default values are:
-//   - TargetGas: 1_000_000
-//   - MinGasPrice: 1
-//   - TimeToDouble: 60
+// DefaultGasPriceConfig returns the config aligned with the C-Chain, which
+// applies when the gas price manager precompile is disabled or has no initial
+// config.
 func DefaultGasPriceConfig() GasPriceConfig {
 	return GasPriceConfig{
-		TargetGas:    1_000_000,
-		MinGasPrice:  1,
-		TimeToDouble: 60,
+		ValidatorTargetGas: true,
+		StaticPricing:      false,
+		MinGasPrice:        1,
+		TimeToDouble:       60,
 	}
 }
 

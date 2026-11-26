@@ -76,6 +76,10 @@ func VerifyExtraPrefix(
 func VerifyExtra(rules extras.AvalancheRules, extra []byte) error {
 	extraLen := len(extra)
 	switch {
+	case rules.IsIgloo:
+		// Igloo headers have no fee window, and the SAE VM verifies the
+		// predicate results.
+		return nil
 	case rules.IsDurango:
 		if extraLen < subnetevm.WindowSize {
 			return fmt.Errorf(
@@ -108,8 +112,13 @@ func VerifyExtra(rules extras.AvalancheRules, extra []byte) error {
 }
 
 // PredicateBytesFromExtra returns the predicate result bytes from the header's
-// extra data. If the extra data is not long enough, an empty slice is returned.
-func PredicateBytesFromExtra(extra []byte) []byte {
+// extra data under rules. From Igloo, the extra data holds only the predicate
+// results. Before Igloo, they follow the fee window, and nil is returned if
+// nothing follows it.
+func PredicateBytesFromExtra(rules extras.AvalancheRules, extra []byte) []byte {
+	if rules.IsIgloo {
+		return extra
+	}
 	offset := subnetevm.WindowSize
 	// Prior to Durango, the VM enforces the extra data is smaller than or equal
 	// to `offset`.

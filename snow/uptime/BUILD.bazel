@@ -16,7 +16,6 @@ go_library(
         "//database",
         "//ids",
         "//utils",
-        "//utils/timer/mockable",
     ],
 )
 

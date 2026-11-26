@@ -26,8 +26,10 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 
 	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -82,7 +84,7 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 		return nil, fmt.Errorf("%w: %d", errNonNilGenesisBlobGasUsed, *g.BlobGasUsed)
 	}
 
-	if err := updateChainConfig(g.Config, upgradeConfig, ctx); err != nil {
+	if err := updateChainConfig(g.Config, g.Timestamp, upgradeConfig, ctx); err != nil {
 		return nil, err
 	}
 
@@ -90,7 +92,7 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 }
 
 // updateChainConfig edits cfg in-place.
-func updateChainConfig(cfg *params.ChainConfig, upgradeConfig extras.UpgradeConfig, ctx *snow.Context) error {
+func updateChainConfig(cfg *params.ChainConfig, genesisTimestamp uint64, upgradeConfig extras.UpgradeConfig, ctx *snow.Context) error {
 	extra := l1params.GetExtra(cfg)
 	if extra.FeeConfig == (commontype.FeeConfig{}) {
 		extra.FeeConfig = l1params.DefaultFeeConfig
@@ -102,6 +104,11 @@ func updateChainConfig(cfg *params.ChainConfig, upgradeConfig extras.UpgradeConf
 		SnowCtx: ctx,
 	}
 
+	if iglooTS, ok := extra.NetworkUpgrades.ScheduledIglooTimestamp(); ok {
+		if err := retirement.ReconcileForIgloo(extra, genesisTimestamp, iglooTS); err != nil {
+			return err
+		}
+	}
 	if err := extra.Verify(); err != nil {
 		return err
 	}
@@ -198,9 +205,8 @@ func writeGenesisBlock(db ethdb.Database, block *types.Block, config *params.Cha
 	return b.Write()
 }
 
-// block constructs the genesis block. The header MUST be identical to the one
-// produced by subnet-evm for the same genesis so that existing L1s retain
-// their genesis hash.
+// block constructs the genesis block. Before Igloo, the header MUST match
+// subnet-evm's so that existing L1s retain their genesis hash.
 func (g *genesis) block() (*types.Block, error) {
 	root, err := g.root()
 	if err != nil {
@@ -253,7 +259,15 @@ func (g *genesis) block() (*types.Block, error) {
 		headerExtra.MinDelayExcess = new(minDelayExcess)
 	}
 
-	// TODO(alarso16): Add SAE required fields if active at genesis.
+	if c.IsIgloo(g.Timestamp) {
+		// The genesis block is synchronous, so its settled markers are zero.
+		headerExtra.SettledHeight = new(uint64)
+		headerExtra.SettledGasUnix = new(uint64)
+		headerExtra.SettledGasNumerator = new(uint64)
+		headerExtra.SettledExcess = new(uint64)
+		headerExtra.TargetExponent = new(dynamic.InitialTargetExponent)
+		setGasConfig(headerExtra, genesisGasConfig(c, g.Timestamp))
+	}
 
 	return types.NewBlock(
 		h,
@@ -306,13 +320,9 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 		return common.Hash{}, err
 	}
 
-	if err := legacy.ApplyPrecompileActivations(
-		g.Config,
-		nil,
-		legacy.NewBlockContext(big.NewInt(genesisNumber), g.Timestamp),
-		statedb,
-	); err != nil {
-		return common.Hash{}, fmt.Errorf("applying precompile activations: %w", err)
+	blockContext := legacy.NewBlockContext(new(big.Int).SetUint64(genesisNumber), g.Timestamp)
+	if err := legacy.ApplyPrecompileActivations(g.Config, nil, blockContext, statedb); err != nil {
+		return common.Hash{}, fmt.Errorf("configuring genesis precompiles: %w", err)
 	}
 
 	for addr, account := range g.Alloc {

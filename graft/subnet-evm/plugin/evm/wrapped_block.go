@@ -53,6 +53,7 @@ var (
 	errParentBeaconRootNonEmpty            = errors.New("invalid non-empty parentBeaconRoot")
 	errBlobGasUsedNilInCancun              = errors.New("blob gas used must not be nil in Cancun")
 	errBlobsNotEnabled                     = errors.New("blobs not enabled on avalanche networks")
+	errIglooUnsupported                    = errors.New("igloo blocks are unsupported")
 )
 
 // wrappedBlock implements the snowman.wrappedBlock interface
@@ -225,6 +226,11 @@ func (b *wrappedBlock) verify(predicateContext *precompileconfig.PredicateContex
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 
+	// Igloo blocks are parsed but executed by the SAE VM.
+	if params.GetExtra(b.vm.chainConfig).IsIgloo(b.ethBlock.Time()) {
+		return errIglooUnsupported
+	}
+
 	if err := b.semanticVerify(predicateContext); err != nil {
 		return fmt.Errorf("failed to verify block: %w", err)
 	}
@@ -305,9 +311,9 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	if err := customheader.VerifyTime(extraConfig, parent, header, b.vm.clock.Time()); err != nil {
 		return err
 	}
-	// Ensure settled block marker fields are unset. The fields belong to SAE
-	// and must never appear on a subnet-evm block.
-	if err := customheader.VerifySettled(header); err != nil {
+	// Ensure SAE header fields are unset. The fields belong to SAE and must
+	// never appear on a subnet-evm block.
+	if err := customheader.VerifyNoSAEFields(header); err != nil {
 		return err
 	}
 
@@ -469,7 +475,7 @@ func (b *wrappedBlock) verifyPredicates(predicateContext *precompileconfig.Predi
 		return fmt.Errorf("failed to marshal predicate results: %w", err)
 	}
 	extraData := b.ethBlock.Extra()
-	headerPredicateResultsBytes := customheader.PredicateBytesFromExtra(extraData)
+	headerPredicateResultsBytes := customheader.PredicateBytesFromExtra(rulesExtra.AvalancheRules, extraData)
 	if !bytes.Equal(headerPredicateResultsBytes, predicateResultsBytes) {
 		return fmt.Errorf("%w (remote: %x local: %x)", errInvalidHeaderPredicateResults, headerPredicateResultsBytes, predicateResultsBytes)
 	}

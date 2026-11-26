@@ -225,7 +225,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 				return nil, fmt.Errorf("applying op at end of block %d to worst-case state: %v", block.Height(), err)
 			}
 		}
-		if _, err := state.FinishBlock(); err != nil {
+		if _, err := state.FinishBlock(block.Header()); err != nil {
 			blockLog.Warn("Could not finish historical worst-case calculation",
 				zap.Error(err),
 			)
@@ -331,14 +331,6 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	}
 	hdr.GasUsed = state.GasUsed()
 
-	bounds, err := state.FinishBlock()
-	if err != nil {
-		log.Warn("Could not finish worst-case block calculation",
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("finishing worst-case state for new block: %v", err)
-	}
-
 	var receipts types.Receipts
 	settling := blocks.Range(parent.LastSettled(), lastSettled)
 	for _, b := range settling {
@@ -361,9 +353,19 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		return nil, errZeroSettledMarker
 	}
 
-	ethB, err := builder.BuildBlock(hdr, bCtx, included, receipts, includedOps, settled)
+	settledHdr := lastSettled.Header()
+	settledRules := b.exec.ChainConfig().Rules(settledHdr.Number, true /*isMerge*/, settledHdr.Time)
+	ethB, err := builder.BuildBlock(hdr, bCtx, included, receipts, includedOps, settled, settledRules, state.StateReader())
 	if err != nil {
 		return nil, err
+	}
+
+	bounds, err := state.FinishBlock(ethB.Header())
+	if err != nil {
+		log.Warn("Could not finish worst-case block calculation",
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("finishing worst-case state for new block: %v", err)
 	}
 
 	block, err := b.new(ethB, parent, lastSettled)

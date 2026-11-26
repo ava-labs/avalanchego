@@ -251,6 +251,15 @@ func TestVerifyExtra(t *testing.T) {
 			extra:    make([]byte, subnetevm.WindowSize-1),
 			expected: errInvalidExtraLength,
 		},
+		{
+			name: "igloo_no_fee_window",
+			rules: extras.AvalancheRules{
+				IsDurango: true,
+				IsIgloo:   true,
+			},
+			extra:    make([]byte, subnetevm.WindowSize-1),
+			expected: nil,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -263,6 +272,7 @@ func TestVerifyExtra(t *testing.T) {
 func TestPredicateBytesFromExtra(t *testing.T) {
 	tests := []struct {
 		name     string
+		rules    extras.AvalancheRules
 		extra    []byte
 		expected []byte
 	}{
@@ -288,10 +298,16 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 			},
 			expected: []byte{5},
 		},
+		{
+			name:     "igloo_no_fee_window",
+			rules:    extras.AvalancheRules{IsIgloo: true},
+			extra:    []byte{5},
+			expected: []byte{5},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := PredicateBytesFromExtra(test.extra)
+			got := PredicateBytesFromExtra(test.rules, test.extra)
 			require.Equal(t, test.expected, got)
 		})
 	}
@@ -369,7 +385,7 @@ func TestPredicateBytesExtra(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			gotExtra := SetPredicateBytesInExtra(test.extra, test.predicate)
 			require.Equal(t, test.wantExtraWithPredicate, gotExtra)
-			gotPredicateBytes := PredicateBytesFromExtra(gotExtra)
+			gotPredicateBytes := PredicateBytesFromExtra(extras.AvalancheRules{}, gotExtra)
 			require.Equal(t, test.wantPredicateBytes, gotPredicateBytes)
 		})
 	}
