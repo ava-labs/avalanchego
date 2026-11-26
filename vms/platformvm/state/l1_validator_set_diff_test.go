@@ -187,7 +187,7 @@ func TestGetL1ValidatorSet(t *testing.T) {
 			s := newTestState(t, db)
 
 			wantSets := []map[ids.NodeID]*validators.GetValidatorOutput{
-				{}, // There are no L1 validators at genesis.
+				{}, // There are no L1 validators at genesis, so the subnet is not an L1.
 			}
 			l1Validators := make(map[ids.ID]L1Validator)
 			for _, block := range test.blocks {
@@ -276,13 +276,12 @@ func TestGetL1ValidatorSetIndexedHeights(t *testing.T) {
 			wantSets = append(wantSets, newWantL1ValidatorSet(l1Validators, subnetID))
 
 			for height, want := range wantSets {
-				got, err := s.GetL1ValidatorSet(t.Context(), uint64(height), subnetID)
 				if uint64(height) < test.wantLowerBound {
-					require.ErrorIs(err, ErrL1ValidatorSetNotIndexed)
+					_, err := s.GetL1ValidatorSet(t.Context(), uint64(height), subnetID)
+					require.ErrorIs(err, validators.ErrL1ValidatorSetNotIndexed)
 					continue
 				}
-				require.NoError(err)
-				require.Equal(want, got)
+				requireL1ValidatorSet(t, s, uint64(height), subnetID, want)
 			}
 		})
 	}
@@ -355,7 +354,9 @@ func FuzzL1ValidatorSetDiffValue(f *testing.F) {
 	})
 }
 
-func TestGetL1ValidatorSetEmptySubnet(t *testing.T) {
+// TestGetL1ValidatorSetNotL1 checks that a subnet without L1 validators is
+// reported as not being an L1, even if another subnet is one.
+func TestGetL1ValidatorSetNotL1(t *testing.T) {
 	require := require.New(t)
 
 	var (
@@ -368,9 +369,8 @@ func TestGetL1ValidatorSetEmptySubnet(t *testing.T) {
 
 	// Only the current height can be queried before any block is accepted.
 	got, err := s.GetL1ValidatorSet(t.Context(), 0, subnetID)
-	require.NoError(err)
-	require.NotNil(got)
-	require.Empty(got)
+	require.ErrorIs(err, validators.ErrNotL1)
+	require.Nil(got)
 
 	acceptL1ValidatorSetBlocks(t, s, l1Validators, []L1Validator{
 		newTestL1Validator(otherSubnetID, ids.GenerateTestNodeID(), newL1ValidatorSetPublicKey(t), 5, true),
@@ -379,9 +379,8 @@ func TestGetL1ValidatorSetEmptySubnet(t *testing.T) {
 	requireBeforeAndAfterReload(t, db, s, func(s *State) {
 		for height := range uint64(2) {
 			got, err := s.GetL1ValidatorSet(t.Context(), height, subnetID)
-			require.NoError(err)
-			require.NotNil(got)
-			require.Empty(got)
+			require.ErrorIs(err, validators.ErrNotL1)
+			require.Nil(got)
 		}
 	})
 }
@@ -512,16 +511,15 @@ func TestGetL1ValidatorSetProposalAndOption(t *testing.T) {
 			require.Equal(test.wantNumNewRows, countL1ValidatorSetDiffs(t, s)-numRows)
 			requireBeforeAndAfterReload(t, db, s, func(s *State) {
 				for height, want := range wantSets {
-					got, err := s.GetL1ValidatorSet(t.Context(), uint64(height), subnetID)
 					if test.gapBeforeProposal && height < 1 {
 						// The proposal block at height 2 starts the indexed
 						// heights, so height 1 is the lowest one that can be
 						// queried.
-						require.ErrorIs(err, ErrL1ValidatorSetNotIndexed)
+						_, err := s.GetL1ValidatorSet(t.Context(), uint64(height), subnetID)
+						require.ErrorIs(err, validators.ErrL1ValidatorSetNotIndexed)
 						continue
 					}
-					require.NoError(err, "height %d", height)
-					require.Equal(want, got, "height %d", height)
+					requireL1ValidatorSet(t, s, uint64(height), subnetID, want)
 				}
 			})
 		})
@@ -751,13 +749,12 @@ func FuzzGetL1ValidatorSet(f *testing.F) {
 			t.Helper()
 			for _, subnetID := range subnetIDs {
 				for height, want := range wantSets[subnetID] {
-					got, err := s.GetL1ValidatorSet(t.Context(), uint64(height), subnetID)
 					if uint64(height) < minIndexedHeight {
-						require.ErrorIs(err, ErrL1ValidatorSetNotIndexed, "height %d", height)
+						_, err := s.GetL1ValidatorSet(t.Context(), uint64(height), subnetID)
+						require.ErrorIs(err, validators.ErrL1ValidatorSetNotIndexed, "height %d", height)
 						continue
 					}
-					require.NoError(err, "height %d", height)
-					require.Equal(want, got, "height %d", height)
+					requireL1ValidatorSet(t, s, uint64(height), subnetID, want)
 				}
 				_, err := s.GetL1ValidatorSet(t.Context(), uint64(len(wantSets[subnetID])), subnetID)
 				require.ErrorIs(err, validators.ErrUnfinalizedHeight)
@@ -962,10 +959,29 @@ func requireL1ValidatorSets(
 	t.Helper()
 
 	for height, want := range wantSets {
-		got, err := s.GetL1ValidatorSet(t.Context(), uint64(height), subnetID)
-		require.NoError(t, err)
-		require.Equal(t, want, got, "height %d", height)
+		requireL1ValidatorSet(t, s, uint64(height), subnetID, want)
 	}
+}
+
+// requireL1ValidatorSet requires the L1 validator set of subnetID at height to
+// be want. A subnet without L1 validators is not an L1, so an empty want
+// requires validators.ErrNotL1.
+func requireL1ValidatorSet(
+	t *testing.T,
+	s *State,
+	height uint64,
+	subnetID ids.ID,
+	want map[ids.NodeID]*validators.GetValidatorOutput,
+) {
+	t.Helper()
+
+	got, err := s.GetL1ValidatorSet(t.Context(), height, subnetID)
+	if len(want) == 0 {
+		require.ErrorIs(t, err, validators.ErrNotL1, "height %d", height)
+		return
+	}
+	require.NoError(t, err, "height %d", height)
+	require.Equal(t, want, got, "height %d", height)
 }
 
 func countL1ValidatorSetDiffs(t *testing.T, s *State) int {

@@ -23,6 +23,14 @@ var (
 	_ State = (*cachedState)(nil)
 
 	ErrUnfinalizedHeight = errors.New("validator set height not yet finalized")
+	// ErrL1ValidatorSetNotIndexed is returned by [State.GetL1ValidatorSet] when
+	// this node didn't index the heights needed to reconstruct the set at the
+	// requested height. Other nodes may still be able to answer.
+	ErrL1ValidatorSetNotIndexed = errors.New("L1 validator set is not indexed")
+	// ErrNotL1 is returned by [State.GetL1ValidatorSet] when the subnet has no
+	// L1 validators at the requested height. An L1 always has at least one
+	// validator, so the subnet was not an L1 at that height.
+	ErrNotL1 = errors.New("subnet is not an L1")
 )
 
 // State allows the lookup of validator sets on specified subnets at the
@@ -68,6 +76,11 @@ type State interface {
 	// [State.GetValidatorSet], inactive validators are returned with their own NodeID
 	// and public key rather than merged under [ids.EmptyNodeID], and legacy
 	// subnet validators are not included.
+	// It returns [ErrUnfinalizedHeight] if the height isn't finalized yet,
+	// [ErrL1ValidatorSetNotIndexed] if this node didn't index the heights
+	// needed to reconstruct the set at the requested height, and [ErrNotL1] if
+	// the subnet was not an L1 at the requested height. The returned set is
+	// never empty.
 	// The returned map should not be modified.
 	GetL1ValidatorSet(
 		ctx context.Context,

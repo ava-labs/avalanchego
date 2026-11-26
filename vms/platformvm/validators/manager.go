@@ -177,7 +177,7 @@ func (m *Manager) GetValidatorSet(
 	targetHeight uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	validatorSetsCache := m.getValidatorSetCache(subnetID)
+	validatorSetsCache := m.getSubnetCache(m.caches, subnetID)
 
 	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
 		m.metrics.IncValidatorSetsCached()
@@ -202,14 +202,6 @@ func (m *Manager) GetValidatorSet(
 	return maps.Clone(validatorSet), nil
 }
 
-func (m *Manager) getValidatorSetCache(subnetID ids.ID) validatorSetCache {
-	return m.getSubnetCache(m.caches, subnetID)
-}
-
-func (m *Manager) getL1ValidatorSetCache(subnetID ids.ID) validatorSetCache {
-	return m.getSubnetCache(m.l1Caches, subnetID)
-}
-
 func (m *Manager) getSubnetCache(caches map[ids.ID]validatorSetCache, subnetID ids.ID) validatorSetCache {
 	// Only cache tracked subnets
 	if subnetID != constants.PrimaryNetworkID && !m.cfg.TrackedSubnets.Contains(subnetID) {
@@ -232,14 +224,15 @@ func (m *Manager) getSubnetCache(caches map[ids.ID]validatorSetCache, subnetID i
 // [ids.EmptyNodeID], and legacy subnet validators are not included.
 //
 // It returns [validators.ErrUnfinalizedHeight] if targetHeight isn't finalized
-// yet, and [state.ErrL1ValidatorSetNotIndexed] if this node didn't index the
-// heights needed to reconstruct the set at targetHeight.
+// yet, [validators.ErrL1ValidatorSetNotIndexed] if this node didn't index the
+// heights needed to reconstruct the set at targetHeight, and
+// [validators.ErrNotL1] if subnetID was not an L1 at targetHeight.
 func (m *Manager) GetL1ValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	validatorSetsCache := m.getL1ValidatorSetCache(subnetID)
+	validatorSetsCache := m.getSubnetCache(m.l1Caches, subnetID)
 	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
 		m.metrics.IncL1ValidatorSetsCached()
 		return maps.Clone(validatorSet), nil

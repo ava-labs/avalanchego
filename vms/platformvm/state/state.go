@@ -59,8 +59,6 @@ const (
 )
 
 var (
-	ErrL1ValidatorSetNotIndexed = errors.New("L1 validator set is not indexed")
-
 	errL1ValidatorSetDuplicateNodeID  = errors.New("L1 validator set contains duplicate nodeID")
 	errL1ValidatorSetInvalidPublicKey = errors.New("L1 validator set contains invalid public key")
 	errValidatorSetAlreadyPopulated   = errors.New("validator set already populated")
@@ -866,8 +864,11 @@ func (s *State) GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*S
 // The set is reconstructed by starting from the persisted L1 validators and
 // applying the L1 validator set diffs from the persisted height down to
 // targetHeight+1. It returns [validators.ErrUnfinalizedHeight] if targetHeight
-// is above the persisted height, and [ErrL1ValidatorSetNotIndexed] if this
-// node didn't write the diffs of every one of those heights.
+// is above the persisted height, and [validators.ErrL1ValidatorSetNotIndexed]
+// if this node didn't write the diffs of every one of those heights.
+//
+// An L1 always has at least one validator, so it returns [validators.ErrNotL1]
+// if the subnet has no L1 validators at targetHeight.
 //
 // Legacy subnet validators are not included.
 func (s *State) GetL1ValidatorSet(
@@ -894,7 +895,7 @@ func (s *State) GetL1ValidatorSet(
 		// (targetHeight, persistedHeight].
 		indexedHeights := s.l1ValidatorSetIndexedHeights
 		if indexedHeights == nil || targetHeight+1 < indexedHeights.LowerBound {
-			return nil, fmt.Errorf("%w at height %d", ErrL1ValidatorSetNotIndexed, targetHeight)
+			return nil, fmt.Errorf("%w at height %d", validators.ErrL1ValidatorSetNotIndexed, targetHeight)
 		}
 	}
 
@@ -903,39 +904,11 @@ func (s *State) GetL1ValidatorSet(
 		return nil, err
 	}
 
-	diffIter := s.l1ValidatorSetDiffsDB.NewIteratorWithStartAndPrefix(
-		marshalL1ValidatorSetDiffStartKey(subnetID, persistedHeight),
-		subnetID[:],
-	)
-	defer diffIter.Release()
-
-	for diffIter.Next() {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		height, validationID, err := unmarshalL1ValidatorSetDiffKey(diffIter.Key())
-		if err != nil {
-			return nil, err
-		}
-		// A diff at height holds the state at height-1, so applying a diff at
-		// or below targetHeight would go past it.
-		if height <= targetHeight {
-			break
-		}
-
-		entry, err := unmarshalL1ValidatorSetDiffValue(diffIter.Value())
-		if err != nil {
-			return nil, err
-		}
-		if entry == nil {
-			delete(vdrs, validationID)
-			continue
-		}
-		vdrs[validationID] = *entry
-	}
-	if err := diffIter.Error(); err != nil {
+	if err := s.applyL1ValidatorSetDiffs(ctx, vdrs, subnetID, persistedHeight, targetHeight); err != nil {
 		return nil, err
+	}
+	if len(vdrs) == 0 {
+		return nil, fmt.Errorf("%w: %s at height %d", validators.ErrNotL1, subnetID, targetHeight)
 	}
 
 	validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(vdrs))
@@ -956,6 +929,51 @@ func (s *State) GetL1ValidatorSet(
 		}
 	}
 	return validatorSet, nil
+}
+
+// applyL1ValidatorSetDiffs rewinds vdrs, the L1 validators of subnetID keyed by
+// validationID at startHeight, to their state at targetHeight. It applies the
+// diffs of the heights in (targetHeight, startHeight], from the highest height
+// to the lowest.
+func (s *State) applyL1ValidatorSetDiffs(
+	ctx context.Context,
+	vdrs map[ids.ID]l1ValidatorSetEntry,
+	subnetID ids.ID,
+	startHeight uint64,
+	targetHeight uint64,
+) error {
+	diffIter := s.l1ValidatorSetDiffsDB.NewIteratorWithStartAndPrefix(
+		marshalL1ValidatorSetDiffStartKey(subnetID, startHeight),
+		subnetID[:],
+	)
+	defer diffIter.Release()
+
+	for diffIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		height, validationID, err := unmarshalL1ValidatorSetDiffKey(diffIter.Key())
+		if err != nil {
+			return err
+		}
+		// A diff at height holds the state at height-1, so applying a diff at
+		// or below targetHeight would go past it.
+		if height <= targetHeight {
+			break
+		}
+
+		entry, err := unmarshalL1ValidatorSetDiffValue(diffIter.Value())
+		if err != nil {
+			return err
+		}
+		if entry == nil {
+			delete(vdrs, validationID)
+			continue
+		}
+		vdrs[validationID] = *entry
+	}
+	return diffIter.Error()
 }
 
 // getPersistedL1ValidatorSet returns the persisted L1 validators of subnetID,

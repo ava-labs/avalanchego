@@ -4,6 +4,7 @@
 package state
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
@@ -93,6 +94,11 @@ func unmarshalL1ValidatorSetDiffKey(key []byte) (uint64, ids.ID, error) {
 
 // marshalL1ValidatorSetDiffValue returns the empty value if entry is nil, which
 // marks a validator that did not exist.
+//
+// Invariant: entry.PublicKey is an uncompressed BLS public key, as stored in
+// [L1Validator]. The length isn't checked here, so a key of any other length
+// would be written as is and then rejected by unmarshalL1ValidatorSetDiffValue
+// on every query that reads the row.
 func marshalL1ValidatorSetDiffValue(entry *l1ValidatorSetEntry) []byte {
 	if entry == nil {
 		return []byte{}
@@ -117,9 +123,8 @@ func unmarshalL1ValidatorSetDiffValue(value []byte) (*l1ValidatorSetEntry, error
 
 	entry := &l1ValidatorSetEntry{
 		Weight:    binary.BigEndian.Uint64(value[l1ValidatorSetDiffWeightOffset:]),
-		PublicKey: make([]byte, len(value)-l1ValidatorSetDiffPublicKeyOffset),
+		PublicKey: bytes.Clone(value[l1ValidatorSetDiffPublicKeyOffset:]),
 	}
 	copy(entry.NodeID[:], value)
-	copy(entry.PublicKey, value[l1ValidatorSetDiffPublicKeyOffset:])
 	return entry, nil
 }

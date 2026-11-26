@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -388,9 +389,9 @@ func TestGetL1ValidatorSet(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name:   "genesis",
-			height: 0,
-			want:   map[ids.NodeID]*validators.GetValidatorOutput{},
+			name:    "not_an_L1_at_genesis",
+			height:  0,
+			wantErr: validators.ErrNotL1,
 		},
 		{
 			name:   "after_addition",
@@ -427,86 +428,126 @@ func TestGetL1ValidatorSet(t *testing.T) {
 	}
 }
 
-// TestGetL1ValidatorSetCache checks that callers can't change cached results,
-// and that a block that is accepted but not committed yet is never cached,
-// whether or not the subnet is tracked.
+// TestGetL1ValidatorSetCache checks that the set of a tracked subnet is built
+// once per height and then served from the cache, that the set of an untracked
+// subnet is built on every call, that callers can't change cached results, and
+// that errors are never cached.
 func TestGetL1ValidatorSetCache(t *testing.T) {
-	for _, tracked := range []bool{true, false} {
-		require := require.New(t)
+	tests := []struct {
+		name        string
+		tracked     bool
+		wantCreated float64
+		wantCached  float64
+	}{
+		{
+			name:        "tracked",
+			tracked:     true,
+			wantCreated: 1,
+			wantCached:  3,
+		},
+		{
+			name:        "untracked",
+			wantCreated: 4,
+			wantCached:  0,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-		var (
-			vdrs = validators.NewManager()
-			s    = statetest.New(t, statetest.Config{
-				Validators: vdrs,
-			})
+			var (
+				vdrs = validators.NewManager()
+				s    = statetest.New(t, statetest.Config{
+					Validators: vdrs,
+				})
 
-			subnetID = ids.GenerateTestID()
-			pk       = newPublicKey(t)
-			vdr      = state.L1Validator{
-				ValidationID:          ids.GenerateTestID(),
-				SubnetID:              subnetID,
-				NodeID:                ids.GenerateTestNodeID(),
-				PublicKey:             bls.PublicKeyToUncompressedBytes(pk),
-				RemainingBalanceOwner: []byte{},
-				DeactivationOwner:     []byte{},
-				Weight:                5,
-				EndAccumulatedFee:     1,
+				subnetID = ids.GenerateTestID()
+				pk       = newPublicKey(t)
+				vdr      = state.L1Validator{
+					ValidationID:          ids.GenerateTestID(),
+					SubnetID:              subnetID,
+					NodeID:                ids.GenerateTestNodeID(),
+					PublicKey:             bls.PublicKeyToUncompressedBytes(pk),
+					RemainingBalanceOwner: []byte{},
+					DeactivationOwner:     []byte{},
+					Weight:                5,
+					EndAccumulatedFee:     1,
+				}
+				deletedVdr = vdr
+			)
+			deletedVdr.Weight = 0
+
+			trackedSubnets := set.Set[ids.ID]{}
+			if test.tracked {
+				trackedSubnets.Add(subnetID)
 			}
-			deletedVdr = vdr
-		)
-		deletedVdr.Weight = 0
+			registry := prometheus.NewRegistry()
+			managerMetrics, err := metrics.New(registry)
+			require.NoError(err)
+			m := NewManager(
+				config.Internal{
+					Validators:     vdrs,
+					TrackedSubnets: trackedSubnets,
+				},
+				s,
+				managerMetrics,
+				new(mockable.Clock),
+			)
 
-		trackedSubnets := set.Set[ids.ID]{}
-		if tracked {
-			trackedSubnets.Add(subnetID)
-		}
-		m := NewManager(
-			config.Internal{
-				Validators:     vdrs,
-				TrackedSubnets: trackedSubnets,
-			},
-			s,
-			metrics.Noop,
-			new(mockable.Clock),
-		)
+			acceptL1ValidatorSetTestBlock(t, s, vdr)
+			require.NoError(s.Commit())
 
-		acceptL1ValidatorSetTestBlock(t, s, vdr)
-		require.NoError(s.Commit())
+			// The first query of a height always builds the set.
+			want := map[ids.NodeID]*validators.GetValidatorOutput{
+				vdr.NodeID: {
+					NodeID:    vdr.NodeID,
+					PublicKey: pk,
+					Weight:    vdr.Weight,
+				},
+			}
+			got, err := m.GetL1ValidatorSet(t.Context(), 1, subnetID)
+			require.NoError(err)
+			require.Equal(want, got)
 
-		want := map[ids.NodeID]*validators.GetValidatorOutput{
-			vdr.NodeID: {
-				NodeID:    vdr.NodeID,
-				PublicKey: pk,
-				Weight:    vdr.Weight,
-			},
-		}
-		got, err := m.GetL1ValidatorSet(t.Context(), 1, subnetID)
-		require.NoError(err)
-		require.Equal(want, got)
+			// Changing the returned set must not change the next result.
+			delete(got, vdr.NodeID)
+			got, err = m.GetL1ValidatorSet(t.Context(), 1, subnetID)
+			require.NoError(err)
+			require.Equal(want, got)
 
-		// Changing the returned set must not change the next result.
-		delete(got, vdr.NodeID)
-		got, err = m.GetL1ValidatorSet(t.Context(), 1, subnetID)
-		require.NoError(err)
-		require.Equal(want, got)
+			// Accept a block at height 2 without committing it.
+			acceptL1ValidatorSetTestBlock(t, s, deletedVdr)
 
-		// Accept a block at height 2 without committing it.
-		acceptL1ValidatorSetTestBlock(t, s, deletedVdr)
+			got, err = m.GetL1ValidatorSet(t.Context(), 2, subnetID)
+			require.ErrorIs(err, validators.ErrUnfinalizedHeight)
+			require.Nil(got)
+			got, err = m.GetL1ValidatorSet(t.Context(), 1, subnetID)
+			require.NoError(err)
+			require.Equal(want, got)
 
-		got, err = m.GetL1ValidatorSet(t.Context(), 2, subnetID)
-		require.ErrorIs(err, validators.ErrUnfinalizedHeight)
-		require.Nil(got)
-		got, err = m.GetL1ValidatorSet(t.Context(), 1, subnetID)
-		require.NoError(err)
-		require.Equal(want, got)
+			// The only L1 validator is deleted at height 2.
+			require.NoError(s.Commit())
+			got, err = m.GetL1ValidatorSet(t.Context(), 2, subnetID)
+			require.ErrorIs(err, validators.ErrNotL1)
+			require.Nil(got)
+			got, err = m.GetL1ValidatorSet(t.Context(), 1, subnetID)
+			require.NoError(err)
+			require.Equal(want, got)
 
-		require.NoError(s.Commit())
-		got, err = m.GetL1ValidatorSet(t.Context(), 2, subnetID)
-		require.NoError(err)
-		require.Empty(got)
-		got, err = m.GetL1ValidatorSet(t.Context(), 1, subnetID)
-		require.NoError(err)
-		require.Equal(want, got)
+			// Only the 4 successful queries are counted, all at height 1.
+			gotCounters := make(map[string]float64)
+			metricFamilies, err := registry.Gather()
+			require.NoError(err)
+			for _, metricFamily := range metricFamilies {
+				for _, metric := range metricFamily.GetMetric() {
+					if counter := metric.GetCounter(); counter != nil {
+						gotCounters[metricFamily.GetName()] += counter.GetValue()
+					}
+				}
+			}
+			require.Equal(test.wantCreated, gotCounters["l1_validator_sets_created"])
+			require.Equal(test.wantCached, gotCounters["l1_validator_sets_cached"])
+		})
 	}
 }
 
