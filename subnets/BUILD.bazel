@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "config.go",
         "config_membership.go",
+        "membership.go",
         "membership_ca.go",
         "membership_crl.go",
         "no_op_allower.go",
@@ -29,6 +30,7 @@ go_test(
         "config_test.go",
         "membership_ca_test.go",
         "membership_crl_test.go",
+        "membership_test.go",
         "subnet_test.go",
     ],
     embed = [":subnets"],
