@@ -44,10 +44,20 @@ this configuration in order to create a full private Subnet.
 
 :::
 
-#### `allowedNodes` (string list)
+#### `allowedNodes` (string list, deprecated)
 
 If `validatorOnly=true` this allows explicitly specified NodeIDs to be allowed
 to sync the Subnet regardless of validator status. Defaults to be empty.
+
+Deprecated: use `membershipCAPath` / `membershipCAContent` instead. Listing a
+node by ID means editing every other node's config, while a membership CA
+admits it with one certificate. `allowedNodes` is still honoured, and the node
+logs a warning at startup when it is set.
+
+Under `--network-require-validator-to-connect`, these nodes also stay
+connected. A node that does not validate the Primary Network, such as an L1
+validator, used to refuse them at the handshake even though this Subnet would
+have answered them.
 
 :::tip
 
@@ -55,6 +65,40 @@ This is a node-specific configuration. Every validator of this Subnet has to use
 this configuration in order to properly allow a node in the private Subnet.
 
 :::
+
+#### `membershipCAPath` (string) and `membershipCAContent` (string list)
+
+Root certificates, as a PEM file (`membershipCAPath`) or inline PEM text
+(`membershipCAContent`); set at most one, and only with `validatorOnly`. A
+peer whose staking certificate chain verifies against one of them is a
+**member** of this Subnet, like its validators and the nodes in
+`allowedNodes`. Listing several roots stages a root rotation. A file with no
+certificate, or one that was cut short, fails the start.
+
+```json
+{
+  "validatorOnly": true,
+  "membershipCAPath": "/path/to/membership-ca.pem"
+}
+```
+
+Design: [network/membership.md](../network/membership.md).
+
+#### `membershipCRLPath` (string) and `membershipCRLContent` (string list)
+
+Revocation lists (X.509 CRLs), as a PEM file or inline PEM text; set at most
+one, and only with a membership CA. A chain through a certificate on any list
+does not verify. Lists are read at startup and their signatures are not
+checked, so verify a list with OpenSSL before installing it. A list that does
+not parse or has a critical extension (a partition or a delta) fails the start.
+
+```json
+{
+  "validatorOnly": true,
+  "membershipCAPath": "/path/to/membership-ca.pem",
+  "membershipCRLPath": "/path/to/membership-crl.pem"
+}
+```
 
 ### Consensus Config
 
