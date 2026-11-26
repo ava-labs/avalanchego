@@ -69,7 +69,7 @@ type VM struct {
 
 	consensusState utils.Atomic[snow.State]
 
-	preference atomic.Pointer[blocks.Block]
+	preference *atomic.Pointer[blocks.Block]
 	last       struct {
 		accepted atomic.Pointer[blocks.Block]
 		settled  *atomic.Pointer[blocks.Block]
@@ -172,7 +172,19 @@ func NewVM[T hook.Transaction](
 	)
 
 	// ==========  Mempool & P2P Gossip  ==========
-	pool, mempoolClosers, err := newGossipMempool(cfg.MempoolConfig, snowCtx, network, exec, ethBlockSource(consensusCritical, db), reg)
+	// Gossip starts before the VM exists, so the mempool shares the preference.
+	preference := new(atomic.Pointer[blocks.Block])
+	preference.Store(exec.LastExecuted())
+	pool, mempoolClosers, err := newGossipMempool(
+		cfg.MempoolConfig,
+		snowCtx,
+		network,
+		exec,
+		hooks,
+		mempoolSettled(cfg.Now, preference),
+		ethBlockSource(consensusCritical, db),
+		reg,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -198,15 +210,15 @@ func NewVM[T hook.Transaction](
 			pool,
 			ethBlockSource(consensusCritical, db),
 		},
-		newTxs:  newTxs,
-		closers: closers,
+		newTxs:     newTxs,
+		closers:    closers,
+		preference: preference,
 	}
 	vm.last.settled = lastSettled
 
 	// ==========  Frontiers  ==========
 	{
 		e := exec.LastExecuted()
-		vm.preference.Store(e)
 		vm.last.accepted.Store(e)
 
 		s := e.LastSettled()
@@ -241,6 +253,8 @@ func newGossipMempool(
 	snowCtx *snow.Context,
 	network *network.Network,
 	exec *saexec.Executor,
+	hooks hook.Points,
+	settled func() *blocks.Block,
 	blockSource saetypes.BlockSource,
 	reg prometheus.Registerer,
 ) (_ *txgossip.Set, _ []io.Closer, retErr error) {
@@ -262,7 +276,14 @@ func newGossipMempool(
 		return nil, nil, err
 	}
 	conf := gossip.BloomSetConfig{Metrics: bloomMetrics}
-	mempool, err := txgossip.NewSet(exec, txPool, conf)
+	mempool, err := txgossip.NewSet(
+		exec,
+		txPool,
+		conf,
+		hooks,
+		settled,
+		snowCtx.Log,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
