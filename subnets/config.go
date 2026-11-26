@@ -26,6 +26,10 @@ type Config struct {
 	ValidatorOnly bool `json:"validatorOnly" yaml:"validatorOnly"`
 	// AllowedNodes is the set of node IDs that are explicitly allowed to connect to this Subnet when
 	// ValidatorOnly is enabled.
+	//
+	// Deprecated: Use [MembershipCAPath] or [MembershipCAContent], which admit a
+	// node without editing every other node's config. AllowedNodes is still
+	// honoured.
 	AllowedNodes set.Set[ids.NodeID] `json:"allowedNodes" yaml:"allowedNodes"`
 
 	// MembershipCAPath is the path to a PEM file holding one or more root

@@ -23,9 +23,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/staking/stakingtest"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 const chainConfigFilenameExtension = ".ex"
@@ -740,6 +742,46 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				return
 			}
 			test.testF(require, subnetConfigs)
+		})
+	}
+}
+
+// TestGetNodeConfigMembershipCA checks that a subnet's membership CA, as a path
+// or inline, reaches the network layer's subnet configs and loads. Without it a
+// node starts cleanly and admits no certificate member, which no other unit
+// test would notice.
+func TestGetNodeConfigMembershipCA(t *testing.T) {
+	subnetID := ids.GenerateTestID()
+	root, _ := stakingtest.NewPKI(t)
+	caPath := filepath.Join(t.TempDir(), "membership-ca.pem")
+	require.NoError(t, os.WriteFile(caPath, root.CertPEM(), perms.ReadWrite))
+	inlineCA, err := json.Marshal([]string{string(root.CertPEM())})
+	require.NoError(t, err)
+
+	tests := map[string]string{
+		"membershipCAPath":    fmt.Sprintf(`{"validatorOnly": true, "membershipCAPath": %q}`, caPath),
+		"membershipCAContent": fmt.Sprintf(`{"validatorOnly": true, "membershipCAContent": %s}`, inlineCA),
+	}
+	for name, subnetJSON := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			subnetPath := filepath.Join(t.TempDir(), "subnets")
+			setupFile(t, subnetPath, subnetID.String()+".json", subnetJSON)
+
+			v := setupViperFlags()
+			v.Set(NetworkNameKey, constants.UnitTestName)
+			v.Set(DataDirKey, t.TempDir())
+			v.Set(TrackSubnetsKey, subnetID.String())
+			v.Set(SubnetConfigDirKey, subnetPath)
+
+			config, err := GetNodeConfig(v)
+			require.NoError(err)
+			require.Equal(config.SubnetConfigs, config.NetworkConfig.SubnetConfigs)
+			subnetConfig := config.NetworkConfig.SubnetConfigs[subnetID]
+			ca, err := subnetConfig.LoadMembershipCA()
+			require.NoError(err)
+			require.NotNil(ca)
 		})
 	}
 }

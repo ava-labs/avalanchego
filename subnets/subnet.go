@@ -40,12 +40,16 @@ type subnet struct {
 	config          Config
 	myNodeID        ids.NodeID
 	bootstrapSignal common.PreemptionSignal
+
+	subnetID ids.ID
+	members  MembershipChecker
 }
 
 func New(myNodeID ids.NodeID, config Config) Subnet {
 	return &subnet{
 		config:   config,
 		myNodeID: myNodeID,
+		members:  NoOpMembershipChecker,
 	}
 }
 
@@ -94,8 +98,10 @@ func (s *subnet) IsAllowed(nodeID ids.NodeID, isValidator bool) bool {
 	// Case 2: This subnet is not validator-only subnet
 	// Case 3: NodeID is a validator for this chain
 	// Case 4: NodeID is explicitly allowed whether it's subnet validator or not
+	// Case 5: NodeID's staking certificate chains to this subnet's membership CA
 	return nodeID == s.myNodeID ||
 		!s.config.ValidatorOnly ||
 		isValidator ||
-		s.config.AllowedNodes.Contains(nodeID)
+		s.config.AllowedNodes.Contains(nodeID) ||
+		s.members.IsCertified(s.subnetID, nodeID)
 }
