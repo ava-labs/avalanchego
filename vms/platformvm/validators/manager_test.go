@@ -557,7 +557,7 @@ func acceptL1ValidatorSetTestBlock(t *testing.T, s *state.State, l1Validator sta
 	t.Helper()
 
 	require := require.New(t)
-	d, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionAllowed)
+	d, err := state.NewDiffOn(s)
 	require.NoError(err)
 	require.NoError(d.PutL1Validator(l1Validator))
 	require.NoError(d.Apply(s))
