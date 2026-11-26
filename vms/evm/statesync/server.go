@@ -8,12 +8,10 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state/snapshot"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/statesync/block"
 	"github.com/ava-labs/avalanchego/vms/evm/statesync/code"
@@ -22,16 +20,12 @@ import (
 	fwsyncer "github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 )
 
-// RegisterHandlers registers the handlers for the state sync protocol.
-func RegisterHandlers(
-	log logging.Logger,
-	network *p2p.Network,
-	db ethdb.Database,
-	tdb *triedb.Database,
-	snap *snapshot.Tree,
-	registerer prometheus.Registerer,
-) error {
-	if err := block.RegisterHandler(log, network, db); err != nil {
+// RegisterHandlers registers the handlers for the state sync protocol, serving
+// state from tdb. From then on the last summary is advertised whenever tdb
+// holds its state.
+func (h *Handler) RegisterHandlers(tdb *triedb.Database, snap *snapshot.Tree, registerer prometheus.Registerer) error {
+	log, network := h.snowCtx.Log, h.network.Network
+	if err := block.RegisterHandler(log, network, h.db); err != nil {
 		return fmt.Errorf("registering block handler: %w", err)
 	}
 
@@ -57,10 +51,11 @@ func RegisterHandlers(
 		}
 	}
 
-	if err := code.RegisterHandler(log, network, db); err != nil {
+	if err := code.RegisterHandler(log, network, h.db); err != nil {
 		return fmt.Errorf("registering code handler: %w", err)
 	}
 
+	h.triedb.Store(tdb)
 	return nil
 }
 

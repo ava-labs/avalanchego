@@ -7,31 +7,18 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/core/state/snapshot"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/evm/statesync"
 
 	cchainstate "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/state"
 )
 
 // RegisterHandlers registers the SAE state sync handler with the given EVM trie
 // database, allowing this node to serve others' state sync requests.
-func RegisterHandlers(
-	log logging.Logger,
-	network *p2p.Network,
-	db ethdb.Database,
-	tdb *triedb.Database,
-	snaps *snapshot.Tree,
-	state *cchainstate.State,
-	registerer prometheus.Registerer,
-) error {
-	if err := cchainstate.RegisterSyncHandler(network, state); err != nil {
+func (h *Handler) RegisterHandlers(tdb *triedb.Database, snaps *snapshot.Tree, registerer prometheus.Registerer) error {
+	if err := cchainstate.RegisterSyncHandler(h.network.Network, h.state); err != nil {
 		return fmt.Errorf("registering C-Chain state handler: %w", err)
 	}
 
-	return statesync.RegisterHandlers(log, network, db, tdb, snaps, registerer)
+	return h.Handler.RegisterHandlers(tdb, snaps, registerer)
 }

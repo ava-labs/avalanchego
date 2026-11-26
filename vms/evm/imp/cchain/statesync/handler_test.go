@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/ava-labs/libevm/triedb"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -29,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
+	"github.com/ava-labs/avalanchego/vms/evm/statesync/statesynctest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -104,10 +107,12 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	// The genesis block (height 0) is shared with the handler so both agree on
 	// its hash.
 	ethDB := rawdb.NewMemoryDatabase()
-	genesis := newBlock(0)
-	writeBlock(ethDB, genesis)
-	for h := uint64(1); h <= cfg.lastExecuted; h++ {
-		writeBlock(ethDB, newBlock(h))
+	// Summaries are only advertised for state the trie database holds.
+	tdb := triedb.NewDatabase(ethDB, nil)
+	root, _, _ := statesynctest.FillTrie(t, tdb, 1)
+
+	for h := uint64(0); h <= cfg.lastExecuted; h++ {
+		writeBlock(ethDB, newBlock(h, root))
 	}
 
 	net, err := network.New(snowCtx, &enginetest.Sender{})
@@ -125,6 +130,7 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		st,
 	)
 	require.NoError(t, err, "New()")
+	require.NoError(t, handler.RegisterHandlers(tdb, nil, prometheus.NewRegistry()), "RegisterHandlers()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, handler.Shutdown(context.WithoutCancel(t.Context())), "%T.Shutdown()", handler)
 	})
@@ -141,8 +147,8 @@ func writeBlock(ethDB ethdb.Database, blk *types.Block) {
 	rawdb.WriteHeadFastBlockHash(ethDB, hdr.Hash())
 }
 
-func newBlock(height uint64) *types.Block {
-	return types.NewBlockWithHeader(&types.Header{Number: new(big.Int).SetUint64(height)})
+func newBlock(height uint64, root common.Hash) *types.Block {
+	return types.NewBlockWithHeader(&types.Header{Number: new(big.Int).SetUint64(height), Root: root})
 }
 
 // wantRoot returns the atomic root that a correct handler must embed for a

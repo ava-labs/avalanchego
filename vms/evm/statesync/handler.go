@@ -8,11 +8,13 @@ package statesync
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -44,10 +46,14 @@ type Handler struct {
 	snowCtx     *snow.Context
 	network     *network.Network
 	blockParser syncblocks.Parser
+	// triedb serves state to syncing peers, set by [Handler.RegisterHandlers].
+	triedb atomic.Pointer[triedb.Database]
 }
 
 // New constructs a new [Handler] with the given configuration and
 // database. See the README for the guarantees expected of the database.
+//
+// The last summary isn't advertised until [Handler.RegisterHandlers] is called.
 func New(
 	cfg Config,
 	db ethdb.Database,
@@ -95,7 +101,33 @@ func (h *Handler) GetLastStateSummary(context.Context) (*Summary, error) {
 	}
 
 	height := saedb.LastCommittedTrieDBHeight(*lastHeight, h.cfg.SummaryInterval)
-	return h.getSummaryAtHeight(height)
+	summary, err := h.getSummaryAtHeight(height)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.checkServable(summary); err != nil {
+		return nil, err
+	}
+	return summary, nil
+}
+
+// checkServable returns [database.ErrNotFound] if the state of summary can't
+// be served to syncing peers. Firewood only holds the roots it committed since
+// it was opened, so after a restart it can't serve the last summary until the
+// next one is executed.
+func (h *Handler) checkServable(summary *Summary) error {
+	tdb := h.triedb.Load()
+	if tdb == nil {
+		return fmt.Errorf("%w: state sync handlers not registered", database.ErrNotFound)
+	}
+	hdr := rawdb.ReadHeader(h.db, summary.AcceptedHash, summary.AcceptedHeight)
+	if hdr == nil {
+		return database.ErrNotFound
+	}
+	if _, err := tdb.Reader(hdr.Root); err != nil {
+		return fmt.Errorf("%w: state root %s of summary at height %d", database.ErrNotFound, hdr.Root, summary.AcceptedHeight)
+	}
+	return nil
 }
 
 // GetStateSummary returns the summary of the block at the given height, if it

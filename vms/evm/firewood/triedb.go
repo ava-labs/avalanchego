@@ -364,12 +364,26 @@ func (*TrieDB) Scheme() string {
 	return rawdb.HashScheme
 }
 
-var errReaderNotSupported = errors.New("TrieDB does not support creating a trie reader")
+var errNodeNotSupported = errors.New("TrieDB does not support reading trie nodes")
 
-// Reader satisfies [triedb.Backend]. This is expected to be used by a [trie.Trie],
-// so Firewood does not need to support this.
-func (*TrieDB) Reader(common.Hash) (database.Reader, error) {
-	return nil, errReaderNotSupported
+// Reader satisfies [triedb.Backend]. It returns an error if root isn't a
+// committed revision, but the returned reader can't read nodes as Firewood
+// doesn't store them in the format a [trie.Trie] expects.
+func (t *TrieDB) Reader(root common.Hash) (database.Reader, error) {
+	revision, err := t.newRevision(root)
+	if err != nil {
+		return nil, err
+	}
+	if err := revision.Drop(); err != nil {
+		return nil, err
+	}
+	return nodeReader{}, nil
+}
+
+type nodeReader struct{}
+
+func (nodeReader) Node(common.Hash, []byte, common.Hash) ([]byte, error) {
+	return nil, errNodeNotSupported
 }
 
 // Size is managed by Firewood, so this returns 0 for both values to avoid confusion.

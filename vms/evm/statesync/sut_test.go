@@ -6,6 +6,7 @@ package statesync
 import (
 	"context"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -65,6 +66,8 @@ type (
 		*sut
 		vm     *sae.VM
 		wallet *saetest.Wallet
+		// shutdown stops the VM, and is safe to call more than once.
+		shutdown func() error
 	}
 
 	sutConfig struct {
@@ -333,20 +336,35 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 		Now:           s.clock.Now,
 	}, s.snowCtx, chainConfig, s.db, s.network)
 	require.NoError(t, err, "NewVM()")
+	shutdown := sync.OnceValue(func() error {
+		return vm.Shutdown(context.WithoutCancel(ctx))
+	})
 	t.Cleanup(func() {
-		require.NoError(t, vm.Shutdown(context.WithoutCancel(ctx)), "Shutdown()")
+		require.NoError(t, shutdown(), "Shutdown()")
 	})
 	require.NoError(t, vm.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
 	require.NoError(t, vm.SetState(ctx, snow.NormalOp), "SetState(NormalOp)")
 
 	tdb, snaps := vm.EVMState()
-	require.NoError(t, RegisterHandlers(s.snowCtx.Log, s.Network.Network, s.db, tdb, snaps, prometheus.NewRegistry()), "RegisterHandlers")
+	require.NoError(t, s.RegisterHandlers(tdb, snaps, prometheus.NewRegistry()), "RegisterHandlers()")
 
 	return &vmSUT{
-		sut:    s,
-		vm:     vm,
-		wallet: saetest.NewWalletWithKeyChain(s.keys, types.LatestSigner(s.genesis.Config)),
+		sut:      s,
+		vm:       vm,
+		wallet:   saetest.NewWalletWithKeyChain(s.keys, types.LatestSigner(s.genesis.Config)),
+		shutdown: shutdown,
 	}
+}
+
+// restart shuts down the VM and starts a new one on the same disk, continuing
+// from the same time and account nonces so that it can keep accepting blocks.
+func (s *vmSUT) restart(t *testing.T) *vmSUT {
+	t.Helper()
+
+	require.NoError(t, s.shutdown(), "shutdown()")
+	restarted := s.asVM(t, s.clock.Now())
+	restarted.wallet = s.wallet
+	return restarted
 }
 
 // lastAcceptedBlock returns the VM's last accepted block.

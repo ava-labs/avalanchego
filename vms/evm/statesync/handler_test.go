@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 )
 
@@ -149,6 +150,11 @@ func TestGetLastStateSummary(t *testing.T) {
 			wantErr: database.ErrNotFound,
 		},
 		{
+			name:      "below_first_summary_height",
+			numBlocks: defaultCommitInterval - 1,
+			wantErr:   database.ErrNotFound,
+		},
+		{
 			name:            "last_committed_synchronous",
 			numBlocks:       numBlocks,
 			lastSynchronous: lastCommitted,
@@ -186,4 +192,55 @@ func checkSummaryMatchesBlock(t *testing.T, summary *Summary, block *types.Block
 	if diff := cmp.Diff(want, summary, CmpOpt()); diff != "" {
 		t.Errorf("summary mismatch (-want +got):\n%s", diff)
 	}
+}
+
+// TestGetLastStateSummaryBeforeRegisterHandlers asserts that a summary isn't
+// advertised by a handler that hasn't registered its state sync handlers.
+func TestGetLastStateSummaryBeforeRegisterHandlers(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	vm := newVM(t)
+	vm.acceptBlocks(t, defaultCommitInterval+1)
+	_, err := vm.Handler.GetLastStateSummary(ctx)
+	require.NoError(t, err, "GetLastStateSummary() after RegisterHandlers()")
+
+	unregistered := newSUT(t, withDiskOf(vm.sut))
+	_, err = unregistered.GetLastStateSummary(ctx)
+	require.ErrorIs(t, err, database.ErrNotFound, "GetLastStateSummary() before RegisterHandlers()")
+}
+
+// TestGetLastStateSummaryAfterRestart asserts that a Firewood node, which loses
+// its revision history when it shuts down, doesn't advertise a summary until it
+// can serve one again.
+func TestGetLastStateSummaryAfterRestart(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	vm := newVM(t, withScheme(firewood.Scheme))
+	vm.acceptBlocks(t, defaultCommitInterval+1)
+
+	summary, err := vm.Handler.GetLastStateSummary(ctx)
+	require.NoError(t, err, "GetLastStateSummary() before restart")
+	checkSummaryMatchesBlock(t, summary, vm.blockAtHeight(t, defaultCommitInterval).EthBlock())
+
+	restarted := vm.restart(t)
+
+	// The last summary is still at the same height, but its root predates
+	// the restart.
+	_, err = restarted.Handler.GetLastStateSummary(ctx)
+	require.ErrorIs(t, err, database.ErrNotFound, "GetLastStateSummary() after restart")
+
+	const nextHeight = 2 * defaultCommitInterval
+	for h := restarted.lastAcceptedBlock(t).Height() + 1; h < nextHeight; h++ {
+		restarted.acceptBlocks(t, 1)
+		_, err = restarted.Handler.GetLastStateSummary(ctx)
+		require.ErrorIsf(t, err, database.ErrNotFound, "GetLastStateSummary() at height %d", h)
+	}
+
+	// Executing the block at the next summary height commits its root again.
+	restarted.acceptBlocks(t, 1)
+	summary, err = restarted.Handler.GetLastStateSummary(ctx)
+	require.NoError(t, err, "GetLastStateSummary() after the next summary height")
+	checkSummaryMatchesBlock(t, summary, restarted.blockAtHeight(t, nextHeight).EthBlock())
 }
