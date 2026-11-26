@@ -41,9 +41,7 @@ graft_go_test(
     ],
     embed = [":client"],
     deps = [
-        "//codec",
         "//graft/evm/message",
-        "//graft/evm/message/messagetest",
         "//graft/evm/sync/client/stats",
         "//graft/evm/sync/handlers",
         "//graft/evm/sync/handlers/stats",

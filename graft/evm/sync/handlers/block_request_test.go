@@ -12,9 +12,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats/statstest"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
@@ -36,7 +34,7 @@ type blockRequestTest struct {
 	requireResponse   func(t testing.TB, stats *statstest.TestHandlerStats, b []byte)
 }
 
-func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*types.Block, c codec.Manager) {
+func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*types.Block) {
 	testHandlerStats := &statstest.TestHandlerStats{}
 
 	// convert into map
@@ -50,7 +48,7 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 			return blk
 		},
 	}
-	blockRequestHandler := NewBlockRequestHandler(blockProvider, c, testHandlerStats)
+	blockRequestHandler := NewBlockRequestHandler(blockProvider, message.Codec, testHandlerStats)
 
 	var blockRequest message.BlockRequest
 	if test.startBlockHash != (common.Hash{}) {
@@ -77,7 +75,7 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 	require.NotEmpty(t, responseBytes)
 
 	var response message.BlockResponse
-	_, err = c.Unmarshal(responseBytes, &response)
+	_, err = message.Codec.Unmarshal(responseBytes, &response)
 	require.NoError(t, err)
 	require.Len(t, response.Blocks, test.expectedBlocks)
 
@@ -127,11 +125,9 @@ func TestBlockRequestHandler(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-			t.Run(test.name, func(t *testing.T) {
-				t.Parallel()
-				executeBlockRequestTest(t, test, blocks, c)
-			})
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			executeBlockRequestTest(t, test, blocks)
 		})
 	}
 }
@@ -174,11 +170,9 @@ func TestBlockRequestHandlerLargeBlocks(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-			t.Run(test.name, func(t *testing.T) {
-				t.Parallel()
-				executeBlockRequestTest(t, test, blocks, c)
-			})
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			executeBlockRequestTest(t, test, blocks)
 		})
 	}
 }
@@ -193,48 +187,46 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 	// convert into map
 	blocksDB := blockMap(blocks)
 
-	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-		cancelAfterNumRequests := 2
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-		blockRequestCallCount := 0
-		blockProvider := &TestBlockProvider{
-			GetBlockFn: func(hash common.Hash, height uint64) *types.Block {
-				blockRequestCallCount++
-				// cancel ctx after the 2nd call to simulate ctx expiring due to deadline exceeding
-				if blockRequestCallCount >= cancelAfterNumRequests {
-					cancel()
-				}
-				blk, ok := blocksDB[hash]
-				if !ok || blk.NumberU64() != height {
-					return nil
-				}
-				return blk
-			},
-		}
-		blockRequestHandler := NewBlockRequestHandler(blockProvider, c, stats.NewNoopHandlerStats())
+	cancelAfterNumRequests := 2
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	blockRequestCallCount := 0
+	blockProvider := &TestBlockProvider{
+		GetBlockFn: func(hash common.Hash, height uint64) *types.Block {
+			blockRequestCallCount++
+			// cancel ctx after the 2nd call to simulate ctx expiring due to deadline exceeding
+			if blockRequestCallCount >= cancelAfterNumRequests {
+				cancel()
+			}
+			blk, ok := blocksDB[hash]
+			if !ok || blk.NumberU64() != height {
+				return nil
+			}
+			return blk
+		},
+	}
+	blockRequestHandler := NewBlockRequestHandler(blockProvider, message.Codec, stats.NewNoopHandlerStats())
 
-		lastBlock := blocks[len(blocks)-1]
-		responseBytes, err := blockRequestHandler.OnBlockRequest(ctx, ids.GenerateTestNodeID(), 1, message.BlockRequest{
-			Hash:    lastBlock.Hash(),
-			Height:  lastBlock.NumberU64(),
-			Parents: uint16(8),
-		})
-		require.NoError(t, err)
-		require.NotEmpty(t, responseBytes)
-
-		var response message.BlockResponse
-		_, err = c.Unmarshal(responseBytes, &response)
-		require.NoError(t, err)
-		// requested 8 blocks, received cancelAfterNumRequests because of timeout
-		require.Len(t, response.Blocks, cancelAfterNumRequests)
-
-		for i, blockBytes := range response.Blocks {
-			block := new(types.Block)
-			require.NoError(t, rlp.DecodeBytes(blockBytes, block))
-			require.Equal(t, blocks[len(blocks)-i-1].Hash(), block.Hash())
-		}
+	lastBlock := blocks[len(blocks)-1]
+	responseBytes, err := blockRequestHandler.OnBlockRequest(ctx, ids.GenerateTestNodeID(), 1, message.BlockRequest{
+		Hash:    lastBlock.Hash(),
+		Height:  lastBlock.NumberU64(),
+		Parents: uint16(8),
 	})
+	require.NoError(t, err)
+	require.NotEmpty(t, responseBytes)
+
+	var response message.BlockResponse
+	_, err = message.Codec.Unmarshal(responseBytes, &response)
+	require.NoError(t, err)
+	// requested 8 blocks, received cancelAfterNumRequests because of timeout
+	require.Len(t, response.Blocks, cancelAfterNumRequests)
+
+	for i, blockBytes := range response.Blocks {
+		block := new(types.Block)
+		require.NoError(t, rlp.DecodeBytes(blockBytes, block))
+		require.Equal(t, blocks[len(blocks)-i-1].Hash(), block.Hash())
+	}
 }
 
 // blockMap creates a map from block hash to block for quick lookups.

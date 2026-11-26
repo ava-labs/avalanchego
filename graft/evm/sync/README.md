@@ -20,15 +20,14 @@ _Note: nodes joining the network through state sync will not have historical sta
 The node needs the following data from its peers to continue processing blocks from a syncable block:
 
 - Accounts trie & storage tries for all accounts (at the state root corresponding to the syncable block),
-- State of the cross-chain shared memory (coreth only: this data is fetched from peers as a merkelized trie containing add/remove operations from Import and Export Txs, known as the _atomic trie_),
 - Contract code referenced in the account trie,
 - 256 parents of the syncable block (required for the BLOCKHASH opcode)
 
 ## Code structure
 
-This package (`evm/sync`) contains the shared state sync implementation used by both coreth (C-Chain) and subnet-evm. VM-specific concerns (atomic trie sync, VM plugin wiring) remain in their respective modules.
+This package (`evm/sync`) contains the state sync implementation used by subnet-evm. VM plugin wiring remains in `subnet-evm/plugin/evm/`.
 
-- `types`: Core interfaces shared across sync packages: `Syncer`, `Finalizer`, `LeafClient`, `Extender`.
+- `types`: Core interfaces shared across sync packages: `Syncer`, `Finalizer`, `LeafClient`.
 - `handlers`: Nodes that have joined the network are expected to respond to valid requests for the chain state:
   - `LeafsRequestHandler`: handles requests for trie data (leafs)
   - `CodeRequestHandler`: handles requests for contract code
@@ -39,30 +38,28 @@ This package (`evm/sync`) contains the shared state sync implementation used by 
 - `leaf`: Generic leaf syncer (`CallbackSyncer`) that iterates trie ranges and invokes callbacks on each batch of received leafs.
 - `block`: Syncs parent blocks of the syncable block.
 - `code`: Syncs contract code referenced in the account trie, with concurrent workers and a persistent queue.
-- `engine`: `SyncerRegistry` orchestrates execution of multiple `Syncer` implementations (EVM state, blocks, code, and VM-specific syncers like the atomic trie).
+- `engine`: `SyncerRegistry` orchestrates execution of multiple `Syncer` implementations (EVM state, blocks, and code).
 - `synctest`: Shared test utilities for trie and block generation.
 - `syncutils`: Iterator utilities for trie traversal.
 
 VM-specific code that uses this package:
 
-- `coreth/plugin/evm/`: Implements `StateSyncableVM`. `StateSyncClient` orchestrates the top-level sync steps. `coreth/plugin/evm/atomic/sync/` syncs the atomic trie via the `Extender` interface.
-- `subnet-evm/plugin/evm/`: Implements `StateSyncableVM` for subnet-evm VMs (no atomic trie).
-- `message`: Contains structs that are serialized and sent over the network during state sync. Supports both coreth and subnet-evm wire formats via `LeafsRequestType`.
+- `subnet-evm/plugin/evm/`: Implements `StateSyncableVM` for subnet-evm VMs.
+- `message`: Contains structs that are serialized and sent over the network during state sync. `message.Codec` serializes them.
 
 ## Sync summaries & engine involvement
 
 When a new node wants to join the network via state sync, it will need a few pieces of information as a starting point so it can make valid requests to its peers:
 
 - Number (height) and hash of the latest available syncable block,
-- Root of the account trie,
-- Root of the atomic trie (coreth only)
+- Root of the account trie
 
 The above information is called a _state summary_, and each syncable block corresponds to one such summary (see `message.BlockSyncSummary`). The engine and VM interact as follows to find a syncable state summary:
 
 1. The engine calls `StateSyncEnabled`. The VM returns `true` to initiate state sync, or `false` to start bootstrapping. This is controlled by the `state-sync-enabled` flag.
 1. The engine calls `GetOngoingSyncStateSummary`. If the VM has a previously interrupted sync to resume it returns that summary. Otherwise, it returns `ErrNotFound`. By default, the VM will resume an interrupted sync.
 1. The engine samples peers for their latest available summaries, then verifies the correctness and availability of each sampled summary with validators. The messaging flow is documented in the [block engine README](https://github.com/ava-labs/avalanchego/blob/master/snow/engine/snowman/block/README.md).
-1. The engine calls `Accept` on the chosen summary. The VM may return `false` to skip syncing to this summary (e.g., coreth skips state sync for less than `defaultStateSyncMinBlocks = 300_000` blocks). If the VM decides to perform the sync, it must return `true` without blocking and fetch the state from its peers asynchronously.
+1. The engine calls `Accept` on the chosen summary. The VM may return `false` to skip syncing to this summary (e.g., when the chain is fewer than `state-sync-min-blocks` blocks ahead of local state). If the VM decides to perform the sync, it must return `true` without blocking and fetch the state from its peers asynchronously.
 1. The VM sends `common.StateSyncDone` on the `toEngine` channel on completion.
 1. The engine calls `VM.SetState(Bootstrapping)`. Then, blocks after the syncable block are processed one by one.
 
@@ -72,16 +69,13 @@ The following steps are executed by the VM to sync its state from peers:
 
 1. Wipe snapshot data
 1. Sync 256 parents of the syncable block (see `BlockRequest`),
-1. Sync VM-specific state (e.g., the atomic trie in coreth, via the `Extender` interface),
 1. Sync the EVM state: account trie, code, and storage tries,
 1. Update in-memory and on-disk pointers.
 
-Steps 3 and 4 involve syncing tries. To sync trie data, the VM will send a series of `LeafRequests` to its peers. Each request specifies:
+Step 3 involves syncing tries. To sync trie data, the VM will send a series of `LeafRequests` to its peers. Each request specifies:
 
-- Type of trie (`NodeType`):
-  - `StateTrieNode` (account trie and storage tries share the same database)
-  - VM-specific node types (e.g., `atomic.TrieNode` for the atomic trie in coreth)
 - `Root` of the trie to sync,
+- `Account` whose storage trie to sync, or empty for the account trie,
 - `Start` and `End` specify a range of keys.
 
 Peers responding to these requests send back trie leafs (key/value pairs) beginning at `Start` and up to `End` (or a maximum number of leafs). The response must also contain a merkle proof for the range of leafs it contains. Nodes serving state sync data are responsible for constructing these proofs (see `handlers/leafs_request.go`).
@@ -109,15 +103,6 @@ When the trie is complete, an `OnFinish` callback is called and any remaining no
 
 When a storage trie leaf is received, it is stored in the account's storage snapshot. A `StackTrie` is used here to reconstruct intermediary trie nodes & root as well.
 
-### Atomic trie (coreth only)
-
-Coreth extends the sync process via the `Extender` interface (`coreth/plugin/evm/atomic/sync/`). The atomic trie contains cross-chain shared memory operations:
-
-- Key: block height + peer blockchain ID
-- Value: codec serialized `atomic.Requests` (includes `PutRequests` and `RemoveRequests`)
-
-For each 4096 blocks (`commitHeightInterval`) inserted in the atomic trie, a root is constructed and the trie is persisted.
-
 ### Updating in-memory and on-disk pointers
 
 Once the tries have been synced, the VM:
@@ -125,8 +110,7 @@ Once the tries have been synced, the VM:
 - Verifies the block the engine has received matches the expected block hash and block number in the summary,
 - Adds a checkpoint to the `core.ChainIndexer` (to avoid indexing missing blocks),
 - Resets in-memory and on-disk pointers on the `core.BlockChain` struct,
-- Updates VM's last accepted block,
-- Applies VM-specific post-sync operations (e.g., coreth applies atomic operations from the atomic trie to shared memory).
+- Updates VM's last accepted block.
 
 ## Resuming a partial sync operation
 

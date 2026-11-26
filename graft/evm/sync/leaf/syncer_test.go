@@ -190,7 +190,7 @@ func TestSyncTaskWrapsFetchError(t *testing.T) {
 	t.Parallel()
 
 	err := newTestSyncer(&batchFetcher{err: errFetch}).syncTask(t.Context(), &recordingTask{})
-	require.ErrorIs(t, err, ErrFailedToFetchLeafs)
+	require.ErrorIs(t, err, errFailedToFetchLeafs)
 	require.ErrorIs(t, err, errFetch)
 }
 

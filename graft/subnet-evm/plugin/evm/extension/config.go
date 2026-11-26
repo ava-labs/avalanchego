@@ -13,8 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -113,17 +111,6 @@ type BuilderMempool interface {
 	SubscribePendingTxs() <-chan struct{}
 }
 
-// LeafRequestConfig is the configuration to handle leaf requests
-// in the network and syncer
-type LeafRequestConfig struct {
-	// LeafType is the type of the leaf node
-	LeafType message.NodeType
-	// MetricName is the name of the metric to use for the leaf request
-	MetricName string
-	// Handler is the handler to use for the leaf request
-	Handler handlers.LeafRequestHandler
-}
-
 // Config is the configuration for the VM extension
 type Config struct {
 	// ConsensusCallbacks is the consensus callbacks to use
@@ -133,15 +120,9 @@ type Config struct {
 	// SyncSummaryProvider provides and parses state sync summaries.
 	// It's required and should be non-nil.
 	SyncSummaryProvider message.SyncSummaryProvider
-	// SyncExtender can extend the syncer to handle custom sync logic.
-	// It's optional and can be nil
-	SyncExtender types.Extender
 	// BlockExtender allows the VM extension to create an extension to handle block processing events.
 	// It's optional and can be nil
 	BlockExtender BlockExtender
-	// ExtraSyncLeafHandlerConfig is the extra configuration to handle leaf requests
-	// in the network and syncer. It's optional and can be nil
-	ExtraSyncLeafHandlerConfig *LeafRequestConfig
 	// ExtraMempool is the mempool to be used in the block builder.
 	// It's optional and can be nil
 	ExtraMempool BuilderMempool
