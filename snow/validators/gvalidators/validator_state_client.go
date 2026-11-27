@@ -105,27 +105,9 @@ func (c *Client) GetValidatorSet(
 	if err != nil {
 		return nil, err
 	}
-	return validatorSetFromProto(resp.Validators)
-}
 
-func (c *Client) GetL1ValidatorSet(
-	ctx context.Context,
-	height uint64,
-	subnetID ids.ID,
-) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	resp, err := c.client.GetL1ValidatorSet(ctx, &pb.GetL1ValidatorSetRequest{
-		Height:   height,
-		SubnetId: subnetID[:],
-	})
-	if err != nil {
-		return nil, err
-	}
-	return validatorSetFromProto(resp.Validators)
-}
-
-func validatorSetFromProto(vdrsPB []*pb.Validator) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(vdrsPB))
-	for _, validator := range vdrsPB {
+	vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(resp.Validators))
+	for _, validator := range resp.Validators {
 		nodeID, err := ids.ToNodeID(validator.NodeId)
 		if err != nil {
 			return nil, err

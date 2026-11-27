@@ -23,15 +23,39 @@ var (
 	_ State = (*cachedState)(nil)
 
 	ErrUnfinalizedHeight = errors.New("validator set height not yet finalized")
-	// ErrL1ValidatorSetNotIndexed is returned by [State.GetL1ValidatorSet] when
-	// this node didn't index the heights needed to reconstruct the set at the
-	// requested height. Other nodes may still be able to answer.
+	// ErrL1ValidatorSetNotIndexed is returned by [L1State.GetL1ValidatorSet]
+	// when this node didn't index the heights needed to reconstruct the set at
+	// the requested height. Other nodes may still be able to answer.
 	ErrL1ValidatorSetNotIndexed = errors.New("L1 validator set is not indexed")
-	// ErrNotL1 is returned by [State.GetL1ValidatorSet] when the subnet has no
-	// L1 validators at the requested height. An L1 always has at least one
+	// ErrNotL1 is returned by [L1State.GetL1ValidatorSet] when the subnet has
+	// no L1 validators at the requested height. An L1 always has at least one
 	// validator, so the subnet was not an L1 at that height.
 	ErrNotL1 = errors.New("subnet is not an L1")
 )
+
+// L1State allows the lookup of the full L1 validator set, including inactive
+// validators, at the requested P-chain height.
+//
+// It is kept separate from [State] because only in-process consumers, such as
+// Simplex, need it, so it is not exposed to VMs over rpcchainvm.
+type L1State interface {
+	// GetL1ValidatorSet returns every L1 validator of the provided subnet,
+	// active or inactive, at the requested P-chain height. Unlike
+	// [State.GetValidatorSet], inactive validators are returned with their own
+	// NodeID and public key rather than merged under [ids.EmptyNodeID], and
+	// legacy subnet validators are not included.
+	// It returns [ErrUnfinalizedHeight] if the height isn't finalized yet,
+	// [ErrL1ValidatorSetNotIndexed] if this node didn't index the heights
+	// needed to reconstruct the set at the requested height, and [ErrNotL1] if
+	// the subnet was not an L1 at the requested height. The returned set is
+	// never empty.
+	// The returned map should not be modified.
+	GetL1ValidatorSet(
+		ctx context.Context,
+		height uint64,
+		subnetID ids.ID,
+	) (map[ids.NodeID]*GetValidatorOutput, error)
+}
 
 // State allows the lookup of validator sets on specified subnets at the
 // requested P-chain height.
@@ -70,23 +94,6 @@ type State interface {
 		ctx context.Context,
 		subnetID ids.ID,
 	) (map[ids.ID]*GetCurrentValidatorOutput, uint64, error)
-
-	// GetL1ValidatorSet returns every L1 validator of the provided subnet,
-	// active or inactive, at the requested P-chain height. Unlike
-	// [State.GetValidatorSet], inactive validators are returned with their own NodeID
-	// and public key rather than merged under [ids.EmptyNodeID], and legacy
-	// subnet validators are not included.
-	// It returns [ErrUnfinalizedHeight] if the height isn't finalized yet,
-	// [ErrL1ValidatorSetNotIndexed] if this node didn't index the heights
-	// needed to reconstruct the set at the requested height, and [ErrNotL1] if
-	// the subnet was not an L1 at the requested height. The returned set is
-	// never empty.
-	// The returned map should not be modified.
-	GetL1ValidatorSet(
-		ctx context.Context,
-		height uint64,
-		subnetID ids.ID,
-	) (map[ids.NodeID]*GetValidatorOutput, error)
 }
 
 type lockedState struct {
@@ -153,17 +160,6 @@ func (s *lockedState) GetCurrentValidatorSet(
 	return s.s.GetCurrentValidatorSet(ctx, subnetID)
 }
 
-func (s *lockedState) GetL1ValidatorSet(
-	ctx context.Context,
-	height uint64,
-	subnetID ids.ID,
-) (map[ids.NodeID]*GetValidatorOutput, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.s.GetL1ValidatorSet(ctx, height, subnetID)
-}
-
 type noValidators struct {
 	State
 }
@@ -185,10 +181,6 @@ func (*noValidators) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.N
 func (n *noValidators) GetCurrentValidatorSet(ctx context.Context, _ ids.ID) (map[ids.ID]*GetCurrentValidatorOutput, uint64, error) {
 	height, err := n.GetCurrentHeight(ctx)
 	return nil, height, err
-}
-
-func (*noValidators) GetL1ValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*GetValidatorOutput, error) {
-	return nil, nil
 }
 
 type cachedState struct {

@@ -24,7 +24,6 @@ type tracedState struct {
 	getWarpValidatorSetsTag   string
 	getValidatorSetTag        string
 	getCurrentValidatorSetTag string
-	getL1ValidatorSetTag      string
 	tracer                    trace.Tracer
 }
 
@@ -37,7 +36,6 @@ func Trace(s State, name string, tracer trace.Tracer) State {
 		getWarpValidatorSetsTag:   name + ".GetWarpValidatorSets",
 		getValidatorSetTag:        name + ".GetValidatorSet",
 		getCurrentValidatorSetTag: name + ".GetCurrentValidatorSet",
-		getL1ValidatorSetTag:      name + ".GetL1ValidatorSet",
 		tracer:                    tracer,
 	}
 }
@@ -101,18 +99,4 @@ func (s *tracedState) GetCurrentValidatorSet(
 	defer span.End()
 
 	return s.s.GetCurrentValidatorSet(ctx, subnetID)
-}
-
-func (s *tracedState) GetL1ValidatorSet(
-	ctx context.Context,
-	height uint64,
-	subnetID ids.ID,
-) (map[ids.NodeID]*GetValidatorOutput, error) {
-	ctx, span := s.tracer.Start(ctx, s.getL1ValidatorSetTag, oteltrace.WithAttributes(
-		attribute.Int64("height", int64(height)),
-		attribute.Stringer("subnetID", subnetID),
-	))
-	defer span.End()
-
-	return s.s.GetL1ValidatorSet(ctx, height, subnetID)
 }

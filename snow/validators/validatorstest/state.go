@@ -21,7 +21,6 @@ var (
 	errGetWarpValidatorSets   = errors.New("unexpectedly called GetWarpValidatorSets")
 	errGetValidatorSet        = errors.New("unexpectedly called GetValidatorSet")
 	errGetCurrentValidatorSet = errors.New("unexpectedly called GetCurrentValidatorSet")
-	errGetL1ValidatorSet      = errors.New("unexpectedly called GetL1ValidatorSet")
 )
 
 var _ validators.State = (*State)(nil)
@@ -34,8 +33,7 @@ type State struct {
 	CantGetSubnetID,
 	CantGetWarpValidatorSets,
 	CantGetValidatorSet,
-	CantGetCurrentValidatorSet,
-	CantGetL1ValidatorSet bool
+	CantGetCurrentValidatorSet bool
 
 	GetMinimumHeightF       func(ctx context.Context) (uint64, error)
 	GetCurrentHeightF       func(ctx context.Context) (uint64, error)
@@ -43,7 +41,6 @@ type State struct {
 	GetWarpValidatorSetsF   func(ctx context.Context, height uint64) (map[ids.ID]validators.WarpSet, error)
 	GetValidatorSetF        func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 	GetCurrentValidatorSetF func(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
-	GetL1ValidatorSetF      func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 }
 
 func (vm *State) GetMinimumHeight(ctx context.Context) (uint64, error) {
@@ -114,18 +111,4 @@ func (vm *State) GetCurrentValidatorSet(
 		require.False(vm.T, vm.CantGetCurrentValidatorSet, errGetCurrentValidatorSet)
 	}
 	return nil, 0, errGetCurrentValidatorSet
-}
-
-func (vm *State) GetL1ValidatorSet(
-	ctx context.Context,
-	height uint64,
-	subnetID ids.ID,
-) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	if vm.GetL1ValidatorSetF != nil {
-		return vm.GetL1ValidatorSetF(ctx, height, subnetID)
-	}
-	if vm.T != nil {
-		require.False(vm.T, vm.CantGetL1ValidatorSet, errGetL1ValidatorSet)
-	}
-	return nil, errGetL1ValidatorSet
 }

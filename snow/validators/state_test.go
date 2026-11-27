@@ -6,7 +6,6 @@ package validators_test
 import (
 	"context"
 	"errors"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -181,41 +180,4 @@ func TestCachedState_GetWarpValidatorSets(t *testing.T) {
 		require.Equal(test.want, got)
 		require.Equal(test.expectCached, !cacheMiss)
 	}
-}
-
-// TestLockedState_GetL1ValidatorSet checks that the lock is held while the
-// wrapped state is queried, because the P-chain state isn't safe to read while
-// a block is being accepted.
-func TestLockedState_GetL1ValidatorSet(t *testing.T) {
-	require := require.New(t)
-
-	var (
-		lock       sync.Mutex
-		wantHeight = uint64(5)
-		subnetID   = ids.GenerateTestID()
-		nodeID     = ids.GenerateTestNodeID()
-		want       = map[ids.NodeID]*GetValidatorOutput{
-			nodeID: {
-				NodeID: nodeID,
-				Weight: 1,
-			},
-		}
-	)
-	s := NewLockedState(&lock, &validatorstest.State{
-		T: t,
-		GetL1ValidatorSetF: func(_ context.Context, height uint64, gotSubnetID ids.ID) (map[ids.NodeID]*GetValidatorOutput, error) {
-			if lock.TryLock() {
-				lock.Unlock()
-				t.Fatal("lock must be held")
-			}
-			require.Equal(wantHeight, height)
-			require.Equal(subnetID, gotSubnetID)
-			return want, nil
-		},
-	})
-
-	got, err := s.GetL1ValidatorSet(t.Context(), wantHeight, subnetID)
-	require.NoError(err)
-	require.Equal(want, got)
-	require.True(lock.TryLock(), "lock must be released")
 }

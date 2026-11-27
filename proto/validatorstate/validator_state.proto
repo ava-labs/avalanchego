@@ -24,9 +24,6 @@ service ValidatorState {
   // GetCurrentValidatorSet returns the validator set for the provided subnet at
   // the current P-chain height.
   rpc GetCurrentValidatorSet(GetCurrentValidatorSetRequest) returns (GetCurrentValidatorSetResponse);
-  // GetL1ValidatorSet returns every L1 validator of the provided subnet,
-  // active or inactive, at the requested P-chain height.
-  rpc GetL1ValidatorSet(GetL1ValidatorSetRequest) returns (GetL1ValidatorSetResponse);
 }
 
 message GetMinimumHeightResponse {
@@ -56,11 +53,6 @@ message GetValidatorSetRequest {
 
 message GetCurrentValidatorSetRequest {
   bytes subnet_id = 1;
-}
-
-message GetL1ValidatorSetRequest {
-  uint64 height = 1;
-  bytes subnet_id = 2;
 }
 
 message Validator {
@@ -97,8 +89,4 @@ message GetValidatorSetResponse {
 message GetCurrentValidatorSetResponse {
   repeated Validator validators = 1;
   uint64 current_height = 2;
-}
-
-message GetL1ValidatorSetResponse {
-  repeated Validator validators = 1;
 }

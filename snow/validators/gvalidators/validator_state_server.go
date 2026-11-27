@@ -77,28 +77,12 @@ func (s *Server) GetValidatorSet(ctx context.Context, req *pb.GetValidatorSetReq
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GetValidatorSetResponse{
-		Validators: validatorSetToProto(vdrs),
-	}, nil
-}
 
-func (s *Server) GetL1ValidatorSet(ctx context.Context, req *pb.GetL1ValidatorSetRequest) (*pb.GetL1ValidatorSetResponse, error) {
-	subnetID, err := ids.ToID(req.SubnetId)
-	if err != nil {
-		return nil, err
+	resp := &pb.GetValidatorSetResponse{
+		Validators: make([]*pb.Validator, len(vdrs)),
 	}
 
-	vdrs, err := s.state.GetL1ValidatorSet(ctx, req.Height, subnetID)
-	if err != nil {
-		return nil, err
-	}
-	return &pb.GetL1ValidatorSetResponse{
-		Validators: validatorSetToProto(vdrs),
-	}, nil
-}
-
-func validatorSetToProto(vdrs map[ids.NodeID]*validators.GetValidatorOutput) []*pb.Validator {
-	vdrsPB := make([]*pb.Validator, 0, len(vdrs))
+	i := 0
 	for _, vdr := range vdrs {
 		vdrPB := &pb.Validator{
 			NodeId: vdr.NodeID.Bytes(),
@@ -110,9 +94,10 @@ func validatorSetToProto(vdrs map[ids.NodeID]*validators.GetValidatorOutput) []*
 			// client side.
 			vdrPB.PublicKey = bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
 		}
-		vdrsPB = append(vdrsPB, vdrPB)
+		resp.Validators[i] = vdrPB
+		i++
 	}
-	return vdrsPB
+	return resp, nil
 }
 
 func (s *Server) GetCurrentValidatorSet(ctx context.Context, req *pb.GetCurrentValidatorSetRequest) (*pb.GetCurrentValidatorSetResponse, error) {

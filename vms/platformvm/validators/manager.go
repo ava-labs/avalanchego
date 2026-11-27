@@ -40,7 +40,8 @@ const (
 )
 
 var (
-	_ validators.State = (*Manager)(nil)
+	_ validators.State   = (*Manager)(nil)
+	_ validators.L1State = (*Manager)(nil)
 
 	errUnfinalizedHeight = errors.New("failed to fetch validator set at unfinalized height")
 )
