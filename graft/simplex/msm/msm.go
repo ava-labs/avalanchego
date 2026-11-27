@@ -13,8 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"go.uber.org/zap"
 )
 
@@ -93,6 +94,8 @@ var (
 	errTimestampTooFarInFuture           = errors.New("invalid timestamp: proposed timestamp is too far in the future compared to current time")
 	errAuxInfoBlockRetrieval             = errors.New("failed to retrieve block while collecting auxiliary info")
 	errAuxInfoIllegalAppend              = errors.New("proposed auxiliary info is not a legal append to the history")
+	errNodeIDWithShortAndLongID          = errors.New("node ID has both a short ID and a long ID")
+	errNodeIDWithEmptyShortAndLongID     = errors.New("node ID has both an empty short ID and an empty long ID")
 
 	signatureContext = "MSM approval"
 )
@@ -127,7 +130,7 @@ type BlockRetriever func(seq uint64, digest common.Digest) (StateMachineBlock, *
 
 // BlockBuilder builds a new VM block with the given observed P-chain height.
 type BlockBuilder interface {
-	BuildBlock(ctx context.Context, pChainHeight uint64) (avalanchego.VMBlock, error)
+	BuildBlock(ctx context.Context, pChainHeight uint64) (common.VMBlock, error)
 
 	// WaitForPendingBlock returns when either the given context is cancelled,
 	// or when the VM signals that a block should be built.
@@ -163,7 +166,7 @@ type StateMachine struct {
 	*Config
 	lock          sync.RWMutex
 	approvalStore *ApprovalStore
-	validators    map[avalanchego.NodeID]struct{}
+	validators    map[common.NodeID]struct{}
 
 	auxInfoStore *auxInfoStore
 }
@@ -203,7 +206,7 @@ type Config struct {
 	// It is used to determine the validator set of the first ever Simplex epoch.
 	LastNonSimplexBlockPChainHeight uint64
 	// LastNonSimplexInnerBlock is the inner block of the last block built by a non-Simplex proposer.
-	LastNonSimplexInnerBlock avalanchego.VMBlock
+	LastNonSimplexInnerBlock common.VMBlock
 	// GenesisValidatorSet is the validator set used for the genesis block.
 	GenesisValidatorSet NodeBLSMappings
 	// MyNodeID
@@ -246,7 +249,7 @@ func NewStateMachine(config *Config) (*StateMachine, error) {
 }
 
 // HandleAuxiliaryInfo processes auxiliary information received from a node.
-func (sm *StateMachine) HandleAuxiliaryInfo(info common.AuxiliaryInfo, from avalanchego.NodeID) {
+func (sm *StateMachine) HandleAuxiliaryInfo(info common.AuxiliaryInfo, from common.NodeID) {
 	sm.lock.Lock()
 	defer sm.lock.Unlock()
 
@@ -265,7 +268,7 @@ func (sm *StateMachine) HandleApproval(approval *common.ValidatorSetApproval) {
 
 	if approvalStore == nil {
 		sm.Logger.Debug("Approval store is not initialized, ignoring approval",
-			zap.String("nodeID", fmt.Sprintf("%x", approval.NodeID)),
+			zap.Stringer("nodeID", approval.NodeID),
 			zap.Uint64("pChainHeight", approval.PChainHeight))
 		return
 	}
@@ -292,9 +295,9 @@ func (sm *StateMachine) maybeInitApprovalStore(block StateMachineBlock) error {
 	sm.lock.Lock()
 	defer sm.lock.Unlock()
 
-	sm.validators = make(map[avalanchego.NodeID]struct{})
+	sm.validators = make(map[common.NodeID]struct{})
 	for _, vdr := range validators {
-		sm.validators[vdr.NodeID] = struct{}{}
+		sm.validators[vdr.NodeID.ToNodeID()] = struct{}{}
 	}
 
 	if sm.approvalStore == nil {
@@ -482,6 +485,18 @@ func (sm *StateMachine) VerifyBlock(ctx context.Context, block *StateMachineBloc
 		return errNilBlock
 	}
 
+	// A node ID is either a short ID or a long ID, never both, and at least one of them must be set.
+	if bvd := block.Metadata.SimplexEpochInfo.BlockValidationDescriptor; bvd != nil {
+		for _, node := range bvd.AggregatedMembership.Members {
+			if node.NodeID.ShortID != ids.ShortEmpty && node.NodeID.LongID != [32]byte{} {
+				return fmt.Errorf("%w: %s", errNodeIDWithShortAndLongID, node.NodeID.ToNodeID())
+			}
+			if node.NodeID.ShortID == ids.ShortEmpty && node.NodeID.LongID == [32]byte{} {
+				return fmt.Errorf("%w: %s", errNodeIDWithEmptyShortAndLongID, node.NodeID.ToNodeID())
+			}
+		}
+	}
+
 	pmd := block.Metadata.SimplexProtocolMetadata
 	seq := pmd.Seq
 
@@ -629,7 +644,7 @@ func (sm *StateMachine) buildBlockOrTransitionEpoch(ctx context.Context, parentB
 	now := sm.GetTime()
 	icmEpochInfo := computeICMEpochInfo(parentBlock, sm.ComputeICMEpoch, now)
 
-	var innerBlock avalanchego.VMBlock
+	var innerBlock common.VMBlock
 
 	if decisionToBuildBlock.buildInnerBlock {
 		innerBlock, err = sm.BlockBuilder.BuildBlock(ctx, icmEpochInfo.PChainEpochHeight)
@@ -675,7 +690,7 @@ func computeICMEpochInfo(parentBlock *StateMachineBlock, computeICMEpoch ICMEpoc
 func verifyAgainstExpected(
 	ctx context.Context,
 	parentBlock *StateMachineBlock,
-	innerBlock avalanchego.VMBlock,
+	innerBlock common.VMBlock,
 	expectedSimplexEpochInfo SimplexEpochInfo,
 	expectedEpoch uint64,
 	expectedPChainHeight uint64,
@@ -1174,7 +1189,7 @@ func (sm *StateMachine) verifyCollectingApprovalsBlock(ctx context.Context, pare
 	}
 
 	sigAggr := sm.SignatureAggregatorCreator(validators.Nodes())
-	approvals := avalanchego.BitmaskFromBytes(newApprovals.NodeIDs)
+	approvals := set.BitsFromBytes(newApprovals.NodeIDs)
 	canSeal := sigAggr.IsQuorum(validators.SelectSubset(approvals))
 
 	if canSeal {
@@ -1241,7 +1256,7 @@ func SignApproval(signer common.Signer, nextPChainReferenceHeight uint64, auxInf
 }
 
 func (sm *StateMachine) aggregatePubKeysForBitmask(nodeIDsBitmask []byte, validators NodeBLSMappings) ([]byte, error) {
-	approvingNodes := avalanchego.BitmaskFromBytes(nodeIDsBitmask)
+	approvingNodes := set.BitsFromBytes(nodeIDsBitmask)
 
 	// Check that the bitmask is not wider than the number of validators, otherwise it would imply that some approving nodes are not in the validator set.
 	if bitLen := approvingNodes.BitLen(); bitLen > len(validators) {
@@ -1309,7 +1324,7 @@ func (sm *StateMachine) computeNewApprovals(parentBlock *StateMachineBlock, vali
 	}
 
 	approvalsFromPeers = append(approvalsFromPeers, common.ValidatorSetApproval{
-		NodeID:        avalanchego.NodeID(sm.MyNodeID),
+		NodeID:        sm.MyNodeID,
 		PChainHeight:  prevBlockNextPChainReferenceHeight,
 		AuxInfoDigest: auxInfoDigest,
 		Signature:     sig,
@@ -1435,7 +1450,7 @@ func getCurrentValidatorSet(parentBlock *StateMachineBlock, getBlock BlockRetrie
 
 // wrapBlock creates a new StateMachineBlock by wrapping the VM block (if applicable) and adding the appropriate metadata.
 func wrapBlock(
-	innerBlock avalanchego.VMBlock,
+	innerBlock common.VMBlock,
 	newSimplexEpochInfo SimplexEpochInfo,
 	pChainHeight uint64,
 	simplexMetadata common.ProtocolMetadata,
@@ -1708,7 +1723,7 @@ func computeNewApprovals(
 		prevNextEpochApprovals = &NextEpochApprovals{}
 	}
 
-	oldApprovingNodes := avalanchego.BitmaskFromBytes(prevNextEpochApprovals.NodeIDs)
+	oldApprovingNodes := set.BitsFromBytes(prevNextEpochApprovals.NodeIDs)
 
 	nodeID2ValidatorIndex := validators.IndexByNodeID()
 
@@ -1741,19 +1756,19 @@ func computeNewApprovals(
 func computeNewApproverSignaturesAndSigners(
 	nextEpochApprovals *NextEpochApprovals,
 	approvalsFromPeers ValidatorSetApprovals,
-	oldApprovingNodes avalanchego.Bitmask,
-	nodeID2ValidatorIndex map[avalanchego.NodeID]int,
+	oldApprovingNodes set.Bits,
+	nodeID2ValidatorIndex map[common.NodeID]int,
 	sigAggr common.SignatureAggregator,
 	logger common.Logger,
-) ([]byte, avalanchego.Bitmask, error) {
+) ([]byte, set.Bits, error) {
 	if nextEpochApprovals == nil {
-		return nil, avalanchego.Bitmask{}, errEmptyNextEpochApprovals
+		return nil, set.Bits{}, errEmptyNextEpochApprovals
 	}
 	// Prepare the new signatures from the new approvals that haven't approved yet and that agree with our candidate auxiliary info digest and P-Chain height.
 	newSignatures := make([]common.SignatureBytes, 0, len(approvalsFromPeers)+1)
 
 	// We will overwrite the old approving nodes with the new approving nodes, by turning on the bits for the new approvers.
-	newApprovingNodes := oldApprovingNodes.Clone()
+	newApprovingNodes := set.BitsFromBytes(oldApprovingNodes.Bytes())
 
 	logger.Debug("Existing approving nodes bitmask before adding new approvals",
 		zap.Int("count", oldApprovingNodes.Len()))
@@ -1783,7 +1798,7 @@ func computeNewApproverSignaturesAndSigners(
 	// Finally, we aggregate all signatures together, to compute the new aggregated signature.
 	aggregatedSignature, err := sigAggr.AppendSignatures(existingSignature, newSignatures...)
 	if err != nil {
-		return nil, avalanchego.Bitmask{}, fmt.Errorf("failed to aggregate signatures: %w", err)
+		return nil, set.Bits{}, fmt.Errorf("failed to aggregate signatures: %w", err)
 	}
 
 	return aggregatedSignature, newApprovingNodes, nil
@@ -1791,9 +1806,9 @@ func computeNewApproverSignaturesAndSigners(
 
 // sanitizeApprovals filters out approvals that are not valid by checking if they agree with our candidate auxiliary info digest and P-Chain height,
 // and if they are from the validator set and haven't already been approved.
-func sanitizeApprovals(approvals ValidatorSetApprovals, pChainHeight uint64, auxInfoDigest common.Digest, nodeID2ValidatorIndex map[avalanchego.NodeID]int, oldApprovingNodes avalanchego.Bitmask, logger common.Logger) ValidatorSetApprovals {
+func sanitizeApprovals(approvals ValidatorSetApprovals, pChainHeight uint64, auxInfoDigest common.Digest, nodeID2ValidatorIndex map[common.NodeID]int, oldApprovingNodes set.Bits, logger common.Logger) ValidatorSetApprovals {
 	filter1 := approvalsThatAgreeWithPChainHeightAndAuxInfoDigest(pChainHeight, auxInfoDigest)
-	filter2 := approvalsThatAreInValidatorSetAndHaveNotAlreadyApproved(oldApprovingNodes.Clone(), nodeID2ValidatorIndex)
+	filter2 := approvalsThatAreInValidatorSetAndHaveNotAlreadyApproved(oldApprovingNodes, nodeID2ValidatorIndex)
 	return approvals.Filter(filter1, logger).Filter(filter2, logger).UniqueByNodeID()
 }
 
@@ -1803,7 +1818,7 @@ func approvalsThatAgreeWithPChainHeightAndAuxInfoDigest(pChainHeight uint64, aux
 		ok := approval.PChainHeight == pChainHeight && approval.AuxInfoDigest == auxInfoDigest
 		if !ok {
 			logger.Debug("Filtering out approval that does not agree with our P-Chain height or auxiliary info digest",
-				zap.String("nodeID", fmt.Sprintf("%x", approval.NodeID)),
+				zap.Stringer("nodeID", approval.NodeID),
 				zap.Uint64("approvalPChainHeight", approval.PChainHeight),
 				zap.Uint64("expectedPChainHeight", pChainHeight),
 				zap.Stringer("approvalAuxInfoSeqDigest", approval.AuxInfoDigest))
@@ -1812,12 +1827,12 @@ func approvalsThatAgreeWithPChainHeightAndAuxInfoDigest(pChainHeight uint64, aux
 	}
 }
 
-func approvalsThatAreInValidatorSetAndHaveNotAlreadyApproved(oldApprovingNodes avalanchego.Bitmask, nodeID2ValidatorIndex map[avalanchego.NodeID]int) func(approval common.ValidatorSetApproval, logger common.Logger) bool {
+func approvalsThatAreInValidatorSetAndHaveNotAlreadyApproved(oldApprovingNodes set.Bits, nodeID2ValidatorIndex map[common.NodeID]int) func(approval common.ValidatorSetApproval, logger common.Logger) bool {
 	return func(approval common.ValidatorSetApproval, logger common.Logger) bool {
 		approvingNodeIndexOfNewApprover, exists := nodeID2ValidatorIndex[approval.NodeID]
 		if !exists {
 			logger.Debug("Filtering out approval from node that is not in the validator set",
-				zap.String("nodeID", fmt.Sprintf("%x", approval.NodeID)))
+				zap.Stringer("nodeID", approval.NodeID))
 			// If the approving node is not in the validator set, we ignore this approval.
 			return false
 		}
@@ -1845,10 +1860,10 @@ func areNextEpochApprovalsSignersSupersetOfApprovalsOfPrevBlock(prev SimplexEpoc
 		return fmt.Errorf("%w: previous block has next epoch approvals but proposed block doesn't have next epoch approvals", errNextEpochApprovalsShrunk)
 	}
 	// Make sure that previous signers are still there.
-	prevSigners := avalanchego.BitmaskFromBytes(prev.NextEpochApprovals.NodeIDs)
-	nextSigners := avalanchego.BitmaskFromBytes(next.NextEpochApprovals.NodeIDs)
+	prevSigners := set.BitsFromBytes(prev.NextEpochApprovals.NodeIDs)
+	nextSigners := set.BitsFromBytes(next.NextEpochApprovals.NodeIDs)
 	// Remove all bits in nextSigners from prevSigners
-	prevSigners.Difference(&nextSigners)
+	prevSigners.Difference(nextSigners)
 	// If we have some bits left, it means there was a bit in prevSigners that wasn't in nextSigners
 	if prevSigners.Len() > 0 {
 		return errSignerSetShrunk

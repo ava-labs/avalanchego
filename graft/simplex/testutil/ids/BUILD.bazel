@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "ids",
+    srcs = ["ids.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/simplex/testutil/ids",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/simplex/common",
+        "//ids",
+    ],
+)

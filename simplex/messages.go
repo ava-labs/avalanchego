@@ -4,6 +4,8 @@
 package simplex
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -12,79 +14,99 @@ import (
 func newBlockProposal(
 	chainID ids.ID,
 	msg *common.VerifiedBlockMessage,
-) *p2p.Simplex {
-	bytes := msg.VerifiedBlock.Bytes()
+) (*p2p.Simplex, error) {
 	vote := msg.Vote
+	sig, err := signatureToP2P(vote.Signature)
+	if err != nil {
+		return nil, err
+	}
 
 	return &p2p.Simplex{
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_BlockProposal{
 			BlockProposal: &p2p.BlockProposal{
-				Block: bytes,
+				Block: msg.VerifiedBlock.Bytes(),
 				Vote: &p2p.Vote{
 					BlockHeader: blockHeaderToP2P(vote.Vote.BlockHeader),
-					Signature: &p2p.Signature{
-						Signer: vote.Signature.Signer,
-						Value:  vote.Signature.Value,
-					},
+					Signature:   sig,
 				},
 			},
 		},
-	}
+	}, nil
 }
 
 func newVote(
 	chainID ids.ID,
 	vote *common.Vote,
-) *p2p.Simplex {
+) (*p2p.Simplex, error) {
+	sig, err := signatureToP2P(vote.Signature)
+	if err != nil {
+		return nil, err
+	}
+
 	return &p2p.Simplex{
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_Vote{
 			Vote: &p2p.Vote{
 				BlockHeader: blockHeaderToP2P(vote.Vote.BlockHeader),
-				Signature: &p2p.Signature{
-					Signer: vote.Signature.Signer,
-					Value:  vote.Signature.Value,
-				},
+				Signature:   sig,
 			},
 		},
-	}
+	}, nil
 }
 
 func newEmptyVote(
 	chainID ids.ID,
 	emptyVote *common.EmptyVote,
-) *p2p.Simplex {
+) (*p2p.Simplex, error) {
+	sig, err := signatureToP2P(emptyVote.Signature)
+	if err != nil {
+		return nil, err
+	}
+
 	return &p2p.Simplex{
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_EmptyVote{
 			EmptyVote: &p2p.EmptyVote{
-				Metadata: emptyVoteMetadataToP2P(emptyVote.Vote.EmptyVoteMetadata),
-				Signature: &p2p.Signature{
-					Signer: emptyVote.Signature.Signer,
-					Value:  emptyVote.Signature.Value,
-				},
+				Metadata:  emptyVoteMetadataToP2P(emptyVote.Vote.EmptyVoteMetadata),
+				Signature: sig,
 			},
 		},
-	}
+	}, nil
 }
 
 func newFinalizeVote(
 	chainID ids.ID,
 	finalizeVote *common.FinalizeVote,
-) *p2p.Simplex {
+) (*p2p.Simplex, error) {
+	sig, err := signatureToP2P(finalizeVote.Signature)
+	if err != nil {
+		return nil, err
+	}
+
 	return &p2p.Simplex{
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_FinalizeVote{
 			FinalizeVote: &p2p.Vote{
 				BlockHeader: blockHeaderToP2P(finalizeVote.Finalization.BlockHeader),
-				Signature: &p2p.Signature{
-					Signer: finalizeVote.Signature.Signer,
-					Value:  finalizeVote.Signature.Value,
-				},
+				Signature:   sig,
 			},
 		},
+	}, nil
+}
+
+// signatureToP2P converts a signature to its p2p form.
+// It fails if the signer cannot be represented as an avalanchego node ID.
+func signatureToP2P(sig common.Signature) (*p2p.Signature, error) {
+	signer, err := sig.Signer.ToAvalancheID()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errInvalidSigner, err)
 	}
+
+	return &p2p.Signature{
+		Signer: signer[:],
+		Value:  sig.Value,
+	}, nil
 }
 
 func newNotarization(
@@ -221,18 +243,23 @@ func newAuxiliaryInfo(
 func newEpochTransitionApproval(
 	chainID ids.ID,
 	approval *common.ValidatorSetApproval,
-) *p2p.Simplex {
+) (*p2p.Simplex, error) {
+	nodeID, err := approval.NodeID.ToAvalancheID()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errInvalidSigner, err)
+	}
+
 	return &p2p.Simplex{
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_EpochTransitionApproval{
 			EpochTransitionApproval: &p2p.ValidatorSetApproval{
-				NodeId:        approval.NodeID[:],
+				NodeId:        nodeID[:],
 				AuxInfoDigest: approval.AuxInfoDigest[:],
 				PChainHeight:  approval.PChainHeight,
 				Signature:     approval.Signature,
 			},
 		},
-	}
+	}, nil
 }
 
 func blockHeaderToP2P(bh common.BlockHeader) *p2p.BlockHeader {

@@ -964,17 +964,24 @@ type canotoData_NodeBLSMapping struct {
 
 // DescribeCanoto returns a [canoto.Spec] describing the fields of this
 // message and their wire types.
-func (*NodeBLSMapping) DescribeCanoto(...reflect.Type) *canoto.Spec {
+//
+// types is used as a stack of ancestor messages to detect recursive specs.
+func (*NodeBLSMapping) DescribeCanoto(types ...reflect.Type) *canoto.Spec {
+	types = append(types, reflect.TypeFor[NodeBLSMapping]())
 	var zero NodeBLSMapping
 	return &canoto.Spec{
 		Name: "NodeBLSMapping",
 		Fields: []canoto.FieldType{
-			{
-				FieldNumber:    canotoNumber_NodeBLSMapping__NodeID,
-				Name:           "NodeID",
-				OneOf:          "",
-				TypeFixedBytes: uint64(len(zero.NodeID)),
-			},
+			canoto.FieldTypeFromField(
+				/*type inference:*/ (&zero.NodeID),
+				/*FieldNumber:   */ canotoNumber_NodeBLSMapping__NodeID,
+				/*Name:          */ "NodeID",
+				/*FixedLength:   */ 0,
+				/*Repeated:      */ false,
+				/*OneOf:         */ "",
+				/*Pointer:       */ false,
+				/*types:         */ types,
+			),
 			{
 				FieldNumber: canotoNumber_NodeBLSMapping__BLSKey,
 				Name:        "BLSKey",
@@ -1031,26 +1038,19 @@ func (c *NodeBLSMapping) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalR
 				return canoto.UnmarshalResult{}, canoto.ErrUnexpectedWireType
 			}
 
-			const (
-				expectedLength       = len(c.NodeID)
-				expectedLengthUint64 = uint64(expectedLength)
-			)
-			var length uint64
-			if err := canoto.ReadUint(&r, &length); err != nil {
+			var msgReader canoto.Reader
+			if err := canoto.ReadSubReader(&r, &msgReader); err != nil {
 				return canoto.UnmarshalResult{}, err
 			}
-			if length != expectedLengthUint64 {
-				return canoto.UnmarshalResult{}, canoto.ErrInvalidLength
-			}
-			if expectedLength > len(r.B) {
-				return canoto.UnmarshalResult{}, canoto.ErrUnexpectedEOF
-			}
-
-			copy((&c.NodeID)[:], r.B)
-			if canoto.IsZero(&c.NodeID) {
+			if !canoto.HasNext(&msgReader) {
 				return canoto.UnmarshalResult{}, canoto.ErrZeroValue
 			}
-			r.B = r.B[expectedLength:]
+
+			result, err := (&c.NodeID).UnmarshalCanotoFrom(msgReader)
+			if err != nil {
+				return canoto.UnmarshalResult{}, err
+			}
+			r.MemoryRemaining = result.MemoryRemaining
 		case canotoNumber_NodeBLSMapping__BLSKey:
 			if wireType != canoto.Len {
 				return canoto.UnmarshalResult{}, canoto.ErrUnexpectedWireType
@@ -1086,8 +1086,9 @@ func (c *NodeBLSMapping) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalR
 // the struct.
 func (c *NodeBLSMapping) CacheCanoto() {
 	var size uint64
-	if !canoto.IsZero(&c.NodeID) {
-		size += uint64(len(canotoTag_NodeBLSMapping__NodeID)) + canoto.SizeBytes((&c.NodeID)[:])
+	(&c.NodeID).CacheCanoto()
+	if fieldSize := (&c.NodeID).SizeCanoto(); fieldSize != 0 {
+		size += uint64(len(canotoTag_NodeBLSMapping__NodeID)) + canoto.SizeUint(fieldSize) + fieldSize
 	}
 	if len(c.BLSKey) != 0 {
 		size += uint64(len(canotoTag_NodeBLSMapping__BLSKey)) + canoto.SizeBytes(c.BLSKey)
@@ -1110,12 +1111,19 @@ func (c *NodeBLSMapping) SizeCanoto() uint64 {
 // ValidCanoto validates that the struct can be correctly marshaled into the
 // Canoto format.
 func (c *NodeBLSMapping) ValidCanoto() bool {
+	c.CacheCanoto()
 	return c.CheckCanoto()
 }
 
 // CheckCanoto validates that the struct can be correctly marshaled into the
 // Canoto format. Most users should just use ValidCanoto.
+//
+// It is assumed that CacheCanoto has been called since the last modification
+// to this struct.
 func (c *NodeBLSMapping) CheckCanoto() bool {
+	if !(&c.NodeID).CheckCanoto() {
+		return false
+	}
 	return true
 }
 
@@ -1139,9 +1147,10 @@ func (c *NodeBLSMapping) MarshalCanoto() []byte {
 //
 // It is assumed that this struct is ValidCanoto.
 func (c *NodeBLSMapping) AppendCanoto(w canoto.Writer) canoto.Writer {
-	if !canoto.IsZero(&c.NodeID) {
+	if fieldSize := (&c.NodeID).SizeCanoto(); fieldSize != 0 {
 		canoto.Append(&w, canotoTag_NodeBLSMapping__NodeID)
-		canoto.AppendBytes(&w, (&c.NodeID)[:])
+		canoto.AppendUint(&w, fieldSize)
+		w = (&c.NodeID).AppendCanoto(w)
 	}
 	if len(c.BLSKey) != 0 {
 		canoto.Append(&w, canotoTag_NodeBLSMapping__BLSKey)
@@ -1914,6 +1923,200 @@ func (c *AuxiliaryInfoBatch) AppendCanoto(w canoto.Writer) canoto.Writer {
 	if !canoto.IsZero(&c.PrevAuxInfoSeq) {
 		canoto.Append(&w, canotoTag_AuxiliaryInfoBatch__PrevAuxInfoSeq)
 		canoto.AppendUint(&w, c.PrevAuxInfoSeq)
+	}
+	return w
+}
+
+const (
+	canotoNumber_EncodedNodeID__ShortID = 1
+	canotoNumber_EncodedNodeID__LongID  = 2
+
+	canotoTag_EncodedNodeID__ShortID = "\x0a" // canoto.Tag(canotoNumber_EncodedNodeID__ShortID, canoto.Len)
+	canotoTag_EncodedNodeID__LongID  = "\x12" // canoto.Tag(canotoNumber_EncodedNodeID__LongID, canoto.Len)
+)
+
+type canotoData_EncodedNodeID struct {
+	size uint64
+}
+
+// DescribeCanoto returns a [canoto.Spec] describing the fields of this
+// message and their wire types.
+func (*EncodedNodeID) DescribeCanoto(...reflect.Type) *canoto.Spec {
+	var zero EncodedNodeID
+	return &canoto.Spec{
+		Name: "EncodedNodeID",
+		Fields: []canoto.FieldType{
+			{
+				FieldNumber:    canotoNumber_EncodedNodeID__ShortID,
+				Name:           "ShortID",
+				OneOf:          "",
+				TypeFixedBytes: uint64(len(zero.ShortID)),
+			},
+			{
+				FieldNumber:    canotoNumber_EncodedNodeID__LongID,
+				Name:           "LongID",
+				OneOf:          "",
+				TypeFixedBytes: uint64(len(zero.LongID)),
+			},
+		},
+	}
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *EncodedNodeID) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B:               bytes,
+		MemoryRemaining: canoto.DefaultMemoryLimit,
+		DepthLimit:      canoto.DefaultDepthLimit,
+	}
+	_, err := c.UnmarshalCanotoFrom(r)
+	return err
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *EncodedNodeID) UnmarshalCanotoFrom(r canoto.Reader) (canoto.UnmarshalResult, error) {
+	// Zero the struct before unmarshaling.
+	*c = EncodedNodeID{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return canoto.UnmarshalResult{}, err
+		}
+		if field < minField {
+			return canoto.UnmarshalResult{}, canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canotoNumber_EncodedNodeID__ShortID:
+			if wireType != canoto.Len {
+				return canoto.UnmarshalResult{}, canoto.ErrUnexpectedWireType
+			}
+
+			const (
+				expectedLength       = len(c.ShortID)
+				expectedLengthUint64 = uint64(expectedLength)
+			)
+			var length uint64
+			if err := canoto.ReadUint(&r, &length); err != nil {
+				return canoto.UnmarshalResult{}, err
+			}
+			if length != expectedLengthUint64 {
+				return canoto.UnmarshalResult{}, canoto.ErrInvalidLength
+			}
+			if expectedLength > len(r.B) {
+				return canoto.UnmarshalResult{}, canoto.ErrUnexpectedEOF
+			}
+
+			copy((&c.ShortID)[:], r.B)
+			if canoto.IsZero(&c.ShortID) {
+				return canoto.UnmarshalResult{}, canoto.ErrZeroValue
+			}
+			r.B = r.B[expectedLength:]
+		case canotoNumber_EncodedNodeID__LongID:
+			if wireType != canoto.Len {
+				return canoto.UnmarshalResult{}, canoto.ErrUnexpectedWireType
+			}
+
+			const (
+				expectedLength       = len(c.LongID)
+				expectedLengthUint64 = uint64(expectedLength)
+			)
+			var length uint64
+			if err := canoto.ReadUint(&r, &length); err != nil {
+				return canoto.UnmarshalResult{}, err
+			}
+			if length != expectedLengthUint64 {
+				return canoto.UnmarshalResult{}, canoto.ErrInvalidLength
+			}
+			if expectedLength > len(r.B) {
+				return canoto.UnmarshalResult{}, canoto.ErrUnexpectedEOF
+			}
+
+			copy((&c.LongID)[:], r.B)
+			if canoto.IsZero(&c.LongID) {
+				return canoto.UnmarshalResult{}, canoto.ErrZeroValue
+			}
+			r.B = r.B[expectedLength:]
+		default:
+			return canoto.UnmarshalResult{}, canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return canoto.UnmarshalResult{MemoryRemaining: r.MemoryRemaining}, nil
+}
+
+// CacheCanoto populates size and OneOf caches based on the current values in
+// the struct.
+func (c *EncodedNodeID) CacheCanoto() {
+	var size uint64
+	if !canoto.IsZero(&c.ShortID) {
+		size += uint64(len(canotoTag_EncodedNodeID__ShortID)) + canoto.SizeBytes((&c.ShortID)[:])
+	}
+	if !canoto.IsZero(&c.LongID) {
+		size += uint64(len(canotoTag_EncodedNodeID__LongID)) + canoto.SizeBytes((&c.LongID)[:])
+	}
+	canoto.CacheUint64(&c.canotoData.size, size)
+}
+
+// SizeCanoto returns the previously calculated size of the Canoto
+// representation from CacheCanoto.
+//
+// If CacheCanoto has not yet been called, or the struct has been modified
+// since the last call to CacheCanoto, the returned size may be incorrect.
+func (c *EncodedNodeID) SizeCanoto() uint64 {
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+func (c *EncodedNodeID) ValidCanoto() bool {
+	return c.CheckCanoto()
+}
+
+// CheckCanoto validates that the struct can be correctly marshaled into the
+// Canoto format. Most users should just use ValidCanoto.
+func (c *EncodedNodeID) CheckCanoto() bool {
+	return true
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+func (c *EncodedNodeID) MarshalCanoto() []byte {
+	c.CacheCanoto()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.SizeCanoto()),
+	}
+	w = c.AppendCanoto(w)
+	return w.B
+}
+
+// AppendCanoto appends the struct to a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CacheCanoto has been called since the last modification
+// to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+func (c *EncodedNodeID) AppendCanoto(w canoto.Writer) canoto.Writer {
+	if !canoto.IsZero(&c.ShortID) {
+		canoto.Append(&w, canotoTag_EncodedNodeID__ShortID)
+		canoto.AppendBytes(&w, (&c.ShortID)[:])
+	}
+	if !canoto.IsZero(&c.LongID) {
+		canoto.Append(&w, canotoTag_EncodedNodeID__LongID)
+		canoto.AppendBytes(&w, (&c.LongID)[:])
 	}
 	return w
 }

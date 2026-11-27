@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -206,7 +205,7 @@ func epochTransitionApprovalFromP2P(approval *p2p.ValidatorSetApproval) (*common
 
 	return &common.Message{
 		EpochTransitionApproval: &common.ValidatorSetApproval{
-			NodeID:        avalanchego.NodeID(nodeID),
+			NodeID:        common.NodeIDFromAvalancheID(nodeID),
 			AuxInfoDigest: auxInfoDigest,
 			PChainHeight:  approval.PChainHeight,
 			Signature:     approval.Signature,
@@ -251,7 +250,7 @@ func p2pSignatureToSimplexSignature(p2pSig *p2p.Signature) (common.Signature, er
 	}
 
 	return common.Signature{
-		Signer: nodeID[:],
+		Signer: common.NodeIDFromAvalancheID(nodeID),
 		Value:  p2pSig.Value,
 	}, nil
 }

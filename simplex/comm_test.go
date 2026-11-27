@@ -31,7 +31,7 @@ var testSimplexMessage = simplexcommon.Message{
 			},
 		},
 		Signature: simplexcommon.Signature{
-			Signer: []byte("dummy_node_id"),
+			Signer: simplexcommon.NodeIDFromAvalancheID(ids.GenerateTestNodeID()),
 			Value:  []byte("dummy_signature"),
 		},
 	},
@@ -45,7 +45,9 @@ func TestCommSendMessage(t *testing.T) {
 	comm, err := NewComm(config)
 	require.NoError(t, err)
 
-	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
+	vote, err := newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage)
+	require.NoError(t, err)
+	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(vote)
 	require.NoError(t, err)
 	expectedSendConfig := common.SendConfig{
 		NodeIDs: set.Of(destinationNodeID),
@@ -53,7 +55,7 @@ func TestCommSendMessage(t *testing.T) {
 	sender := config.Sender.(*sendermock.ExternalSender)
 	sender.EXPECT().Send(outboundMsg, expectedSendConfig, comm.subnetID, gomock.Any())
 
-	comm.Send(&testSimplexMessage, destinationNodeID[:])
+	comm.Send(&testSimplexMessage, simplexcommon.NodeIDFromAvalancheID(destinationNodeID))
 }
 
 // TestCommBroadcast tests the Broadcast method sends to all nodes in the subnet
@@ -64,14 +66,16 @@ func TestCommBroadcast(t *testing.T) {
 
 	comm, err := NewComm(config)
 	require.NoError(t, err)
-	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
+	vote, err := newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage)
+	require.NoError(t, err)
+	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(vote)
 	require.NoError(t, err)
 	nodes := make([]ids.NodeID, 0, len(comm.Validators()))
 	for _, node := range comm.Validators() {
-		if node.Id.Equals(config.Ctx.NodeID[:]) {
+		if node.Id.Equals(simplexcommon.NodeIDFromAvalancheID(config.Ctx.NodeID)) {
 			continue // skip the sending node
 		}
-		nodes = append(nodes, ids.NodeID(node.Id))
+		nodes = append(nodes, ids.NodeID(node.Id.ShortID))
 	}
 
 	expectedSendConfig := common.SendConfig{
@@ -140,4 +144,18 @@ func TestSimplexMessageReplicationResponse(t *testing.T) {
 			require.NotNil(t, newReplicationResponse(chainID, tt.resp))
 		})
 	}
+}
+
+// TestSimplexMessageRejectsLongSigner tests that a signature whose signer has a LongID
+// is not sent with a truncated signer.
+func TestSimplexMessageRejectsLongSigner(t *testing.T) {
+	config := newEngineConfig(t, 1)
+	comm, err := NewComm(config)
+	require.NoError(t, err)
+
+	vote := *testSimplexMessage.VoteMessage
+	vote.Signature.Signer.LongID = [32]byte{1}
+
+	_, err = comm.simplexMessageToOutboundMessage(&simplexcommon.Message{VoteMessage: &vote})
+	require.ErrorIs(t, err, errInvalidSigner)
 }

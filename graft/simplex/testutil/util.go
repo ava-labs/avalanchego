@@ -5,7 +5,6 @@ package testutil
 
 import (
 	"crypto/rand"
-	"encoding/asn1"
 	"fmt"
 	"testing"
 	"time"
@@ -19,9 +18,11 @@ import (
 // It is generous so that tests do not flake on slow or loaded machines, such as CI runners with the race detector.
 const DefaultTimeout = 30 * time.Second
 
+//go:generate go run github.com/StephenButtolph/canoto/canoto util.go
+
 // DefaultTestNodeEpochConfig returns a default epoch config for a given node.
 func DefaultTestNodeEpochConfig(t *testing.T, nodeID common.NodeID, comm common.Communication, bb common.BlockBuilder) (simplex.EpochConfig, *TestWAL, *InMemStorage) {
-	l := MakeLogger(t, int(nodeID[0]))
+	l := MakeLogger(t, int(nodeID.ShortID[0]))
 	storage := NewInMemStorage()
 	wal := NewTestWAL(t)
 	conf := simplex.EpochConfig{
@@ -120,11 +121,9 @@ type testQCDeserializer struct {
 }
 
 func (t *testQCDeserializer) DeserializeQuorumCertificate(bytes []byte) (common.QuorumCertificate, error) {
-	var qc []common.Signature
-	rest, err := asn1.Unmarshal(bytes, &qc)
+	qc, err := DeserializeTestQC(bytes)
 	require.NoError(t.t, err)
-	require.Empty(t.t, rest)
-	return TestQC(qc), err
+	return qc, nil
 }
 
 type TestSignatureAggregator struct {
@@ -171,6 +170,32 @@ func (t *TestSignatureAggregator) AboveByzantineThreshold(signers []common.NodeI
 	return len(signers) >= common.F(t.N)+1
 }
 
+// wireNodeID is the serializable form of a [common.NodeID].
+// It cannot be [metadata.EncodedNodeID] because msm tests import this package.
+type wireNodeID struct {
+	ShortID [20]byte `canoto:"fixed bytes,1"`
+	LongID  [32]byte `canoto:"fixed bytes,2"`
+
+	canotoData canotoData_wireNodeID
+}
+
+// wireSignature is the serializable form of a [common.Signature].
+type wireSignature struct {
+	Signer wireNodeID            `canoto:"value,1"`
+	Value  common.SignatureBytes `canoto:"bytes,2"`
+
+	canotoData canotoData_wireSignature
+}
+
+// wireQC is the serializable form of a [TestQC].
+type wireQC struct {
+	Signatures []wireSignature `canoto:"repeated value,1"`
+
+	canotoData canotoData_wireQC
+}
+
+// TestQC is a [common.QuorumCertificate] that is just the list of its signatures.
+// It is converted to [wireQC] only when serialized, so it never holds canoto caches.
 type TestQC []common.Signature
 
 func (t TestQC) Signers() []common.NodeID {
@@ -186,12 +211,32 @@ func (t TestQC) Verify([]byte, common.Nodes) error {
 }
 
 func (t TestQC) Bytes() []byte {
-	bytes, err := asn1.Marshal(t)
-	if err != nil {
-		panic(err)
+	wire := wireQC{Signatures: make([]wireSignature, len(t))}
+	for i, sig := range t {
+		wire.Signatures[i] = wireSignature{
+			Signer: wireNodeID{ShortID: sig.Signer.ShortID, LongID: sig.Signer.LongID},
+			Value:  sig.Value,
+		}
 	}
-	return bytes
+	return wire.MarshalCanoto()
 }
+
+// DeserializeTestQC parses bytes produced by [TestQC.Bytes].
+func DeserializeTestQC(bytes []byte) (TestQC, error) {
+	var wire wireQC
+	if err := wire.UnmarshalCanoto(bytes); err != nil {
+		return nil, err
+	}
+	var qc TestQC
+	for _, sig := range wire.Signatures {
+		qc = append(qc, common.Signature{
+			Signer: common.NodeID{ShortID: sig.Signer.ShortID, LongID: sig.Signer.LongID},
+			Value:  sig.Value,
+		})
+	}
+	return qc, nil
+}
+
 func (t TestQC) Size() int {
 	return len(t.Bytes())
 }
@@ -274,13 +319,13 @@ func WaitForBlockProposerTimeout(t *testing.T, e *simplex.Epoch, startTime *time
 }
 
 func GenerateNodeID(t *testing.T) common.NodeID {
-	b := make([]byte, 32)
+	var nodeID common.NodeID
 
 	// fill with cryptographically secure random data
-	_, err := rand.Read(b)
+	_, err := rand.Read(nodeID.ShortID[:])
 	require.NoError(t, err)
 
-	return common.NodeID(b)
+	return nodeID
 }
 
 // EqualWeights returns the weights of nodeCount nodes that all have a weight of 1.

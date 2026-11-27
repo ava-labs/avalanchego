@@ -127,7 +127,7 @@ func newEngineWithSignerVerifier(ctx context.Context, config *Config, signer BLS
 		MaxRebroadcastWait: config.Params.MaxRebroadcastWait,
 		QCDeserializer:     qcDeserializer,
 		Logger:             config.Log,
-		ID:                 config.Ctx.NodeID[:],
+		ID:                 simplexcommon.NodeIDFromAvalancheID(config.Ctx.NodeID),
 		Signer:             &signer,
 		Verifier:           &verifier,
 		BlockDeserializer:  blockDeserializer,
@@ -214,7 +214,7 @@ func (e *Engine) Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simple
 		return nil
 	}
 
-	return e.epoch.HandleMessage(simplexMsg, nodeID[:])
+	return e.epoch.HandleMessage(simplexMsg, simplexcommon.NodeIDFromAvalancheID(nodeID))
 }
 
 func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*simplexcommon.Message, error) {

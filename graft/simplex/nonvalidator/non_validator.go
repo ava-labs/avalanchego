@@ -21,7 +21,7 @@ import (
 type finalizedSeq struct {
 	// proposerIDToBlock holds one block per leader that proposed for this sequence.
 	// Rounds that share a sequence can have different leaders, so several proposerIDToBlock may be stored.
-	proposerIDToBlock map[string]common.Block
+	proposerIDToBlock map[common.NodeID]common.Block
 	finalization      *common.Finalization
 }
 
@@ -332,7 +332,7 @@ func (n *NonValidator) handleBlock(block common.Block, from common.NodeID) error
 		return nil
 	}
 
-	if !bytes.Equal(simplex.LeaderForRound(epoch.nodes.NodeIDs(), bh.Round), from) {
+	if simplex.LeaderForRound(epoch.nodes.NodeIDs(), bh.Round) != from {
 		n.Logger.Debug("Received a block not from the leader of that round", zap.Uint64("Epoch", bh.Epoch), zap.Stringer("From", from))
 		return nil
 	}
@@ -345,13 +345,13 @@ func (n *NonValidator) handleBlock(block common.Block, from common.NodeID) error
 
 	incomplete, ok := n.incompleteSequences[bh.Seq]
 	if !ok {
-		incomplete = &finalizedSeq{proposerIDToBlock: make(map[string]common.Block)}
+		incomplete = &finalizedSeq{proposerIDToBlock: make(map[common.NodeID]common.Block)}
 		n.incompleteSequences[bh.Seq] = incomplete
 	}
 
 	// Without a finalization we cannot tell which block is the right one, so keep one per node.
 	if incomplete.finalization == nil {
-		incomplete.proposerIDToBlock[string(from)] = block
+		incomplete.proposerIDToBlock[from] = block
 		n.Logger.Debug("Stored incomplete sequence", zap.Stringer("Sequence", incomplete))
 		return nil
 	}
@@ -526,7 +526,7 @@ func (n *NonValidator) handleFinalization(finalization *common.Finalization, fro
 
 	incomplete, ok := n.incompleteSequences[bh.Seq]
 	if !ok {
-		incomplete = &finalizedSeq{proposerIDToBlock: make(map[string]common.Block)}
+		incomplete = &finalizedSeq{proposerIDToBlock: make(map[common.NodeID]common.Block)}
 		n.incompleteSequences[bh.Seq] = incomplete
 	}
 

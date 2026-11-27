@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	. "github.com/ava-labs/avalanchego/graft/simplex/testutil/ids"
 	wal "github.com/ava-labs/avalanchego/graft/simplex/wal"
 	"github.com/stretchr/testify/require"
 )
@@ -225,7 +226,7 @@ func TestGarbageCollectedWALAppendOutOfOrder(t *testing.T) {
 	walRecordBlock := func(round uint64) *testutil.TestBlock {
 		return testutil.NewTestBlock(common.ProtocolMetadata{Round: round, Seq: round}, common.Blacklist{})
 	}
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := ShortIDs(4)
 	sigAggr := &testutil.TestSignatureAggregator{N: len(nodes)}
 
 	blockRecord := func(round uint64) []byte {
