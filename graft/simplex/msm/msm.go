@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"go.uber.org/zap"
 )
@@ -93,6 +94,8 @@ var (
 	errTimestampTooFarInFuture           = errors.New("invalid timestamp: proposed timestamp is too far in the future compared to current time")
 	errAuxInfoBlockRetrieval             = errors.New("failed to retrieve block while collecting auxiliary info")
 	errAuxInfoIllegalAppend              = errors.New("proposed auxiliary info is not a legal append to the history")
+	errNodeIDWithShortAndLongID          = errors.New("node ID has both a short ID and a long ID")
+	errNodeIDWithEmptyShortAndLongID     = errors.New("node ID has both an empty short ID and an empty long ID")
 
 	signatureContext = "MSM approval"
 )
@@ -480,6 +483,18 @@ func (sm *StateMachine) BuildBlock(ctx context.Context, metadata common.Protocol
 func (sm *StateMachine) VerifyBlock(ctx context.Context, block *StateMachineBlock) error {
 	if block == nil {
 		return errNilBlock
+	}
+
+	// A node ID is either a short ID or a long ID, never both, and at least one of them must be set.
+	if bvd := block.Metadata.SimplexEpochInfo.BlockValidationDescriptor; bvd != nil {
+		for _, node := range bvd.AggregatedMembership.Members {
+			if node.NodeID.ShortID != ids.ShortEmpty && node.NodeID.LongID != [32]byte{} {
+				return fmt.Errorf("%w: %s", errNodeIDWithShortAndLongID, node.NodeID.ToNodeID())
+			}
+			if node.NodeID.ShortID == ids.ShortEmpty && node.NodeID.LongID == [32]byte{} {
+				return fmt.Errorf("%w: %s", errNodeIDWithEmptyShortAndLongID, node.NodeID.ToNodeID())
+			}
+		}
 	}
 
 	pmd := block.Metadata.SimplexProtocolMetadata

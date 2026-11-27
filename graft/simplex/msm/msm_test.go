@@ -122,6 +122,24 @@ func TestMSMBuildAndVerifyBlocksAfterGenesis(t *testing.T) {
 			},
 			err: errBlockDigestMismatch,
 		},
+		{
+			name: "node ID with both short and long ID",
+			md:   validMD,
+			mutateBlock: func(block *StateMachineBlock) {
+				members := block.Metadata.SimplexEpochInfo.BlockValidationDescriptor.AggregatedMembership.Members
+				members[0].NodeID.LongID = [32]byte{1}
+			},
+			err: errNodeIDWithShortAndLongID,
+		},
+		{
+			name: "node ID with both empty short and long ID",
+			md:   validMD,
+			mutateBlock: func(block *StateMachineBlock) {
+				members := block.Metadata.SimplexEpochInfo.BlockValidationDescriptor.AggregatedMembership.Members
+				members[0].NodeID.ShortID = [20]byte{}
+			},
+			err: errNodeIDWithEmptyShortAndLongID,
+		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			sm1, _ := newStateMachine(t)

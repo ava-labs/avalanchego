@@ -23,7 +23,6 @@ go_library(
         "//graft/simplex/nonvalidator",
         "//graft/simplex/simplex",
         "//graft/simplex/wal",
-        "//ids",
         "@org_uber_go_zap//:zap",
     ],
 )
