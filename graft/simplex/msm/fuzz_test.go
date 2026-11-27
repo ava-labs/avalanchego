@@ -159,14 +159,14 @@ func buildEpochChain(tb testing.TB, logger common.Logger) ([]*StateMachineBlock,
 	node3 := [20]byte{3}
 
 	validatorSet1 := NodeBLSMappings{
-		{NodeID: NodeID{ShortID: node1}, BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NodeID{ShortID: node2}, BLSKey: []byte{2}, Weight: 1},
-		{NodeID: NodeID{ShortID: node3}, BLSKey: []byte{3}, Weight: 1},
+		{NodeID: EncodedNodeID{ShortID: node1}, BLSKey: []byte{1}, Weight: 1},
+		{NodeID: EncodedNodeID{ShortID: node2}, BLSKey: []byte{2}, Weight: 1},
+		{NodeID: EncodedNodeID{ShortID: node3}, BLSKey: []byte{3}, Weight: 1},
 	}
 	validatorSet2 := NodeBLSMappings{
-		{NodeID: NodeID{ShortID: node1}, BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NodeID{ShortID: node2}, BLSKey: []byte{4}, Weight: 1},
-		{NodeID: NodeID{ShortID: node3}, BLSKey: []byte{5}, Weight: 1},
+		{NodeID: EncodedNodeID{ShortID: node1}, BLSKey: []byte{1}, Weight: 1},
+		{NodeID: EncodedNodeID{ShortID: node2}, BLSKey: []byte{4}, Weight: 1},
+		{NodeID: EncodedNodeID{ShortID: node3}, BLSKey: []byte{5}, Weight: 1},
 	}
 
 	pChainHeight1 := uint64(100)

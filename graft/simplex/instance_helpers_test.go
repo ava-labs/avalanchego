@@ -946,7 +946,7 @@ func newNodeMapping(id int) metadata.NodeBLSMapping {
 	avaID := [20]byte{byte(id)}
 
 	return metadata.NodeBLSMapping{
-		NodeID: metadata.NodeID{ShortID: avaID},
+		NodeID: metadata.EncodedNodeID{ShortID: avaID},
 		BLSKey: []byte{avaID[0], byte(id + 1)},
 		Weight: 1,
 	}

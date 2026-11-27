@@ -61,8 +61,8 @@ func sealingBlock(epoch, seq uint64, members []metadata.NodeBLSMapping) metadata
 
 func testValidatorSet() metadata.NodeBLSMappings {
 	return metadata.NodeBLSMappings{
-		{NodeID: metadata.NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), BLSKey: []byte{1, 2}, Weight: 1},
-		{NodeID: metadata.NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), BLSKey: []byte{3, 4}, Weight: 2},
+		{NodeID: metadata.NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), BLSKey: []byte{1, 2}, Weight: 1},
+		{NodeID: metadata.NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{2}}), BLSKey: []byte{3, 4}, Weight: 2},
 	}
 }
 

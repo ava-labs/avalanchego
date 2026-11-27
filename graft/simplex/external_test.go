@@ -125,8 +125,8 @@ func TestParsedBlockVerifyRejectsNodeIDWithShortAndLongID(t *testing.T) {
 					BlockValidationDescriptor: &metadata.BlockValidationDescriptor{
 						AggregatedMembership: metadata.AggregatedMembership{
 							Members: []metadata.NodeBLSMapping{
-								{NodeID: metadata.NodeID{ShortID: ids.ShortID{1}}, Weight: 1},
-								{NodeID: metadata.NodeID{ShortID: ids.ShortID{2}, LongID: [32]byte{2}}, Weight: 1},
+								{NodeID: metadata.EncodedNodeID{ShortID: ids.ShortID{1}}, Weight: 1},
+								{NodeID: metadata.EncodedNodeID{ShortID: ids.ShortID{2}, LongID: [32]byte{2}}, Weight: 1},
 							},
 						},
 					},

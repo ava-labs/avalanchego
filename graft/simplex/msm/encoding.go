@@ -195,9 +195,9 @@ func (smm *StateMachineMetadata) NextState() state {
 }
 
 type NodeBLSMapping struct {
-	NodeID NodeID `canoto:"value,1"`
-	BLSKey []byte `canoto:"bytes,2"`
-	Weight uint64 `canoto:"uint,3"`
+	NodeID EncodedNodeID `canoto:"value,1"`
+	BLSKey []byte        `canoto:"bytes,2"`
+	Weight uint64        `canoto:"uint,3"`
 
 	canotoData canotoData_NodeBLSMapping
 }
@@ -463,23 +463,23 @@ func (ai *AuxiliaryInfoBatch) Equal(a *AuxiliaryInfoBatch) bool {
 	return true
 }
 
-type NodeID struct {
+type EncodedNodeID struct {
 	ShortID ids.ShortID `canoto:"fixed bytes,1"`
 	LongID  [32]byte    `canoto:"fixed bytes,2"`
 
-	canotoData canotoData_NodeID
+	canotoData canotoData_EncodedNodeID
 }
 
-// NewNodeID converts a [common.NodeID] to its serializable form.
-func NewNodeID(nodeID common.NodeID) NodeID {
-	return NodeID{
+// NewEncodedNodeID converts a [common.NodeID] to its serializable form.
+func NewEncodedNodeID(nodeID common.NodeID) EncodedNodeID {
+	return EncodedNodeID{
 		ShortID: nodeID.ShortID,
 		LongID:  nodeID.LongID,
 	}
 }
 
 // ToNodeID converts the serializable form back to a [common.NodeID].
-func (nodeID *NodeID) ToNodeID() common.NodeID {
+func (nodeID *EncodedNodeID) ToNodeID() common.NodeID {
 	return common.NodeID{
 		ShortID: nodeID.ShortID,
 		LongID:  nodeID.LongID,
@@ -488,18 +488,18 @@ func (nodeID *NodeID) ToNodeID() common.NodeID {
 
 // Equals returns whether both IDs hold the same ShortID and LongID.
 // It must be used instead of == because == also compares the cached serialization data.
-func (nodeID *NodeID) Equals(other NodeID) bool {
+func (nodeID *EncodedNodeID) Equals(other EncodedNodeID) bool {
 	return nodeID.ShortID == other.ShortID && nodeID.LongID == other.LongID
 }
 
 // Compare orders by LongID first and then by ShortID, like [common.NodeID.Compare].
-func (nodeID *NodeID) Compare(other NodeID) int {
+func (nodeID *EncodedNodeID) Compare(other EncodedNodeID) int {
 	return nodeID.ToNodeID().Compare(other.ToNodeID())
 }
 
-// Clone returns a copy of the NodeID without the cached serialization data.
-func (nodeID *NodeID) Clone() NodeID {
-	return NodeID{
+// Clone returns a copy of the EncodedNodeID without the cached serialization data.
+func (nodeID *EncodedNodeID) Clone() EncodedNodeID {
+	return EncodedNodeID{
 		ShortID: nodeID.ShortID,
 		LongID:  nodeID.LongID,
 	}

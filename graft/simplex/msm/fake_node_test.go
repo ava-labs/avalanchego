@@ -23,12 +23,12 @@ var emptyAuxInfoDigest common.Digest
 func TestFakeNodeEpochChangesDespiteEmptyMempool(t *testing.T) {
 	validatorSetRetriever := validatorSetRetriever{
 		resultMap: map[uint64]NodeBLSMappings{
-			0:   {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}},
-			100: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}},
-			200: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: NodeID{ShortID: [20]byte{2}}},
-				{BLSKey: []byte{3}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{3}}}},
-			300: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: NodeID{ShortID: [20]byte{2}}},
-				{BLSKey: []byte{3}, Weight: 3, NodeID: NodeID{ShortID: [20]byte{3}}}, {BLSKey: []byte{4}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{4}}}},
+			0:   {{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{2}}}},
+			100: {{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{2}}}},
+			200: {{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: EncodedNodeID{ShortID: [20]byte{2}}},
+				{BLSKey: []byte{3}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{3}}}},
+			300: {{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: EncodedNodeID{ShortID: [20]byte{2}}},
+				{BLSKey: []byte{3}, Weight: 3, NodeID: EncodedNodeID{ShortID: [20]byte{3}}}, {BLSKey: []byte{4}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{4}}}},
 		},
 	}
 
@@ -78,12 +78,12 @@ func TestFakeNodeEpochChangesDespiteEmptyMempool(t *testing.T) {
 func TestFakeNode(t *testing.T) {
 	validatorSetRetriever := validatorSetRetriever{
 		resultMap: map[uint64]NodeBLSMappings{
-			0:   {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}},
-			100: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}},
-			200: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: NodeID{ShortID: [20]byte{2}}},
-				{BLSKey: []byte{3}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{3}}}},
-			300: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: NodeID{ShortID: [20]byte{2}}},
-				{BLSKey: []byte{3}, Weight: 3, NodeID: NodeID{ShortID: [20]byte{3}}}, {BLSKey: []byte{4}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{4}}}},
+			0:   {{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{2}}}},
+			100: {{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{2}}}},
+			200: {{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: EncodedNodeID{ShortID: [20]byte{2}}},
+				{BLSKey: []byte{3}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{3}}}},
+			300: {{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: EncodedNodeID{ShortID: [20]byte{2}}},
+				{BLSKey: []byte{3}, Weight: 3, NodeID: EncodedNodeID{ShortID: [20]byte{3}}}, {BLSKey: []byte{4}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{4}}}},
 		},
 	}
 
@@ -143,12 +143,12 @@ func TestFakeNode(t *testing.T) {
 func TestFakeNodeEmptyMempool(t *testing.T) {
 	validatorSetRetriever := validatorSetRetriever{
 		resultMap: map[uint64]NodeBLSMappings{
-			0:   {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}},
-			100: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}},
-			200: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: NodeID{ShortID: [20]byte{2}}},
-				{BLSKey: []byte{3}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{3}}}},
-			300: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: NodeID{ShortID: [20]byte{2}}},
-				{BLSKey: []byte{3}, Weight: 3, NodeID: NodeID{ShortID: [20]byte{3}}}, {BLSKey: []byte{4}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{4}}}},
+			0:   {{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{2}}}},
+			100: {{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{2}}}},
+			200: {{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: EncodedNodeID{ShortID: [20]byte{2}}},
+				{BLSKey: []byte{3}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{3}}}},
+			300: {{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: EncodedNodeID{ShortID: [20]byte{2}}},
+				{BLSKey: []byte{3}, Weight: 3, NodeID: EncodedNodeID{ShortID: [20]byte{3}}}, {BLSKey: []byte{4}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{4}}}},
 		},
 	}
 

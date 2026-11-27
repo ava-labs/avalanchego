@@ -23,7 +23,7 @@ func makeValidators(n int) NodeBLSMappings {
 	vdrs := make(NodeBLSMappings, n)
 	for i := 0; i < n; i++ {
 		vdrs[i] = NodeBLSMapping{
-			NodeID: NewNodeID(makeNodeID(byte(i + 1))),
+			NodeID: NewEncodedNodeID(makeNodeID(byte(i + 1))),
 			BLSKey: []byte{byte(i + 1)},
 			Weight: 1,
 		}

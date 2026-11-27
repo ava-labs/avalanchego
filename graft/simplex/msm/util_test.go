@@ -388,8 +388,8 @@ func newStateMachineWithLogger(tb testing.TB, logger common.Logger) (*StateMachi
 
 	smConfig := Config{
 		GenesisValidatorSet: NodeBLSMappings{
-			{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}},
-			{BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}},
+			{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}},
+			{BLSKey: []byte{2}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{2}}},
 		},
 		LastNonSimplexBlockPChainHeight: 100,
 		GetTime:                         time.Now,

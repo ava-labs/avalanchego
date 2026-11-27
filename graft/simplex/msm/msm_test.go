@@ -582,14 +582,14 @@ func TestMSMFullEpochLifecycle(t *testing.T) {
 	node3 := [20]byte{3}
 
 	validatorSet1 := NodeBLSMappings{
-		{NodeID: NodeID{ShortID: node1}, BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NodeID{ShortID: node2}, BLSKey: []byte{2}, Weight: 1},
-		{NodeID: NodeID{ShortID: node3}, BLSKey: []byte{3}, Weight: 1},
+		{NodeID: EncodedNodeID{ShortID: node1}, BLSKey: []byte{1}, Weight: 1},
+		{NodeID: EncodedNodeID{ShortID: node2}, BLSKey: []byte{2}, Weight: 1},
+		{NodeID: EncodedNodeID{ShortID: node3}, BLSKey: []byte{3}, Weight: 1},
 	}
 	validatorSet2 := NodeBLSMappings{
-		{NodeID: NodeID{ShortID: node1}, BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NodeID{ShortID: node2}, BLSKey: []byte{4}, Weight: 1},
-		{NodeID: NodeID{ShortID: node3}, BLSKey: []byte{5}, Weight: 1},
+		{NodeID: EncodedNodeID{ShortID: node1}, BLSKey: []byte{1}, Weight: 1},
+		{NodeID: EncodedNodeID{ShortID: node2}, BLSKey: []byte{4}, Weight: 1},
+		{NodeID: EncodedNodeID{ShortID: node3}, BLSKey: []byte{5}, Weight: 1},
 	}
 
 	pChainHeight1 := uint64(100)
@@ -1280,8 +1280,8 @@ func TestVerifyDoesNotInitializeApprovalStore(t *testing.T) {
 	const simplexStartHeight, chainEndHeight = 5, 10
 	newPChainHeight := uint64(200)
 
-	currentSet := NodeBLSMappings{{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}}
-	newSet := NodeBLSMappings{{BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}, {BLSKey: []byte{3}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{3}}}}
+	currentSet := NodeBLSMappings{{BLSKey: []byte{1}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{2}}}}
+	newSet := NodeBLSMappings{{BLSKey: []byte{2}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{2}}}, {BLSKey: []byte{3}, Weight: 1, NodeID: EncodedNodeID{ShortID: [20]byte{3}}}}
 
 	sm, tc := newStateMachine(t)
 	sm.AuxiliaryInfoApp = &noopTestAuxInfoApp{}
@@ -1755,9 +1755,9 @@ func TestBuildBlockCollectingApprovalsDedupsOwnApprovalAcrossRounds(t *testing.T
 	// Place MyNodeID at index 0 of a 3-node validator set so quorum is not
 	// reachable from a single approval (canSeal stays false on both rounds).
 	validators := NodeBLSMappings{
-		{NodeID: NewNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
-		{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
+		{NodeID: NewEncodedNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
+		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
+		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
 	}
 	tc.validatorSetRetriever.result = validators
 
@@ -1934,9 +1934,9 @@ func TestCollectingApprovalsAuxInfoGating(t *testing.T) {
 
 	// A 3-node validator set including MyNodeID at index 0
 	validators := NodeBLSMappings{
-		{NodeID: NewNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
-		{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
+		{NodeID: NewEncodedNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
+		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
+		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
 	}
 	tc.validatorSetRetriever.result = validators
 
@@ -2049,9 +2049,9 @@ func TestVerifyCollectingApprovalsRejectsIllegalAuxInfoBatch(t *testing.T) {
 	sm.GetPChainHeightForVerifying = func() uint64 { return nextPChainRefHeight }
 
 	validators := NodeBLSMappings{
-		{NodeID: NewNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
-		{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
+		{NodeID: NewEncodedNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
+		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
+		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
 	}
 	tc.validatorSetRetriever.result = validators
 
@@ -2130,9 +2130,9 @@ func TestCollectingApprovalsAuxInfoVersionIDIsBackwardCompatible(t *testing.T) {
 	sm.AuxiliaryInfoApp = app
 
 	validators := NodeBLSMappings{
-		{NodeID: NewNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
-		{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
+		{NodeID: NewEncodedNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
+		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
+		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
 	}
 	tc.validatorSetRetriever.result = validators
 
@@ -2214,9 +2214,9 @@ func TestCollectingApprovalsIncludesMultipleAuxInfoMessages(t *testing.T) {
 	sm.AuxiliaryInfoApp = &voteCountingAuxInfoApp{threshold: 10}
 
 	validators := NodeBLSMappings{
-		{NodeID: NewNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
-		{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
+		{NodeID: NewEncodedNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
+		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
+		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
 	}
 	tc.validatorSetRetriever.result = validators
 

@@ -171,7 +171,7 @@ func (t *TestSignatureAggregator) AboveByzantineThreshold(signers []common.NodeI
 }
 
 // wireNodeID is the serializable form of a [common.NodeID].
-// It cannot be [metadata.NodeID] because msm tests import this package.
+// It cannot be [metadata.EncodedNodeID] because msm tests import this package.
 type wireNodeID struct {
 	ShortID [20]byte `canoto:"fixed bytes,1"`
 	LongID  [32]byte `canoto:"fixed bytes,2"`

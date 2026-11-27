@@ -114,7 +114,7 @@ func newTransitionBlock(t *testing.T, nextPChainRef uint64) *ParsedBlock {
 
 func TestTransitionNotInValidatorSet(t *testing.T) {
 	// the next validator set does not contain our node
-	otherValidator := metadata.NodeBLSMappings{{NodeID: metadata.NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 1}}
+	otherValidator := metadata.NodeBLSMappings{{NodeID: metadata.NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 1}}
 	auxApp := &stubAuxInfoApp{sufficient: false, generated: []byte("more aux info")}
 	env := newListenerTestEnv(t, otherValidator, auxApp)
 
@@ -130,7 +130,7 @@ func TestTransitionNotInValidatorSet(t *testing.T) {
 func TestTransitionNotEnoughAuxiliary(t *testing.T) {
 	peer1 := common.NodeID{ShortID: ids.ShortID{2}}
 	peer2 := common.NodeID{ShortID: ids.ShortID{3}}
-	validatorSet := metadata.NodeBLSMappings{{NodeID: metadata.NewNodeID(testNodeID), Weight: 1}, {NodeID: metadata.NewNodeID(peer1), Weight: 1}, {NodeID: metadata.NewNodeID(peer2), Weight: 1}}
+	validatorSet := metadata.NodeBLSMappings{{NodeID: metadata.NewEncodedNodeID(testNodeID), Weight: 1}, {NodeID: metadata.NewEncodedNodeID(peer1), Weight: 1}, {NodeID: metadata.NewEncodedNodeID(peer2), Weight: 1}}
 	auxApp := &stubAuxInfoApp{sufficient: false, generated: []byte("more aux info")}
 	env := newListenerTestEnv(t, validatorSet, auxApp)
 
@@ -154,7 +154,7 @@ func TestTransitionSendsApproval(t *testing.T) {
 	const nextPChainRef = uint64(100)
 
 	peer := common.NodeID{ShortID: ids.ShortID{2}}
-	validatorSet := metadata.NodeBLSMappings{{NodeID: metadata.NewNodeID(testNodeID), Weight: 1}, {NodeID: metadata.NewNodeID(peer), Weight: 1}}
+	validatorSet := metadata.NodeBLSMappings{{NodeID: metadata.NewEncodedNodeID(testNodeID), Weight: 1}, {NodeID: metadata.NewEncodedNodeID(peer), Weight: 1}}
 	env := newListenerTestEnv(t, validatorSet, &stubAuxInfoApp{sufficient: true})
 
 	block := newTransitionBlock(t, nextPChainRef)
@@ -183,7 +183,7 @@ func TestTransitionSendsApproval(t *testing.T) {
 // transition, exactly like a validator does. Non-validators pass a nil handleApproval, so
 // nothing is recorded locally, but the auxiliary info is still sent.
 func TestNonValidatorContributesAuxiliaryInfo(t *testing.T) {
-	validatorSet := metadata.NodeBLSMappings{{NodeID: metadata.NewNodeID(testNodeID), Weight: 1}, {NodeID: metadata.NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 1}}
+	validatorSet := metadata.NodeBLSMappings{{NodeID: metadata.NewEncodedNodeID(testNodeID), Weight: 1}, {NodeID: metadata.NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 1}}
 	auxApp := &stubAuxInfoApp{sufficient: false, generated: []byte("non-validator aux")}
 	env := newListenerTestEnv(t, validatorSet, auxApp)
 
@@ -205,7 +205,7 @@ func TestNonValidatorContributesAuxiliaryInfo(t *testing.T) {
 func TestNonValidatorContributesApproval(t *testing.T) {
 	const nextPChainRef = uint64(100)
 
-	validatorSet := metadata.NodeBLSMappings{{NodeID: metadata.NewNodeID(testNodeID), Weight: 1}, {NodeID: metadata.NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 1}}
+	validatorSet := metadata.NodeBLSMappings{{NodeID: metadata.NewEncodedNodeID(testNodeID), Weight: 1}, {NodeID: metadata.NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 1}}
 	env := newListenerTestEnv(t, validatorSet, &stubAuxInfoApp{sufficient: true})
 
 	block := newTransitionBlock(t, nextPChainRef)

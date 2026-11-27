@@ -104,14 +104,14 @@ func TestSimplexEpochInfoEqual(t *testing.T) {
 			a: &SimplexEpochInfo{
 				BlockValidationDescriptor: &BlockValidationDescriptor{
 					AggregatedMembership: AggregatedMembership{
-						Members: []NodeBLSMapping{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
+						Members: []NodeBLSMapping{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
 					},
 				},
 			},
 			b: &SimplexEpochInfo{
 				BlockValidationDescriptor: &BlockValidationDescriptor{
 					AggregatedMembership: AggregatedMembership{
-						Members: []NodeBLSMapping{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
+						Members: []NodeBLSMapping{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
 					},
 				},
 			},
@@ -122,14 +122,14 @@ func TestSimplexEpochInfoEqual(t *testing.T) {
 			a: &SimplexEpochInfo{
 				BlockValidationDescriptor: &BlockValidationDescriptor{
 					AggregatedMembership: AggregatedMembership{
-						Members: []NodeBLSMapping{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
+						Members: []NodeBLSMapping{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
 					},
 				},
 			},
 			b: &SimplexEpochInfo{
 				BlockValidationDescriptor: &BlockValidationDescriptor{
 					AggregatedMembership: AggregatedMembership{
-						Members: []NodeBLSMapping{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 20}},
+						Members: []NodeBLSMapping{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 20}},
 					},
 				},
 			},
@@ -177,14 +177,14 @@ func TestNodeBLSMappingEquals(t *testing.T) {
 		},
 		{
 			name:     "equal with values",
-			a:        NodeBLSMapping{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1, 2, 3}}), BLSKey: []byte{4, 5}, Weight: 100},
-			b:        NodeBLSMapping{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1, 2, 3}}), BLSKey: []byte{4, 5}, Weight: 100},
+			a:        NodeBLSMapping{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1, 2, 3}}), BLSKey: []byte{4, 5}, Weight: 100},
+			b:        NodeBLSMapping{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1, 2, 3}}), BLSKey: []byte{4, 5}, Weight: 100},
 			expected: true,
 		},
 		{
 			name:     "different NodeID",
-			a:        NodeBLSMapping{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}})},
-			b:        NodeBLSMapping{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{2}})},
+			a:        NodeBLSMapping{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}})},
+			b:        NodeBLSMapping{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{2}})},
 			expected: false,
 		},
 		{
@@ -233,12 +233,12 @@ func TestBlockValidationDescriptorEquals(t *testing.T) {
 			name: "equal members",
 			a: &BlockValidationDescriptor{
 				AggregatedMembership: AggregatedMembership{
-					Members: []NodeBLSMapping{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
+					Members: []NodeBLSMapping{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
 				},
 			},
 			b: &BlockValidationDescriptor{
 				AggregatedMembership: AggregatedMembership{
-					Members: []NodeBLSMapping{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
+					Members: []NodeBLSMapping{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
 				},
 			},
 			expected: true,
@@ -247,12 +247,12 @@ func TestBlockValidationDescriptorEquals(t *testing.T) {
 			name: "different members",
 			a: &BlockValidationDescriptor{
 				AggregatedMembership: AggregatedMembership{
-					Members: []NodeBLSMapping{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
+					Members: []NodeBLSMapping{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
 				},
 			},
 			b: &BlockValidationDescriptor{
 				AggregatedMembership: AggregatedMembership{
-					Members: []NodeBLSMapping{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 20}},
+					Members: []NodeBLSMapping{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 20}},
 				},
 			},
 			expected: false,
@@ -284,14 +284,14 @@ func TestAggregatedMembershipEquals(t *testing.T) {
 		},
 		{
 			name:     "equal",
-			members:  []NodeBLSMapping{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), BLSKey: []byte{2}, Weight: 3}},
-			other:    []NodeBLSMapping{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), BLSKey: []byte{2}, Weight: 3}},
+			members:  []NodeBLSMapping{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), BLSKey: []byte{2}, Weight: 3}},
+			other:    []NodeBLSMapping{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), BLSKey: []byte{2}, Weight: 3}},
 			expected: true,
 		},
 		{
 			name:     "different",
-			members:  []NodeBLSMapping{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}})}},
-			other:    []NodeBLSMapping{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{2}})}},
+			members:  []NodeBLSMapping{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}})}},
+			other:    []NodeBLSMapping{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{2}})}},
 			expected: false,
 		},
 	}
@@ -370,20 +370,20 @@ func TestNodeBLSMappingsCompare(t *testing.T) {
 		},
 		{
 			name:     "equal same order",
-			a:        NodeBLSMappings{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}, {NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 20}},
-			b:        NodeBLSMappings{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}, {NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 20}},
+			a:        NodeBLSMappings{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}, {NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 20}},
+			b:        NodeBLSMappings{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}, {NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 20}},
 			expected: true,
 		},
 		{
 			name:     "equal different order",
-			a:        NodeBLSMappings{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 20}, {NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
-			b:        NodeBLSMappings{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}, {NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 20}},
+			a:        NodeBLSMappings{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 20}, {NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
+			b:        NodeBLSMappings{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}, {NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 20}},
 			expected: true,
 		},
 		{
 			name:     "different values",
-			a:        NodeBLSMappings{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
-			b:        NodeBLSMappings{{NodeID: NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 99}},
+			a:        NodeBLSMappings{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 10}},
+			b:        NodeBLSMappings{{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{1}}), Weight: 99}},
 			expected: false,
 		},
 	}
