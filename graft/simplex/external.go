@@ -14,9 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	errNodeIDWithShortAndLongID = errors.New("node ID has both a short ID and a long ID")
-)
+var errNodeIDWithShortAndLongID = errors.New("node ID has both a short ID and a long ID")
 
 type ParsedBlock struct {
 	metadata.StateMachineBlock
