@@ -595,7 +595,7 @@ func TestReplicationStuckInProposingBlock(t *testing.T) {
 
 	tbb := testutil.NewTestBlockBuilder()
 	bb := testutil.NewTestControlledBlockBuilder(t)
-	bb.TestBlockBuilder = *tbb
+	bb.TestBlockBuilder = tbb
 	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
 	blocks := createBlocks(t, nodes, 5)
 
@@ -623,7 +623,7 @@ func TestReplicationStuckInProposingBlock(t *testing.T) {
 	require.NoError(t, e.Start())
 
 	bb.TriggerNewBlock()
-	notarizeAndFinalizeRoundWithMetadata(t, e, &bb.TestBlockBuilder, &blocks[0].Finalization.Finalization.ProtocolMetadata)
+	notarizeAndFinalizeRoundWithMetadata(t, e, bb.TestBlockBuilder, &blocks[0].Finalization.Finalization.ProtocolMetadata)
 
 	gb := storage.WaitForBlockCommit(0)
 	require.Equal(t, gb, blocks[0].VerifiedBlock.(*testutil.TestBlock))
@@ -643,14 +643,6 @@ func TestReplicationStuckInProposingBlock(t *testing.T) {
 		msg := <-sentMessages
 		if msg.ReplicationRequest != nil {
 			break
-		}
-	}
-
-	// Drain the block builder channels
-	for len(bb.BlockShouldBeBuilt) > 0 {
-		select {
-		case <-bb.BlockShouldBeBuilt:
-		default:
 		}
 	}
 
@@ -1428,13 +1420,10 @@ func TestReplicationChain(t *testing.T) {
 	}
 
 	// full nodes operate normally
-	fullNode1 := testutil.NewControlledSimplexNode(t, nodes[0], net, newNodeConfig(nodes[0]))
-	fullNode2 := testutil.NewControlledSimplexNode(t, nodes[1], net, newNodeConfig(nodes[1]))
-	fullNode1.Silence()
-	fullNode2.Silence()
+	testutil.NewControlledSimplexNode(t, nodes[0], net, newNodeConfig(nodes[0]))
+	testutil.NewControlledSimplexNode(t, nodes[1], net, newNodeConfig(nodes[1]))
 	// node 3 will not receive finalize votes & finalizations
 	blockFinalize3 := testutil.NewControlledSimplexNode(t, nodes[2], net, newNodeConfig(nodes[2]))
-	blockFinalize3.Silence()
 	// lagging node is disconnected initially. It initially receives only empty notarizations
 	// but then later receives notarizations and must send finalize votes for them
 	laggingNode := testutil.NewControlledSimplexNode(t, nodes[3], net, newNodeConfig(nodes[3]))
@@ -1478,6 +1467,7 @@ func TestReplicationChain(t *testing.T) {
 	leader := simplex.LeaderForRound(nodes, numNotarizations)
 	require.NotEqual(t, laggingNode.E.ID, leader)
 
+	// Keep only empty notarizations for the lagging node, so it can catch up on them first.
 	net.SetAllNodesMessageFilter(sendEmptyNotarizationQuorumRounds(emptyNotarizations))
 	net.Connect(laggingNode.E.ID)
 	net.TriggerLeaderBlockBuilder(numNotarizations)
@@ -1490,8 +1480,15 @@ func TestReplicationChain(t *testing.T) {
 	require.Equal(t, numNotarizations, laggingNode.E.Metadata().Round)
 	require.Equal(t, uint64(0), laggingNode.E.Metadata().Seq)
 
-	// nodes send a block but can't notarize so they time out
+	// Stop filtering in only empty notarizations, so the lagging node can catch up on notarizations too.
+	// but node 3 will still not receive finalize votes & finalizations.
 	net.SetAllNodesMessageFilter(allowFinalizeVotes)
+
+	// The other nodes notarize the leader's block, but the lagging node can't vote for it,
+	// as it is missing the block's ancestors.
+	// Make it time out on this round, so its empty vote prompts the other nodes to send it what it needs to replicate them.
+	// The round is given explicitly, as a replication response may have already advanced the lagging node past it.
+	laggingNode.BlockShouldBeBuiltInRound(numNotarizations)
 
 	for _, n := range net.Instances {
 		// the message filter blocks finalizations for blockFinalize3
@@ -1513,14 +1510,14 @@ func TestReplicationChain(t *testing.T) {
 
 	// Sanity check that blockFinalize3 can also catch up once the filter is removed
 	net.SetAllNodesMessageFilter(testutil.AllowAllMessages)
-	for {
-		numBlocks := blockFinalize3.Storage.NumBlocks()
 
-		if numBlocks >= numNotarizations-missedNotarizations+1 {
-			break
-		}
-		net.AdvanceTime(simplex.DefaultReplicationRequestTimeout)
+	// Build a new block, so that its finalization reaches blockFinalize3 and makes it replicate the blocks it has not finalized.
+	// We let whichever node leads it build the block.
+	for _, n := range net.Instances {
+		n.TriggerNewBlock()
 	}
+
+	blockFinalize3.Storage.WaitForBlockCommit(numNotarizations - missedNotarizations)
 }
 
 // TestReplicationStartsRoundFromFinalization tests that a replicating node will start monitoring a round after it
@@ -1538,8 +1535,7 @@ func TestReplicationStartsRoundFromFinalization(t *testing.T) {
 		BroadcastMessages: broadcastMessages,
 	}, bb)
 	conf.ReplicationEnabled = true
-	e, err := simplex.NewEpoch(conf)
-	require.NoError(t, err)
+	e := testutil.NewEpoch(t, conf, bb)
 	t.Cleanup(e.Stop)
 	require.NoError(t, e.Start())
 
@@ -1622,9 +1618,7 @@ messages:
 				time.Duration(iteration) * simplex.DefaultEmptyVoteRebroadcastTimeout,
 			)
 			iteration++
-			if len(bb.BlockShouldBeBuilt) == 0 {
-				bb.BlockShouldBeBuilt <- struct{}{}
-			}
+			bb.TriggerBlockShouldBeBuilt()
 			e.AdvanceTime(newTime)
 		}
 	}
@@ -1648,8 +1642,7 @@ func TestReplicationStartsRoundFromFinalizationWithBlock(t *testing.T) {
 		BroadcastMessages: broadcastMessages,
 	}, bb)
 	conf.ReplicationEnabled = true
-	e, err := simplex.NewEpoch(conf)
-	require.NoError(t, err)
+	e := testutil.NewEpoch(t, conf, bb)
 	t.Cleanup(e.Stop)
 	require.NoError(t, e.Start())
 
@@ -1744,9 +1737,7 @@ messages:
 				time.Duration(iteration) * simplex.DefaultEmptyVoteRebroadcastTimeout,
 			)
 			iteration++
-			if len(bb.BlockShouldBeBuilt) == 0 {
-				bb.BlockShouldBeBuilt <- struct{}{}
-			}
+			bb.TriggerBlockShouldBeBuilt()
 			e.AdvanceTime(newTime)
 		}
 	}
@@ -2017,4 +2008,47 @@ func TestReplicationRedeliversRestoredFinalization(t *testing.T) {
 
 	require.NoError(t, e.HandleMessage(replicateSeq(blocks[1]), nodes[1]))
 	storage.WaitForBlockCommit(1)
+}
+
+// TestReplicationContinuesPastAlreadyNotarizedRound tests that a replicated round we have already notarized
+// does not prevent the node from processing the replicated rounds that follow it.
+func TestReplicationContinuesPastAlreadyNotarizedRound(t *testing.T) {
+	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	blocks := createBlocks(t, nodes, 2)
+	quorum := common.Quorum(len(nodes))
+
+	bb := testutil.NewTestBlockBuilder()
+	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), bb)
+	conf.ReplicationEnabled = true
+
+	e, err := simplex.NewEpoch(conf)
+	require.NoError(t, err)
+	t.Cleanup(e.Stop)
+	require.NoError(t, e.Start())
+
+	// Notarize round 0, which moves the node to round 1.
+	block0, notarization0 := advanceRound(t, e, bb, true, false, &blocks[0].Finalization.Finalization.ProtocolMetadata)
+	require.Equal(t, blocks[0].VerifiedBlock.BlockHeader().Digest, block0.BlockHeader().Digest)
+	require.Equal(t, uint64(1), e.Metadata().Round)
+
+	notarization1, err := testutil.NewNotarization(e.Logger, &testutil.TestSignatureAggregator{N: len(nodes)}, blocks[1].VerifiedBlock, nodes[:quorum])
+	require.NoError(t, err)
+	round1 := common.QuorumRound{
+		Block:        blocks[1].VerifiedBlock.(*testutil.TestBlock),
+		Notarization: &notarization1,
+	}
+
+	// Replicate round 0, which we have already notarized, together with round 1.
+	// Round 0 is processed first, and must not stop round 1 from being processed.
+	require.NoError(t, e.HandleMessage(&common.Message{
+		ReplicationResponse: &common.ReplicationResponse{
+			LatestRound: &round1,
+			Data: []common.QuorumRound{
+				{Block: block0.(*testutil.TestBlock), Notarization: notarization0},
+				round1,
+			},
+		},
+	}, nodes[1]))
+
+	testutil.WaitToEnterRoundWithTimeout(t, e, 2, testutil.DefaultTimeout)
 }

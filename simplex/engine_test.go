@@ -6,15 +6,18 @@ package simplex
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/ava-labs/avalanchego/utils"
@@ -34,9 +37,100 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 	ctx := t.Context()
 	engine, configs := setupEngine(t)
 
-	qcBytes := buildQCBytes(t, configs)
+	for _, msg := range allSimplexMessages(buildQCBytes(t, configs)) {
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
+	}
+}
 
-	allSimplexMessages := []*p2p.Simplex{
+// TestSimplexMessageRoundTrip tests that for every p2p message x:
+//
+//	encode(decode(x)) == x
+//
+// where decode converts a p2p message into a simplex message and encode
+// converts it back.
+func TestSimplexMessageRoundTrip(t *testing.T) {
+	configs := createSimplexEngineConfig(t, noKeyReuse)
+	// Parse the inner block into a block with the same bytes, so the block
+	// re-encodes to the same bytes.
+	configs[0].VM.(*wrappedVM).ParseBlockF = func(_ context.Context, bytes []byte) (snowman.Block, error) {
+		return &snowmantest.Block{BytesV: bytes}, nil
+	}
+	engine, err := NewEngine(t.Context(), configs[0])
+	require.NoError(t, err)
+
+	chainID := ids.GenerateTestID()
+	for _, msg := range allSimplexMessages(buildQCBytes(t, configs)) {
+		t.Run(fmt.Sprintf("%T", msg.GetMessage()), func(t *testing.T) {
+			decoded, err := engine.p2pToSimplexMessage(t.Context(), msg)
+			require.NoError(t, err)
+
+			// We receive blocks, but we send verified blocks.
+			encoded, err := simplexMessageToP2P(chainID, toVerifiedMessage(t, decoded))
+			require.NoError(t, err)
+
+			// The chain ID isn't part of the simplex message, so encode uses its own.
+			expected := proto.Clone(msg).(*p2p.Simplex)
+			expected.ChainId = chainID[:]
+			require.True(t, proto.Equal(expected, encoded), "expected %v, got %v", expected, encoded)
+		})
+	}
+}
+
+// toVerifiedMessage converts a received message into the message we would
+// send, which carries verified blocks instead of blocks.
+func toVerifiedMessage(t *testing.T, msg *simplexcommon.Message) *simplexcommon.Message {
+	switch {
+	case msg.BlockMessage != nil:
+		return &simplexcommon.Message{
+			VerifiedBlockMessage: &simplexcommon.VerifiedBlockMessage{
+				VerifiedBlock: toVerifiedBlock(t, msg.BlockMessage.Block),
+				Vote:          msg.BlockMessage.Vote,
+			},
+		}
+	case msg.ReplicationResponse != nil:
+		resp := msg.ReplicationResponse
+		data := make([]simplexcommon.VerifiedQuorumRound, len(resp.Data))
+		for i := range resp.Data {
+			data[i] = *toVerifiedQuorumRound(t, &resp.Data[i])
+		}
+		return &simplexcommon.Message{
+			VerifiedReplicationResponse: &simplexcommon.VerifiedReplicationResponse{
+				Data:               data,
+				LatestRound:        toVerifiedQuorumRound(t, resp.LatestRound),
+				LatestFinalizedSeq: toVerifiedQuorumRound(t, resp.LatestSeq),
+			},
+		}
+	default:
+		return msg
+	}
+}
+
+// toVerifiedQuorumRound returns nil if [qr] is nil.
+func toVerifiedQuorumRound(t *testing.T, qr *simplexcommon.QuorumRound) *simplexcommon.VerifiedQuorumRound {
+	if qr == nil {
+		return nil
+	}
+	return &simplexcommon.VerifiedQuorumRound{
+		VerifiedBlock:     toVerifiedBlock(t, qr.Block),
+		Notarization:      qr.Notarization,
+		Finalization:      qr.Finalization,
+		EmptyNotarization: qr.EmptyNotarization,
+	}
+}
+
+// toVerifiedBlock returns nil if [block] is nil.
+func toVerifiedBlock(t *testing.T, block simplexcommon.Block) simplexcommon.VerifiedBlock {
+	if block == nil {
+		return nil
+	}
+	verifiedBlock, ok := block.(simplexcommon.VerifiedBlock)
+	require.True(t, ok)
+	return verifiedBlock
+}
+
+// allSimplexMessages returns a message of every simplex message type.
+func allSimplexMessages(qcBytes []byte) []*p2p.Simplex {
+	return []*p2p.Simplex{
 		simplexBlockProposal,
 		simplexVote,
 		simplexEmptyVote,
@@ -46,10 +140,9 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 		NewFinalizationMessage(qcBytes),
 		simplexReplicationRequest,
 		NewReplicationResponseMessage(qcBytes),
-	}
-
-	for _, msg := range allSimplexMessages {
-		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
+		simplexBlockDigestRequest,
+		simplexAuxiliaryInfo,
+		simplexEpochTransitionApproval,
 	}
 }
 
@@ -356,13 +449,13 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 		},
 		// --- ReplicationResponse ---
 		{
-			name: "ReplicationResponse with nil latest_round",
+			name: "ReplicationResponse with nil latest_round and nil latest_seq (allowed)",
 			msg: &p2p.Simplex{
 				Message: &p2p.Simplex_ReplicationResponse{
 					ReplicationResponse: &p2p.ReplicationResponse{},
 				},
 			},
-			expectedErr: errNilField,
+			expectedErr: nil,
 		},
 		// --- Edge case: invalid digest ---
 		{
@@ -397,6 +490,154 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 				},
 			},
 			expectedErr: errInvalidSigner,
+		},
+		// --- ReplicationResponse fields ---
+		{
+			name: "ReplicationResponse with nil data entry",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_ReplicationResponse{
+					ReplicationResponse: &p2p.ReplicationResponse{
+						Data: []*p2p.QuorumRound{nil},
+					},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		{
+			name: "ReplicationResponse with malformed latest_round",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_ReplicationResponse{
+					ReplicationResponse: &p2p.ReplicationResponse{
+						LatestRound: &p2p.QuorumRound{
+							Notarization: &p2p.QuorumCertificate{},
+						},
+					},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		{
+			name: "ReplicationResponse with malformed latest_seq",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_ReplicationResponse{
+					ReplicationResponse: &p2p.ReplicationResponse{
+						LatestSeq: &p2p.QuorumRound{
+							Finalization: &p2p.QuorumCertificate{},
+						},
+					},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		{
+			name: "ReplicationResponse with latest_seq invalid digest",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_ReplicationResponse{
+					ReplicationResponse: &p2p.ReplicationResponse{
+						LatestSeq: &p2p.QuorumRound{
+							Finalization: &p2p.QuorumCertificate{
+								BlockHeader: &p2p.BlockHeader{
+									Metadata: p2pProtocolMetadata,
+									Digest:   []byte{1, 2, 3},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErr: errInvalidDigestLength,
+		},
+		// --- BlockDigestRequest ---
+		{
+			name: "BlockDigestRequest with missing digest",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_BlockDigestRequest{
+					BlockDigestRequest: &p2p.BlockDigestRequest{Seq: 1},
+				},
+			},
+			expectedErr: errInvalidDigestLength,
+		},
+		{
+			name: "BlockDigestRequest with invalid digest length(too short)",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_BlockDigestRequest{
+					BlockDigestRequest: &p2p.BlockDigestRequest{
+						Seq:    1,
+						Digest: digest[:31],
+					},
+				},
+			},
+			expectedErr: errInvalidDigestLength,
+		},
+		{
+			name: "BlockDigestRequest with invalid digest length(too long)",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_BlockDigestRequest{
+					BlockDigestRequest: &p2p.BlockDigestRequest{
+						Seq:    1,
+						Digest: append(digest[:], byte(1), byte(2)),
+					},
+				},
+			},
+			expectedErr: errInvalidDigestLength,
+		},
+		// --- AuxiliaryInfo ---
+		{
+			name: "AuxiliaryInfo with no data (allowed)",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_AuxiliaryInfo{
+					AuxiliaryInfo: &p2p.AuxiliaryInfo{},
+				},
+			},
+			expectedErr: nil,
+		},
+		// --- EpochTransitionApproval ---
+		{
+			name: "EpochTransitionApproval with missing node ID",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_EpochTransitionApproval{
+					EpochTransitionApproval: &p2p.ValidatorSetApproval{
+						AuxInfoDigest: digest[:],
+					},
+				},
+			},
+			expectedErr: errInvalidSigner,
+		},
+		{
+			name: "EpochTransitionApproval with invalid node ID",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_EpochTransitionApproval{
+					EpochTransitionApproval: &p2p.ValidatorSetApproval{
+						NodeId:        []byte{1, 2, 3},
+						AuxInfoDigest: digest[:],
+					},
+				},
+			},
+			expectedErr: errInvalidSigner,
+		},
+		{
+			name: "EpochTransitionApproval with invalid aux info digest",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_EpochTransitionApproval{
+					EpochTransitionApproval: &p2p.ValidatorSetApproval{
+						NodeId:        signer,
+						AuxInfoDigest: []byte{1, 2, 3},
+					},
+				},
+			},
+			expectedErr: errInvalidDigestLength,
+		},
+		{
+			name: "EpochTransitionApproval with no signature (allowed)",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_EpochTransitionApproval{
+					EpochTransitionApproval: &p2p.ValidatorSetApproval{
+						NodeId:        signer,
+						AuxInfoDigest: digest[:],
+					},
+				},
+			},
+			expectedErr: nil,
 		},
 	}
 
@@ -510,8 +751,46 @@ var (
 		ChainId: []byte("chain-1"),
 		Message: &p2p.Simplex_ReplicationRequest{
 			ReplicationRequest: &p2p.ReplicationRequest{
-				Seqs:        []uint64{1, 2, 3},
-				LatestRound: 42,
+				Seqs:               []uint64{1, 2, 3},
+				LatestRound:        42,
+				Rounds:             []uint64{4, 5},
+				LatestFinalizedSeq: 3,
+			},
+		},
+	}
+
+	// BlockDigestRequest
+	simplexBlockDigestRequest = &p2p.Simplex{
+		ChainId: []byte("chain-1"),
+		Message: &p2p.Simplex_BlockDigestRequest{
+			BlockDigestRequest: &p2p.BlockDigestRequest{
+				Seq:    1,
+				Digest: digest[:],
+			},
+		},
+	}
+
+	// AuxiliaryInfo
+	simplexAuxiliaryInfo = &p2p.Simplex{
+		ChainId: []byte("chain-1"),
+		Message: &p2p.Simplex_AuxiliaryInfo{
+			AuxiliaryInfo: &p2p.AuxiliaryInfo{
+				Epoch:   1,
+				Version: 1,
+				Data:    []byte("aux-info"),
+			},
+		},
+	}
+
+	// EpochTransitionApproval
+	simplexEpochTransitionApproval = &p2p.Simplex{
+		ChainId: []byte("chain-1"),
+		Message: &p2p.Simplex_EpochTransitionApproval{
+			EpochTransitionApproval: &p2p.ValidatorSetApproval{
+				NodeId:        signer,
+				AuxInfoDigest: digest[:],
+				PChainHeight:  1,
+				Signature:     []byte("approval-sig"),
 			},
 		},
 	}
@@ -620,6 +899,7 @@ func NewReplicationResponseMessage(qcBytes []byte) *p2p.Simplex {
 					},
 				},
 				LatestRound: &p2p.QuorumRound{Block: blockBytes},
+				LatestSeq:   &p2p.QuorumRound{Block: blockBytes},
 			},
 		},
 	}
@@ -756,15 +1036,17 @@ func FuzzSimplexFinalizations(f *testing.F) {
 }
 
 func FuzzSimplexReplicationRequests(f *testing.F) {
-	f.Fuzz(func(t *testing.T, seq1, seq2, seq3, latestRound uint64) {
+	f.Fuzz(func(t *testing.T, seq1, seq2, seq3, latestRound, round1, round2, latestFinalizedSeq uint64) {
 		ctx := t.Context()
 		engine, configs := setupEngineForFuzz(t)
 
 		msg := &p2p.Simplex{
 			Message: &p2p.Simplex_ReplicationRequest{
 				ReplicationRequest: &p2p.ReplicationRequest{
-					Seqs:        []uint64{seq1, seq2, seq3},
-					LatestRound: latestRound,
+					Seqs:               []uint64{seq1, seq2, seq3},
+					LatestRound:        latestRound,
+					Rounds:             []uint64{round1, round2},
+					LatestFinalizedSeq: latestFinalizedSeq,
 				},
 			},
 		}
@@ -780,6 +1062,16 @@ func FuzzSimplexReplicationResponses(f *testing.F) {
 		ctx := t.Context()
 		engine, configs := setupEngineForFuzz(t)
 
+		blockHeader := &p2p.BlockHeader{
+			Metadata: &p2p.ProtocolMetadata{
+				Version: version,
+				Epoch:   epoch,
+				Round:   round,
+				Seq:     seq,
+				Prev:    blockDigest,
+			},
+			Digest: blockDigest,
+		}
 		msg := &p2p.Simplex{
 			Message: &p2p.Simplex_ReplicationResponse{
 				ReplicationResponse: &p2p.ReplicationResponse{
@@ -787,21 +1079,19 @@ func FuzzSimplexReplicationResponses(f *testing.F) {
 						{
 							Block: blockBytes,
 							Notarization: &p2p.QuorumCertificate{
-								BlockHeader: &p2p.BlockHeader{
-									Metadata: &p2p.ProtocolMetadata{
-										Version: version,
-										Epoch:   epoch,
-										Round:   round,
-										Seq:     seq,
-										Prev:    blockDigest,
-									},
-									Digest: blockDigest,
-								},
+								BlockHeader:       blockHeader,
 								QuorumCertificate: qc,
 							},
 						},
 					},
 					LatestRound: &p2p.QuorumRound{Block: blockBytes},
+					LatestSeq: &p2p.QuorumRound{
+						Block: blockBytes,
+						Finalization: &p2p.QuorumCertificate{
+							BlockHeader:       blockHeader,
+							QuorumCertificate: qc,
+						},
+					},
 				},
 			},
 		}
@@ -851,6 +1141,63 @@ func FuzzSimplexEmptyNotarizations(f *testing.F) {
 				EmptyNotarization: &p2p.EmptyNotarization{
 					Metadata:          &p2p.EmptyVoteMetadata{Epoch: epoch, Round: round},
 					QuorumCertificate: qc,
+				},
+			},
+		}
+
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexBlockDigestRequests(f *testing.F) {
+	f.Fuzz(func(t *testing.T, seq uint64, blockDigest []byte) {
+		ctx := t.Context()
+		engine, configs := setupEngineForFuzz(t)
+
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_BlockDigestRequest{
+				BlockDigestRequest: &p2p.BlockDigestRequest{
+					Seq:    seq,
+					Digest: blockDigest,
+				},
+			},
+		}
+
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexAuxiliaryInfos(f *testing.F) {
+	f.Fuzz(func(t *testing.T, epoch uint64, version uint32, data []byte) {
+		ctx := t.Context()
+		engine, configs := setupEngineForFuzz(t)
+
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_AuxiliaryInfo{
+				AuxiliaryInfo: &p2p.AuxiliaryInfo{
+					Epoch:   epoch,
+					Version: version,
+					Data:    data,
+				},
+			},
+		}
+
+		require.NoError(t, engine.Simplex(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexEpochTransitionApprovals(f *testing.F) {
+	f.Fuzz(func(t *testing.T, nodeID, auxInfoDigest []byte, pChainHeight uint64, signature []byte) {
+		ctx := t.Context()
+		engine, configs := setupEngineForFuzz(t)
+
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_EpochTransitionApproval{
+				EpochTransitionApproval: &p2p.ValidatorSetApproval{
+					NodeId:        nodeID,
+					AuxInfoDigest: auxInfoDigest,
+					PChainHeight:  pChainHeight,
+					Signature:     signature,
 				},
 			},
 		}

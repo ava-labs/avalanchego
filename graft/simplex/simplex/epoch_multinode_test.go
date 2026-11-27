@@ -241,8 +241,8 @@ func TestSimplexMultiNodeBlacklist(t *testing.T) {
 	}
 
 	// Skip the third node because it is disconnected.
-	for i := range allButThirdNode {
-		net.Instances[i].BlockShouldBeBuilt()
+	for _, n := range allButThirdNode {
+		n.BlockShouldBeBuilt()
 	}
 
 	for _, n := range allButThirdNode {
@@ -270,8 +270,8 @@ func TestSimplexMultiNodeBlacklist(t *testing.T) {
 	require.False(t, lastBlacklist.IsNodeSuspected(3, uint64(len(nodes))))
 
 	// The third node will now time out.
-	for i := range allButThirdNode {
-		net.Instances[i].BlockShouldBeBuilt()
+	for _, n := range allButThirdNode {
+		n.BlockShouldBeBuilt()
 	}
 
 	for _, n := range allButThirdNode {

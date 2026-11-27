@@ -10,6 +10,7 @@ set -euo pipefail
 # DOCKER_IMAGE=avaplatform/avalanchego ./scripts/build_image.sh                       # Build and push multi-arch image to docker hub
 # DOCKER_IMAGE=localhost:5001/avalanchego ./scripts/build_image.sh                    # Build and push multi-arch image to private registry
 # DOCKER_IMAGE=localhost:5001/avalanchego FORCE_TAG_MASTER=1 ./scripts/build_image.sh # Build and push image to private registry with tag `master`
+# IMAGE_TAG_SUFFIX=-firewood-abc123 ./scripts/build_image.sh                          # Append a suffix to every image tag
 
 # Multi-arch builds require Docker Buildx and QEMU. buildx should be enabled by
 # default in the version of docker included with Ubuntu 22.04, and qemu can be
@@ -41,6 +42,10 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 source "$AVALANCHE_PATH"/scripts/git_commit.sh
 source "$AVALANCHE_PATH"/scripts/image_tag.sh
 source "$AVALANCHE_PATH"/scripts/lib_go_module_cache.sh
+
+# Distinguishes variant builds (e.g. a firewood build) from the standard images.
+commit_hash+="${IMAGE_TAG_SUFFIX:-}"
+image_tag+="${IMAGE_TAG_SUFFIX:-}"
 
 if [[ -z "${SKIP_BUILD_RACE}" && $image_tag == *"-r" ]]; then
   echo "Branch name must not end in '-r'"

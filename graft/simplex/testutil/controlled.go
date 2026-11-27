@@ -117,8 +117,7 @@ func NewControlledSimplexNode(t *testing.T, nodeID common.NodeID, net *Controlle
 		}
 	}
 
-	e, err := simplex.NewEpoch(epochConfig)
-	require.NoError(t, err)
+	e := NewEpoch(t, epochConfig, bb.TestBlockBuilder)
 	ti := &ControlledNode{
 		BasicNode: NewBasicNode(t, e, epochConfig.Logger.(*TestLogger)),
 		WAL:       wal,
@@ -132,14 +131,12 @@ func NewControlledSimplexNode(t *testing.T, nodeID common.NodeID, net *Controlle
 
 // TimeoutOnRound advances time until the node times out of the given round.
 func (t *ControlledNode) TimeoutOnRound(round uint64) {
+	t.bb.TriggerBlockShouldBeBuiltInRound(round)
+
 	for {
 		currentRound := t.E.Metadata().Round
 		if currentRound > round {
 			return
-		}
-
-		if !t.ShouldBlockBeBuilt() {
-			t.BlockShouldBeBuilt()
 		}
 
 		t.AdvanceTime(t.E.MaxProposalWait)
@@ -153,18 +150,18 @@ func (t *ControlledNode) TimeoutOnRound(round uint64) {
 	}
 }
 
-func (t *ControlledNode) ShouldBlockBeBuilt() bool {
-	return len(t.bb.BlockShouldBeBuilt) > 0
-}
-
 func (t *ControlledNode) TriggerNewBlock() {
 	t.bb.TriggerNewBlock()
 }
+
+// BlockShouldBeBuilt signals that a block should be built in the node's current round.
 func (t *ControlledNode) BlockShouldBeBuilt() {
-	select {
-	case t.bb.BlockShouldBeBuilt <- struct{}{}:
-	default:
-	}
+	t.bb.TriggerBlockShouldBeBuilt()
+}
+
+// BlockShouldBeBuiltInRound signals that a block should be built in the given round.
+func (t *ControlledNode) BlockShouldBeBuiltInRound(round uint64) {
+	t.bb.TriggerBlockShouldBeBuiltInRound(round)
 }
 
 func (t *ControlledNode) TickUntilRoundAdvanced(round uint64, tick time.Duration) {
@@ -191,7 +188,7 @@ func (t *ControlledNode) TickUntilRoundAdvanced(round uint64, tick time.Duration
 type TestControlledBlockBuilder struct {
 	t       *testing.T
 	control chan struct{}
-	TestBlockBuilder
+	*TestBlockBuilder
 }
 
 // NewTestControlledBlockBuilder returns a BlockBuilder that only builds a block
@@ -200,7 +197,7 @@ func NewTestControlledBlockBuilder(t *testing.T) *TestControlledBlockBuilder {
 	return &TestControlledBlockBuilder{
 		t:                t,
 		control:          make(chan struct{}, 1),
-		TestBlockBuilder: *NewTestBlockBuilder(),
+		TestBlockBuilder: NewTestBlockBuilder(),
 	}
 }
 
