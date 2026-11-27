@@ -312,6 +312,10 @@ type VMBlock interface {
 	//
 	// If nil is returned, it is guaranteed that either Accept or Reject will be
 	// called on this block, unless the VM is shut down.
+	//
+	// The P-chain height is the P-chain height that will be used to verify the block
+	// in case the verification depends on the P-chain height.
+	// For more details, see ACP-181.
 	Verify(ctx context.Context, pChainHeight uint64) error
 
 	// Bytes returns the byte representation of this block.
