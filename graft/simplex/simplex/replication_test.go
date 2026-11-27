@@ -403,10 +403,16 @@ func TestReplicationStartsBeforeCurrentRound(t *testing.T) {
 	defer net.StopInstances()
 
 	net.TriggerLeaderBlockBuilder(startSeq)
-	for i := uint64(0); i <= startSeq; i++ {
-		for _, n := range net.Instances {
-			n.Storage.WaitForBlockCommit(startSeq)
+	for _, n := range net.Instances {
+		if n.E.ID.Equals(laggingNode.E.ID) {
+			// maybe lagging node has requested finalizations to a node without it, we may need to resend the request
+			for n.Storage.NumBlocks() <= startSeq {
+				time.Sleep(10 * time.Millisecond)
+				n.AdvanceTime(simplex.DefaultReplicationRequestTimeout)
+			}
+			continue
 		}
+		n.Storage.WaitForBlockCommit(startSeq)
 	}
 }
 
