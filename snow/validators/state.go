@@ -25,7 +25,7 @@ var (
 	ErrUnfinalizedHeight = errors.New("validator set height not yet finalized")
 	// ErrL1ValidatorSetNotIndexed is returned by [L1State.GetL1ValidatorSet]
 	// when this node didn't index the heights needed to reconstruct the set at
-	// the requested height. Other nodes may still be able to answer.
+	// the requested height.
 	ErrL1ValidatorSetNotIndexed = errors.New("L1 validator set is not indexed")
 	// ErrNotL1 is returned by [L1State.GetL1ValidatorSet] when the subnet has
 	// no L1 validators at the requested height. An L1 always has at least one
