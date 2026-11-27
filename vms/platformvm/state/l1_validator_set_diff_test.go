@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -290,6 +291,17 @@ func TestGetL1ValidatorSetIndexedHeights(t *testing.T) {
 		s := newTestState(t, memdb.New())
 		_, err := s.GetL1ValidatorSet(t.Context(), 1, subnetID)
 		require.ErrorIs(t, err, validators.ErrUnfinalizedHeight)
+	})
+
+	t.Run("corrupted_indexed_heights", func(t *testing.T) {
+		require := require.New(t)
+
+		s := newTestState(t, memdb.New())
+		// A single byte is too short to hold the codec version.
+		require.NoError(s.singletonDB.Put(L1ValidatorSetHeightsIndexedKey, []byte{0}))
+
+		err := s.loadL1ValidatorSetIndexedHeights()
+		require.ErrorIs(err, codec.ErrCantUnpackVersion)
 	})
 }
 

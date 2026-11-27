@@ -177,7 +177,7 @@ func (m *Manager) GetValidatorSet(
 	targetHeight uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	validatorSetsCache := m.getSubnetCache(m.caches, subnetID)
+	validatorSetsCache := m.getValidatorSetCache(subnetID)
 
 	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
 		m.metrics.IncValidatorSetsCached()
@@ -200,6 +200,14 @@ func (m *Manager) GetValidatorSet(
 	m.metrics.AddValidatorSetsDuration(duration)
 	m.metrics.AddValidatorSetsHeightDiff(currentHeight - targetHeight)
 	return maps.Clone(validatorSet), nil
+}
+
+func (m *Manager) getValidatorSetCache(subnetID ids.ID) validatorSetCache {
+	return m.getSubnetCache(m.caches, subnetID)
+}
+
+func (m *Manager) getL1ValidatorSetCache(subnetID ids.ID) validatorSetCache {
+	return m.getSubnetCache(m.l1Caches, subnetID)
 }
 
 func (m *Manager) getSubnetCache(caches map[ids.ID]validatorSetCache, subnetID ids.ID) validatorSetCache {
@@ -232,7 +240,7 @@ func (m *Manager) GetL1ValidatorSet(
 	targetHeight uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	validatorSetsCache := m.getSubnetCache(m.l1Caches, subnetID)
+	validatorSetsCache := m.getL1ValidatorSetCache(subnetID)
 	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
 		m.metrics.IncL1ValidatorSetsCached()
 		return maps.Clone(validatorSet), nil
