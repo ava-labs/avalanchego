@@ -58,9 +58,9 @@ func NewBasicNode(t *testing.T, epoch *simplex.Epoch, logger *TestLogger) *Basic
 }
 
 func (b *BasicNode) Start() {
+	require.NoError(b.t, b.E.Start())
 	b.running.Add(1)
 	go b.handleMessages()
-	require.NoError(b.t, b.E.Start())
 }
 
 func (b *BasicNode) AdvanceTime(duration time.Duration) {
