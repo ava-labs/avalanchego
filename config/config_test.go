@@ -8,8 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -1392,4 +1395,51 @@ func TestGetUpgradeConfigRejectsOutOfOrderUpgrades(t *testing.T) {
 	v.Set(UpgradeFileContentKey, base64.StdEncoding.EncodeToString(upgradeJSON))
 	_, err = getUpgradeConfig(v, constants.UnitTestID)
 	require.ErrorIs(t, err, upgrade.ErrInvalidUpgradeTimes, "getUpgradeConfig()")
+}
+
+func TestRedactSensitiveFlags(t *testing.T) {
+	require := require.New(t)
+
+	flags := map[string]interface{}{
+		NetworkNameKey: "fuji",
+	}
+	expected := map[string]interface{}{
+		NetworkNameKey: "fuji",
+	}
+	for flag := range sensitiveFlags {
+		flags[flag] = flag
+		expected[flag] = redactedFlagValue
+	}
+	original := maps.Clone(flags)
+	require.Equal(expected, RedactSensitiveFlags(flags))
+	require.Equal(original, flags, "the input must not be modified")
+}
+
+func TestSensitiveFlagsAreNotSerialized(t *testing.T) {
+	// configField is the path of the [node.Config] field holding each flag.
+	configField := map[string]string{
+		HTTPSKeyContentKey:         "HTTPConfig.HTTPSKey",
+		StakingTLSKeyContentKey:    "StakingConfig.StakingTLSCert",
+		StakingSignerKeyContentKey: "StakingConfig.StakingSignerConfig.KeyContent",
+		TracingHeadersKey:          "TraceConfig.ExporterConfig.Headers",
+	}
+
+	for flag := range sensitiveFlags {
+		if flag == ConfigContentKey {
+			continue
+		}
+		path, ok := configField[flag]
+		require.True(t, ok, "add the node.Config field holding %s", flag)
+
+		// The field is hidden if it, or a struct containing it, is tagged `json:"-"`.
+		hidden := false
+		typ := reflect.TypeOf(node.Config{})
+		for _, name := range strings.Split(path, ".") {
+			field, ok := typ.FieldByName(name)
+			require.True(t, ok, "no field %s", path)
+			hidden = hidden || field.Tag.Get("json") == "-"
+			typ = field.Type
+		}
+		require.True(t, hidden, "%s holds %s but is serialized to JSON", path, flag)
+	}
 }

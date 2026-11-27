@@ -84,6 +84,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	avagoconfig "github.com/ava-labs/avalanchego/config"
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -161,7 +162,7 @@ func New(
 		zap.Stringer("nodeID", n.ID),
 		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
 		zap.Reflect("nodePOP", pop),
-		zap.Reflect("providedFlags", n.Config.ProvidedFlags),
+		zap.Reflect("providedFlags", avagoconfig.RedactSensitiveFlags(n.Config.ProvidedFlags)),
 		zap.Reflect("config", n.Config),
 	)
 
