@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
-	"github.com/ava-labs/avalanchego/ids"
+	. "github.com/ava-labs/avalanchego/graft/simplex/testutil/ids"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +22,7 @@ func TestPoS(t *testing.T) {
 		4: 1,
 	}
 
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 
 	posSigAggregatorCreator := func(_ []common.Node) common.SignatureAggregator {
 		return &testutil.TestSignatureAggregator{

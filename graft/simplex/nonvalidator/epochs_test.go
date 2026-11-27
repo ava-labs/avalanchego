@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	. "github.com/ava-labs/avalanchego/graft/simplex/testutil/ids"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
 )
@@ -54,10 +55,10 @@ func TestNewEpochs(t *testing.T) {
 	var nonSimplexBlock = indexedBlock{seq: 0, round: 0, epoch: 0, sealingInfo: nil}
 
 	nodes := common.Nodes{
-		{Id: common.NodeID{ShortID: ids.ShortID{1}}},
-		{Id: common.NodeID{ShortID: ids.ShortID{2}}},
-		{Id: common.NodeID{ShortID: ids.ShortID{3}}},
-		{Id: common.NodeID{ShortID: ids.ShortID{4}}},
+		{Id: ShortID(1)},
+		{Id: ShortID(2)},
+		{Id: ShortID(3)},
+		{Id: ShortID(4)},
 	}
 
 	sigAggCreator := func(n []common.Node) common.SignatureAggregator {
@@ -329,7 +330,7 @@ func TestCollectedSealingBlockInfoIgnoresRemovedValidators(t *testing.T) {
 	require.False(t, e.maybeObserveThresholdResponses(info, bh, validators[0].Id))
 
 	// replace validators[0] so its old vote shouldn't make us reach a threshold of 2
-	latest = append(common.Nodes{{Id: common.NodeID{ShortID: ids.ShortID{5}}, Weight: 1}}, validators[1:]...)
+	latest = append(common.Nodes{{Id: ShortID(5), Weight: 1}}, validators[1:]...)
 	require.False(t, e.maybeObserveThresholdResponses(info, bh, validators[1].Id))
 }
 
@@ -421,13 +422,13 @@ func TestCollectedSealingBlockInfoUsesLatestStake(t *testing.T) {
 	}, weightedSignatureAggregatorCreator)
 
 	// 100 of 400
-	require.False(t, e.maybeObserveThresholdResponses(info, bh, common.NodeID{ShortID: ids.ShortID{1}}))
+	require.False(t, e.maybeObserveThresholdResponses(info, bh, ShortID(1)))
 
 	// Node 1 moves most of its stake to node 4. Under the previous stake, node 2 would bring
 	// the reporters to 200 of 400, but under the latest stake they hold only 101 of 400.
 	latest = weightedNodes(1, 100, 100, 199)
-	require.False(t, e.maybeObserveThresholdResponses(info, bh, common.NodeID{ShortID: ids.ShortID{2}}))
+	require.False(t, e.maybeObserveThresholdResponses(info, bh, ShortID(2)))
 
 	// 201 of 400
-	require.True(t, e.maybeObserveThresholdResponses(info, bh, common.NodeID{ShortID: ids.ShortID{3}}))
+	require.True(t, e.maybeObserveThresholdResponses(info, bh, ShortID(3)))
 }

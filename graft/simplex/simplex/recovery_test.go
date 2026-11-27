@@ -12,7 +12,7 @@ import (
 	. "github.com/ava-labs/avalanchego/graft/simplex/common"
 	. "github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
-	"github.com/ava-labs/avalanchego/ids"
+	. "github.com/ava-labs/avalanchego/graft/simplex/testutil/ids"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,7 +21,7 @@ import (
 func TestRecoverFromWALProposed(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 	ctx := context.Background()
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	quorum := Quorum(len(nodes))
 
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
@@ -99,7 +99,7 @@ func TestRecoverFromWALProposed(t *testing.T) {
 func TestRecoverFromNotarization(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 	ctx := context.Background()
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	quorum := Quorum(len(nodes))
 	sigAggregrator := &testutil.TestSignatureAggregator{N: 4}
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
@@ -153,7 +153,7 @@ func TestRecoverFromNotarization(t *testing.T) {
 func TestRecoverFromWalWithStorage(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 	ctx := context.Background()
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	quorum := Quorum(len(nodes))
 	sigAggregrator := &testutil.TestSignatureAggregator{N: 4}
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
@@ -216,7 +216,7 @@ func TestWalCreatedProperly(t *testing.T) {
 	ctx := context.Background()
 	bb := testutil.NewTestBlockBuilder()
 
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	quorum := Quorum(len(nodes))
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 
@@ -275,7 +275,7 @@ func TestWalCreatedProperly(t *testing.T) {
 func TestWalWritesBlockRecord(t *testing.T) {
 	ctx := context.Background()
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	// nodes[1] is not the leader for the first round
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), bb)
 
@@ -324,7 +324,7 @@ func TestWalWritesFinalization(t *testing.T) {
 	ctx := context.Background()
 	bb := testutil.NewTestBlockBuilder()
 	sigAggregrator := &testutil.TestSignatureAggregator{N: 4}
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	quorum := Quorum(len(nodes))
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 
@@ -414,7 +414,7 @@ func TestWalWritesFinalization(t *testing.T) {
 func TestRecoverFromMultipleNotarizations(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 	ctx := context.Background()
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	quorum := Quorum(len(nodes))
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 
@@ -493,7 +493,7 @@ func TestRecoverFromMultipleNotarizations(t *testing.T) {
 func TestRecoveryBlocksIndexed(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 	ctx := context.Background()
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	quorum := Quorum(len(nodes))
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 
@@ -556,7 +556,7 @@ func TestRecoveryBlocksIndexed(t *testing.T) {
 // derived from the last indexed block.
 func TestEpochCorrectlyInitializesMetadataFromStorage(t *testing.T) {
 	ctx := context.Background()
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 
 	tests := []struct {
 		name          string
@@ -646,7 +646,7 @@ func TestEpochCorrectlyInitializesMetadataFromStorage(t *testing.T) {
 func TestRecoveryAsLeader(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 	ctx := context.Background()
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	finalizedBlocks := createBlocks(t, nodes, 4)
 	conf, _, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 
@@ -674,7 +674,7 @@ func TestRecoveryAsLeader(t *testing.T) {
 func TestRecoveryReVerifiesBlocks(t *testing.T) {
 	ctx := context.Background()
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	finalizedBlocks := createBlocks(t, nodes, 4)
 
 	deserializer := &testutil.BlockDeserializer{
@@ -714,7 +714,7 @@ func TestWalRecoveryTriggersEmptyVoteTimeout(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 	ctx := context.Background()
 	quorum := Quorum(4)
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	initialBlock := createBlocks(t, nodes, 1)[0]
 	recordingComm := &recordingComm{Communication: testutil.NewNoopComm(nodes), BroadcastMessages: make(chan *Message, 100), SentMessages: make(chan *Message, 100)}
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], recordingComm, bb)
@@ -779,7 +779,7 @@ func TestWalRecoveryTriggersEmptyVoteTimeout(t *testing.T) {
 func TestWalRecoveryMonitorsProgress(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 	ctx := context.Background()
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	initialBlock := createBlocks(t, nodes, 1)[0]
 	recordingComm := &recordingComm{Communication: testutil.NewNoopComm(nodes), BroadcastMessages: make(chan *Message, 100), SentMessages: make(chan *Message, 100)}
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], recordingComm, bb)
@@ -823,7 +823,7 @@ func TestWalRecoveryMonitorsProgress(t *testing.T) {
 func TestWalRecoverySetsRoundCorrectly(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 	ctx := context.Background()
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	quorum := Quorum(len(nodes))
 
 	tests := []struct {
@@ -1043,7 +1043,7 @@ func TestWalRecoverySetsRoundCorrectly(t *testing.T) {
 }
 
 func TestRecoveryAndBroadcast(t *testing.T) {
-	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 
 	net := testutil.NewControlledNetwork(t, nodes)
 

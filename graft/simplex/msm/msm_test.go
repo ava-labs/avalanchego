@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
-	"github.com/ava-labs/avalanchego/ids"
+	. "github.com/ava-labs/avalanchego/graft/simplex/testutil/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/stretchr/testify/require"
 )
@@ -1538,10 +1538,10 @@ func TestComputePrevVMBlockSeq(t *testing.T) {
 }
 
 func TestSanitizeApprovals(t *testing.T) {
-	node0 := common.NodeID{ShortID: ids.ShortID{0}}
-	node1 := common.NodeID{ShortID: ids.ShortID{1}}
-	node2 := common.NodeID{ShortID: ids.ShortID{2}}
-	node3 := common.NodeID{ShortID: ids.ShortID{3}}
+	node0 := ShortID(0)
+	node1 := ShortID(1)
+	node2 := ShortID(2)
+	node3 := ShortID(3)
 
 	nodeID2Index := map[common.NodeID]int{
 		node0: 0,
@@ -1607,9 +1607,9 @@ func TestSanitizeApprovals(t *testing.T) {
 }
 
 func TestComputeNewApproverSignaturesAndSigners(t *testing.T) {
-	node0 := common.NodeID{ShortID: ids.ShortID{0}}
-	node1 := common.NodeID{ShortID: ids.ShortID{1}}
-	node2 := common.NodeID{ShortID: ids.ShortID{2}}
+	node0 := ShortID(0)
+	node1 := ShortID(1)
+	node2 := ShortID(2)
 
 	nodeID2Index := map[common.NodeID]int{
 		node0: 0,
@@ -1706,7 +1706,7 @@ func TestComputeNewApproverSignaturesAndSigners(t *testing.T) {
 	t.Run("peer not in validator set is skipped", func(t *testing.T) {
 		prevApprovals := &NextEpochApprovals{}
 		oldApproving := set.BitsFromBytes(nil)
-		unknownNode := common.NodeID{ShortID: ids.ShortID{99}}
+		unknownNode := ShortID(99)
 
 		peers := ValidatorSetApprovals{
 			{NodeID: unknownNode, Signature: []byte("unknown")},
@@ -1756,8 +1756,8 @@ func TestBuildBlockCollectingApprovalsDedupsOwnApprovalAcrossRounds(t *testing.T
 	// reachable from a single approval (canSeal stays false on both rounds).
 	validators := NodeBLSMappings{
 		{NodeID: NewEncodedNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
-		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
+		{NodeID: NewEncodedNodeID(ShortID(187)), BLSKey: []byte{2}, Weight: 1},
+		{NodeID: NewEncodedNodeID(ShortID(204)), BLSKey: []byte{3}, Weight: 1},
 	}
 	tc.validatorSetRetriever.result = validators
 
@@ -1935,8 +1935,8 @@ func TestCollectingApprovalsAuxInfoGating(t *testing.T) {
 	// A 3-node validator set including MyNodeID at index 0
 	validators := NodeBLSMappings{
 		{NodeID: NewEncodedNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
-		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
+		{NodeID: NewEncodedNodeID(ShortID(187)), BLSKey: []byte{2}, Weight: 1},
+		{NodeID: NewEncodedNodeID(ShortID(204)), BLSKey: []byte{3}, Weight: 1},
 	}
 	tc.validatorSetRetriever.result = validators
 
@@ -2050,8 +2050,8 @@ func TestVerifyCollectingApprovalsRejectsIllegalAuxInfoBatch(t *testing.T) {
 
 	validators := NodeBLSMappings{
 		{NodeID: NewEncodedNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
-		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
+		{NodeID: NewEncodedNodeID(ShortID(187)), BLSKey: []byte{2}, Weight: 1},
+		{NodeID: NewEncodedNodeID(ShortID(204)), BLSKey: []byte{3}, Weight: 1},
 	}
 	tc.validatorSetRetriever.result = validators
 
@@ -2131,8 +2131,8 @@ func TestCollectingApprovalsAuxInfoVersionIDIsBackwardCompatible(t *testing.T) {
 
 	validators := NodeBLSMappings{
 		{NodeID: NewEncodedNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
-		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
+		{NodeID: NewEncodedNodeID(ShortID(187)), BLSKey: []byte{2}, Weight: 1},
+		{NodeID: NewEncodedNodeID(ShortID(204)), BLSKey: []byte{3}, Weight: 1},
 	}
 	tc.validatorSetRetriever.result = validators
 
@@ -2215,8 +2215,8 @@ func TestCollectingApprovalsIncludesMultipleAuxInfoMessages(t *testing.T) {
 
 	validators := NodeBLSMappings{
 		{NodeID: NewEncodedNodeID(sm.MyNodeID), BLSKey: []byte{1}, Weight: 1},
-		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xBB}}), BLSKey: []byte{2}, Weight: 1},
-		{NodeID: NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xCC}}), BLSKey: []byte{3}, Weight: 1},
+		{NodeID: NewEncodedNodeID(ShortID(187)), BLSKey: []byte{2}, Weight: 1},
+		{NodeID: NewEncodedNodeID(ShortID(204)), BLSKey: []byte{3}, Weight: 1},
 	}
 	tc.validatorSetRetriever.result = validators
 

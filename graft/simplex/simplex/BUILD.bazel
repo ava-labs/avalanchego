@@ -43,6 +43,7 @@ graft_go_test(
     deps = [
         "//graft/simplex/common",
         "//graft/simplex/testutil",
+        "//graft/simplex/testutil/ids",
         "//graft/simplex/testutil/long_running",
         "//graft/simplex/testutil/random_network",
         "//ids",

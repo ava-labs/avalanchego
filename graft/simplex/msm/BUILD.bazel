@@ -43,6 +43,7 @@ graft_go_test(
         "//graft/simplex/common",
         "//graft/simplex/simplex",
         "//graft/simplex/testutil",
+        "//graft/simplex/testutil/ids",
         "//ids",
         "//utils/set",
         "@com_github_stretchr_testify//require",

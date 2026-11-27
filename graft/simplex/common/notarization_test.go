@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	. "github.com/ava-labs/avalanchego/graft/simplex/testutil"
-	"github.com/ava-labs/avalanchego/ids"
+	. "github.com/ava-labs/avalanchego/graft/simplex/testutil/ids"
 
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +31,7 @@ func TestNewNotarization(t *testing.T) {
 			name: "valid notarization",
 			votesForCurrentRound: func() map[common.NodeID]*common.Vote {
 				votes := make(map[common.NodeID]*common.Vote)
-				nodeIds := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{5}}}
+				nodeIds := ShortIDs(5)
 				for _, nodeId := range nodeIds {
 					vote, err := NewTestVote(testBlock, nodeId)
 					require.NoError(t, err)
@@ -42,29 +42,25 @@ func TestNewNotarization(t *testing.T) {
 			block:               testBlock,
 			signatureAggregator: &TestSignatureAggregator{N: 5},
 			expectError:         nil,
-			expectedSigners: []common.NodeID{
-				{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{5}},
-			},
+			expectedSigners:     ShortIDs(5),
 		},
 		{
 			name: "diverging votes",
 			votesForCurrentRound: func() map[common.NodeID]*common.Vote {
 				votes := make(map[common.NodeID]*common.Vote)
-				nodeIds := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{5}}}
+				nodeIds := ShortIDs(5)
 				for _, nodeId := range nodeIds {
 					vote, err := NewTestVote(testBlock, nodeId)
 					require.NoError(t, err)
 					votes[nodeId] = vote
 				}
-				votes[common.NodeID{ShortID: ids.ShortID{2}}].Vote.Digest[0]++ // Diverging vote
+				votes[ShortID(2)].Vote.Digest[0]++ // Diverging vote
 				return votes
 			}(),
 			block:               testBlock,
 			signatureAggregator: &TestSignatureAggregator{N: 5},
 			expectError:         nil,
-			expectedSigners: []common.NodeID{
-				{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{5}},
-			},
+			expectedSigners:     []common.NodeID{ShortID(1), ShortID(3), ShortID(4), ShortID(5)},
 		},
 		{
 			name:                 "no votes",
@@ -77,7 +73,7 @@ func TestNewNotarization(t *testing.T) {
 			name: "error aggregating",
 			votesForCurrentRound: func() map[common.NodeID]*common.Vote {
 				votes := make(map[common.NodeID]*common.Vote)
-				nodeIds := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{5}}}
+				nodeIds := ShortIDs(5)
 				for _, nodeId := range nodeIds {
 					vote, err := NewTestVote(testBlock, nodeId)
 					require.NoError(t, err)
@@ -121,31 +117,31 @@ func TestNewFinalization(t *testing.T) {
 		{
 			name: "valid finalizations in order",
 			finalizeVotes: []*common.FinalizeVote{
-				NewTestFinalizeVote(t, &TestBlock{}, common.NodeID{ShortID: ids.ShortID{1}}),
-				NewTestFinalizeVote(t, &TestBlock{}, common.NodeID{ShortID: ids.ShortID{2}}),
-				NewTestFinalizeVote(t, &TestBlock{}, common.NodeID{ShortID: ids.ShortID{3}}),
+				NewTestFinalizeVote(t, &TestBlock{}, ShortID(1)),
+				NewTestFinalizeVote(t, &TestBlock{}, ShortID(2)),
+				NewTestFinalizeVote(t, &TestBlock{}, ShortID(3)),
 			},
 			signatureAggregator:  &TestSignatureAggregator{N: 4},
-			expectedFinalization: &NewTestFinalizeVote(t, &TestBlock{}, common.NodeID{ShortID: ids.ShortID{1}}).Finalization,
+			expectedFinalization: &NewTestFinalizeVote(t, &TestBlock{}, ShortID(1)).Finalization,
 			expectError:          nil,
 		},
 		{
 			name: "unsorted finalizations",
 			finalizeVotes: []*common.FinalizeVote{
-				NewTestFinalizeVote(t, &TestBlock{}, common.NodeID{ShortID: ids.ShortID{3}}),
-				NewTestFinalizeVote(t, &TestBlock{}, common.NodeID{ShortID: ids.ShortID{1}}),
-				NewTestFinalizeVote(t, &TestBlock{}, common.NodeID{ShortID: ids.ShortID{2}}),
+				NewTestFinalizeVote(t, &TestBlock{}, ShortID(3)),
+				NewTestFinalizeVote(t, &TestBlock{}, ShortID(1)),
+				NewTestFinalizeVote(t, &TestBlock{}, ShortID(2)),
 			},
 			signatureAggregator:  &TestSignatureAggregator{N: 4},
-			expectedFinalization: &NewTestFinalizeVote(t, &TestBlock{}, common.NodeID{ShortID: ids.ShortID{1}}).Finalization,
+			expectedFinalization: &NewTestFinalizeVote(t, &TestBlock{}, ShortID(1)).Finalization,
 			expectError:          nil,
 		},
 		{
 			name: "finalizations with different digests",
 			finalizeVotes: []*common.FinalizeVote{
-				NewTestFinalizeVote(t, &TestBlock{Digest: common.Digest{1}}, common.NodeID{ShortID: ids.ShortID{1}}),
-				NewTestFinalizeVote(t, &TestBlock{Digest: common.Digest{2}}, common.NodeID{ShortID: ids.ShortID{2}}),
-				NewTestFinalizeVote(t, &TestBlock{Digest: common.Digest{3}}, common.NodeID{ShortID: ids.ShortID{3}}),
+				NewTestFinalizeVote(t, &TestBlock{Digest: common.Digest{1}}, ShortID(1)),
+				NewTestFinalizeVote(t, &TestBlock{Digest: common.Digest{2}}, ShortID(2)),
+				NewTestFinalizeVote(t, &TestBlock{Digest: common.Digest{3}}, ShortID(3)),
 			},
 			signatureAggregator: &TestSignatureAggregator{N: 4},
 			expectError:         common.ErrorInvalidFinalizationDigest,
@@ -153,7 +149,7 @@ func TestNewFinalization(t *testing.T) {
 		{
 			name: "signature aggregator errors",
 			finalizeVotes: []*common.FinalizeVote{
-				NewTestFinalizeVote(t, &TestBlock{}, common.NodeID{ShortID: ids.ShortID{1}}),
+				NewTestFinalizeVote(t, &TestBlock{}, ShortID(1)),
 			},
 			signatureAggregator: &TestSignatureAggregator{Err: errorSigAggregation, N: 4},
 			expectError:         errorSigAggregation,

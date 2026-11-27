@@ -13,17 +13,17 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
+	. "github.com/ava-labs/avalanchego/graft/simplex/testutil/ids"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
-	"github.com/ava-labs/avalanchego/ids"
 )
 
 // TestReplication tests the replication process of a node that
 // is behind the rest of the network by less than maxRoundWindow.
 func TestBasicReplication(t *testing.T) {
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 
 	for i := range 3 * simplex.DefaultMaxRoundWindow {
 		testName := fmt.Sprintf("Basic replication_of_%d_blocks", i)
@@ -78,7 +78,7 @@ func testReplication(t *testing.T, startSeq uint64, nodes []common.NodeID) {
 // has been sent a different block by one node, however the rest of the network
 // notarizes a different block for the same round
 func TestReplicationAdversarialNode(t *testing.T) {
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	quorum := common.Quorum(len(nodes))
 	net := testutil.NewControlledNetwork(t, nodes)
 
@@ -148,7 +148,7 @@ func TestReplicationAdversarialNode(t *testing.T) {
 // a lagging node and the rest of the network correctly propagate missing
 // finalizations and index all blocks.
 func TestRebroadcastingWithReplication(t *testing.T) {
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	net := testutil.NewControlledNetwork(t, nodes)
 
 	newNodeConfig := func(from common.NodeID) *testutil.TestNodeConfig {
@@ -256,7 +256,7 @@ func TestRebroadcastingWithReplication(t *testing.T) {
 // many empty notarizations in a row.
 // This test sometimes takes > 30 sec
 func TestReplicationEmptyNotarizations(t *testing.T) {
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{5}}, {ShortID: ids.ShortID{6}}}
+	nodes := ShortIDs(6)
 
 	for endRound := uint64(2); endRound <= 2*simplex.DefaultMaxRoundWindow; endRound++ {
 		isLaggingNodeLeader := simplex.LeaderForRound(nodes, endRound) == nodes[5]
@@ -350,7 +350,7 @@ func testReplicationEmptyNotarizations(t *testing.T, nodes []common.NodeID, endR
 // TestReplicationStartsBeforeCurrentRound tests the replication process of a node that
 // starts replicating in the middle of the current round.
 func TestReplicationStartsBeforeCurrentRound(t *testing.T) {
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	quorum := common.Quorum(len(nodes))
 	net := testutil.NewControlledNetwork(t, nodes)
 	startSeq := uint64(simplex.DefaultMaxRoundWindow + 3)
@@ -413,7 +413,7 @@ func TestReplicationStartsBeforeCurrentRound(t *testing.T) {
 func TestReplicationFutureFinalization(t *testing.T) {
 	// send a block, then simultaneously send a finalization for the block
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	quorum := common.Quorum(len(nodes))
 
 	conf, _, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), bb)
@@ -465,7 +465,7 @@ func TestReplicationFutureFinalization(t *testing.T) {
 // and the rest of the nodes continue to make progress for another `endDisconnect - startDisconnect` blocks.
 // The lagging node reconnects and the after the next `finalization` is sent, the lagging node catches up to the latest height.
 func TestReplicationAfterNodeDisconnects(t *testing.T) {
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 
 	for startDisconnect := uint64(0); startDisconnect <= 5; startDisconnect++ {
 		for endDisconnect := uint64(10); endDisconnect <= 20; endDisconnect++ {
@@ -596,7 +596,7 @@ func TestReplicationStuckInProposingBlock(t *testing.T) {
 	tbb := testutil.NewTestBlockBuilder()
 	bb := testutil.NewTestControlledBlockBuilder(t)
 	bb.TestBlockBuilder = tbb
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	blocks := createBlocks(t, nodes, 5)
 
 	quorum := common.Quorum(len(nodes))
@@ -700,7 +700,7 @@ func TestReplicationStuckInProposingBlock(t *testing.T) {
 // propagated an empty notarization).
 func TestReplicationNodeDiverges(t *testing.T) {
 
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{5}}, {ShortID: ids.ShortID{6}}}
+	nodes := ShortIDs(6)
 	numBlocks := uint64(5)
 
 	net := testutil.NewControlledNetwork(t, nodes)
@@ -821,7 +821,7 @@ func assertEqualLedgers(t *testing.T, net *testutil.ControlledInMemoryNetwork) {
 }
 
 func TestReplicationNotarizationWithoutFinalizations(t *testing.T) {
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 
 	for numBlocks := uint64(1); numBlocks <= 3*simplex.DefaultMaxRoundWindow; numBlocks++ {
 		// lagging node cannot be the leader after node disconnects
@@ -918,7 +918,7 @@ func createBlocks(t *testing.T, nodes []common.NodeID, seqCount uint64) []common
 
 func TestReplicationVerifyNotarization(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 
 	// This function takes a QC and makes it that it is signed by only 2 out of 4 nodes,
 	// while still having a quorum of signatures.
@@ -1007,7 +1007,7 @@ func TestReplicationVerifyNotarization(t *testing.T) {
 func TestReplicationVerifyEmptyNotarization(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 
 	// This function takes a QC and makes it that it is signed by only 2 out of 4 nodes,
 	// while still having a quorum of signatures.
@@ -1094,7 +1094,7 @@ func TestReplicationVerifyEmptyNotarization(t *testing.T) {
 // finalizations and notarizations. It ensures the node sends finalized votes for rounds
 // without finalizations.
 func TestReplicationVotesForNotarizations(t *testing.T) {
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 
 	numFinalizedBlocks := uint64(5)
 	// number of notarized blocks after the finalized blocks
@@ -1109,7 +1109,7 @@ func TestReplicationVotesForNotarizations(t *testing.T) {
 	almostFinalizeBlocks := func(msg *common.Message, from, _ common.NodeID) bool {
 		// block finalized votes and finalizations
 		if msg.Finalization != nil || msg.FinalizeVote != nil {
-			return from.Equals(common.NodeID{ShortID: ids.ShortID{1}})
+			return from.Equals(ShortID(1))
 		}
 		return true
 	}
@@ -1230,7 +1230,7 @@ func TestReplicationVotesForNotarizations(t *testing.T) {
 // TestReplicationEmptyNotarizations ensures a lagging node will properly replicate
 // a tail of empty notarizations.
 func TestReplicationEmptyNotarizationsTail(t *testing.T) {
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{5}}, {ShortID: ids.ShortID{6}}}
+	nodes := ShortIDs(6)
 
 	for endRound := uint64(2); endRound <= 2*simplex.DefaultMaxRoundWindow; endRound++ {
 		isLaggingNodeLeader := simplex.LeaderForRound(nodes, endRound) == nodes[5]
@@ -1326,7 +1326,7 @@ func sendEmptyNotarizationQuorumRounds(emptyNotarizations map[uint64]*common.Emp
 
 func allowFinalizeVotes(msg *common.Message, from, to common.NodeID) bool {
 	if msg.Finalization != nil || msg.FinalizeVote != nil {
-		if to.Equals(common.NodeID{ShortID: ids.ShortID{3}}) || from.Equals(common.NodeID{ShortID: ids.ShortID{3}}) {
+		if to.Equals(ShortID(3)) || from.Equals(ShortID(3)) {
 			return false
 		}
 	}
@@ -1337,7 +1337,7 @@ func allowFinalizeVotes(msg *common.Message, from, to common.NodeID) bool {
 // map when processing.
 func TestReplicationStoresFinalization(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	sentMessages := make(chan *common.Message, 100)
 
 	conf, _, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[3], &recordingComm{
@@ -1409,7 +1409,7 @@ func TestReplicationStoresFinalization(t *testing.T) {
 // TestReplicationChain tests that a node can both empty notarizations and notarizations for the same round.
 func TestReplicationChain(t *testing.T) {
 	// Digest message requests are needed for this test
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	net := testutil.NewControlledNetwork(t, nodes)
 
 	newNodeConfig := func(from common.NodeID) *testutil.TestNodeConfig {
@@ -1526,7 +1526,7 @@ func TestReplicationChain(t *testing.T) {
 // empty notarization after replicating.
 func TestReplicationStartsRoundFromFinalization(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 
 	sentMessages := make(chan *common.Message, 100)
 	broadcastMessages := make(chan *common.Message, 100)
@@ -1633,7 +1633,7 @@ messages:
 // except it checks the replication path when a block already exists in our rounds map for the finalized block.
 func TestReplicationStartsRoundFromFinalizationWithBlock(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 
 	sentMessages := make(chan *common.Message, 100)
 	broadcastMessages := make(chan *common.Message, 100)
@@ -1752,7 +1752,7 @@ messages:
 // sequences ahead of its next sequence to commit only requests sequences up to MaxRoundWindow-1 ahead of it
 func TestReplicationRequestsWithinMaxRoundWindow(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	sentMessages := make(chan *common.Message, 100)
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], &recordingComm{
 		Communication: testutil.NewNoopComm(nodes),
@@ -1800,7 +1800,7 @@ func TestLeaderStartsRoundAfterReplicatedQuorumRound(t *testing.T) {
 	// The node receives a notarization/finalization for round 0, which it does not have the block for.
 	// It will request the block and the notarization/finalization again, which should make it advance to round 1.
 	// Since node is the leader of round 1, it should propose a block.
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 
 	for _, testCase := range []struct {
 		name string
@@ -1929,7 +1929,7 @@ func TestLeaderStartsRoundAfterReplicatedQuorumRound(t *testing.T) {
 // TestLeaderDoesNotRestartRoundAfterReplicatingOlderNotarization makes sure that replicating a
 // notarized block for an older round does not restart the current round.
 func TestLeaderDoesNotRestartRoundAfterReplicatingOlderNotarization(t *testing.T) {
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	quorum := common.Quorum(len(nodes))
 
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), testutil.NewTestBlockBuilder())
@@ -1987,7 +1987,7 @@ func replicateSeq(block common.VerifiedFinalizedBlock) *common.Message {
 // recovered from the WAL or previously received in a finalization message.
 func TestReplicationRedeliversRestoredFinalization(t *testing.T) {
 	ctx := context.Background()
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	blocks := createBlocks(t, nodes, 2)
 
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), testutil.NewTestBlockBuilder())
@@ -2014,7 +2014,7 @@ func TestReplicationRedeliversRestoredFinalization(t *testing.T) {
 // TestReplicationContinuesPastAlreadyNotarizedRound tests that a replicated round we have already notarized
 // does not prevent the node from processing the replicated rounds that follow it.
 func TestReplicationContinuesPastAlreadyNotarizedRound(t *testing.T) {
-	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
+	nodes := ShortIDs(4)
 	blocks := createBlocks(t, nodes, 2)
 	quorum := common.Quorum(len(nodes))
 

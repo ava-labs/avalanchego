@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
+	. "github.com/ava-labs/avalanchego/graft/simplex/testutil/ids"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -86,7 +87,7 @@ func TestValidatorCacheReturnedSliceIsIsolated(t *testing.T) {
 		set, err := vc.GetValidatorSet(4)
 		require.NoError(t, err)
 		set[0].Weight = 12345
-		set[0].NodeID = metadata.NewEncodedNodeID(common.NodeID{ShortID: ids.ShortID{0xFF}})
+		set[0].NodeID = metadata.NewEncodedNodeID(ShortID(255))
 
 		again, err := vc.GetValidatorSet(4)
 		require.NoError(t, err)

@@ -10,15 +10,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	. "github.com/ava-labs/avalanchego/graft/simplex/testutil/ids"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
 )
 
 var testNodes = common.Nodes{
-	{Id: common.NodeID{ShortID: ids.ShortID{1}}, Weight: 1},
-	{Id: common.NodeID{ShortID: ids.ShortID{2}}, Weight: 1},
-	{Id: common.NodeID{ShortID: ids.ShortID{3}}, Weight: 1},
-	{Id: common.NodeID{ShortID: ids.ShortID{4}}, Weight: 1},
+	{Id: ShortID(1), Weight: 1},
+	{Id: ShortID(2), Weight: 1},
+	{Id: ShortID(3), Weight: 1},
+	{Id: ShortID(4), Weight: 1},
 }
 
 var genesis = testutil.NewTestBlock(common.ProtocolMetadata{

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
-	"github.com/ava-labs/avalanchego/ids"
+	. "github.com/ava-labs/avalanchego/graft/simplex/testutil/ids"
 
 	"github.com/stretchr/testify/require"
 )
@@ -316,9 +316,9 @@ type sentAuxInfo struct {
 }
 
 func TestCollectAuxInfo(t *testing.T) {
-	node1 := common.NodeID{ShortID: ids.ShortID{1}}
-	node2 := common.NodeID{ShortID: ids.ShortID{2}}
-	node3 := common.NodeID{ShortID: ids.ShortID{3}}
+	node1 := ShortID(1)
+	node2 := ShortID(2)
+	node3 := ShortID(3)
 
 	// voteCountingAuxInfoApp rejects appends whose data is already in the history.
 	history := AuxInfoHistory{
@@ -411,7 +411,7 @@ func TestCollectAuxInfo(t *testing.T) {
 func TestCollectAuxInfoKeepsRejectedEntries(t *testing.T) {
 	store := newAuxInfoStore(&voteCountingAuxInfoApp{}, noopLogger{})
 	info := common.AuxiliaryInfo{Version: 1, Data: []byte("a")}
-	store.HandleAuxiliaryMessage(info, common.NodeID{ShortID: ids.ShortID{1}})
+	store.HandleAuxiliaryMessage(info, ShortID(1))
 
 	// the entry duplicates the history, so it is rejected but kept in the store
 	history := AuxInfoHistory{
