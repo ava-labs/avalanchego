@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-cat >> "$HOME/.bazelrc" <<EOF
+cat >> .bazelrc.local <<EOF
 # Added by .github/actions/setup-bazel
 common --repository_cache=${REPOSITORY_CACHE_DIR}
 common --repo_env=GO_REPOSITORY_USE_HOST_MODCACHE=1
@@ -17,6 +17,7 @@ if [[ "$BAZEL_REMOTE_CACHE_ENABLED" == "true" && -z "$BAZEL_REMOTE_CACHE_AUTH_HE
   echo "::warning::Bazel remote cache is enabled but BAZEL_REMOTE_CACHE_AUTH_HEADER is empty; continuing without the remote cache."
 fi
 
+remote_cache_configured=false
 if [[ "$BAZEL_REMOTE_CACHE_ENABLED" == "true" && -n "$BAZEL_REMOTE_CACHE_URL" && -n "$BAZEL_REMOTE_CACHE_AUTH_HEADER" ]]; then
   case "$BAZEL_REMOTE_CACHE_URL" in
     grpcs://*) ;;
@@ -26,7 +27,7 @@ if [[ "$BAZEL_REMOTE_CACHE_ENABLED" == "true" && -n "$BAZEL_REMOTE_CACHE_URL" &&
       ;;
   esac
 
-  cat >> "$HOME/.bazelrc" <<EOF
+  cat >> .bazelrc.local <<EOF
 # CI-only remote cache
 build --remote_cache=${BAZEL_REMOTE_CACHE_URL}
 build --remote_upload_local_results=true
@@ -35,4 +36,9 @@ build --remote_retries=3
 build --remote_cache_compression
 build --remote_header="${BAZEL_REMOTE_CACHE_AUTH_HEADER}"
 EOF
+  remote_cache_configured=true
 fi
+
+# Tell the image build whether the remote cache is configured so it can select
+# compilation with or without network access.
+printf 'BAZEL_REMOTE_CACHE_CONFIGURED=%s\n' "${remote_cache_configured}" >> "${GITHUB_ENV:?}"

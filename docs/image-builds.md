@@ -4,6 +4,7 @@
 
 - [Overview](#overview)
 - [Supported tasks](#supported-tasks)
+- [Bazel-built AvalancheGo image](#bazel-built-avalanchego-image)
 - [Conceptual model](#conceptual-model)
 - [Go module dependencies](#go-module-dependencies)
   - [Host cache preparation](#host-cache-preparation)
@@ -19,7 +20,7 @@ Antithesis test setups. Repository tasks provide the standard interface for
 these builds. Product-specific scripts configure Buildx and supply the inputs
 that each image needs.
 
-Go build instructions compile code without network access. The build scripts
+Go build instructions outside Bazel compile code without network access. The build scripts
 provide a local file proxy from the module cache for Go tasks outside Bazel.
 This separates dependency preparation from compilation in Dockerfiles. Other
 image-build operations, such as base-image pulls and package installation, can
@@ -31,6 +32,7 @@ Use these repository tasks to build images:
 
 ```sh
 task build-image
+task bazel-build-image-avalanchego
 task build-xsvm-image
 task build-subnet-evm-image
 task build-antithesis-images-avalanchego
@@ -39,6 +41,106 @@ task build-antithesis-images-subnet-evm
 
 Each task starts the product-specific build script in the repository's
 configured environment.
+
+## Bazel-built AvalancheGo image
+
+`task bazel-build-image-avalanchego` builds AvalancheGo with Bazel and packages
+it in a separate `debian:12-slim` runtime image. It then smoke-tests the image.
+The script builds Linux images for the host architecture, either amd64 or
+arm64. It rejects other architectures instead of cross-compiling.
+
+The runtime image contains the executable, not the builder filesystem or
+toolchain. The CI job validates the Bazel build path as well as the image:
+Bazel runs on every image build so a cached Docker layer cannot bypass the
+current cache settings or download restrictions. Bazel can still reuse its own
+cached results; this is not a clean compilation on every run.
+
+The default image is `avalanchego:bazel-local`, distinct from the Go/Docker
+image's tags. Both build paths remain available for comparison. Set
+`BAZEL_IMAGE` to choose a different image reference:
+
+```sh
+BAZEL_IMAGE=avalanchego:bazel-dev task bazel-build-image-avalanchego
+```
+
+The image task runs `--version` and checks the reported source commit. It
+copies any existing `.bazelrc.local` into a temporary configuration. Local
+builds add the image's dependency-cache settings; CI inherits the settings
+written by `setup-bazel` unchanged. BuildKit mounts this
+configuration as a secret, without copying credentials into an image layer or
+changing the checkout's configuration. For the file's general behavior, see
+[local Bazel configuration](./bazel.md#local-bazel-configuration).
+
+Outside CI, the Linux builder prepares dependencies with network access. Bazel
+repository rules fetch toolchains for the platform they run on, so preparation
+on a non-Linux host would fetch the wrong toolchains. CI instead supplies the
+caches prepared by `setup-bazel` on the Linux runner. Both paths use the same
+[CI dependency list](./bazel.md#checked-in-bazel-dependency-list) and supply
+read-only caches to compilation. The shared list fetches more dependencies than
+the image needs, but avoids maintaining a separate list.
+
+Local preparation uses a fresh Bazel output tree so existing repositories and
+registry metadata cannot hide missing cache inputs. BuildKit retains dependency
+caches between builds under `BAZEL_CACHE_NAMESPACE`.
+
+Compilation uses `--network=none` unless
+`BAZEL_REMOTE_CACHE_CONFIGURED=true`. In CI, `setup-bazel` exports this flag
+only when it configures the remote cache. The image task uses that decision for
+network selection and inherits the cache settings from `.bazelrc.local`.
+`BAZEL_REMOTE_CACHE_ENABLED=false` tells `setup-bazel` to disable the cache.
+
+For local usage of a bazel remote cache, configure a `grpcs://` cache URL,
+authentication, and other cache options in `.bazelrc.local`. Set
+`BAZEL_REMOTE_CACHE_CONFIGURED=true` when building an image to allow
+compilation to access that cache. Local image builds do not generate these
+settings. See [why the cache uses
+gRPC](./bazel.md#why-the-remote-cache-uses-grpc) for the transport
+requirements. Without the flag, compilation disables the remote cache even if
+imported Bazel configuration enables it.  The default local build and scheduled
+CI therefore compile without network access. With the cache enabled,
+compilation has network access, not an enforced cache-only connection. Bazel
+can still download registry metadata because its download restriction exempts
+those files. Use the offline validation below to check that preparation
+supplies all required inputs. Base-image pulls, package installation, and
+Bazel installation can still require network access in either mode.
+
+The Dockerfile has two alternative compilation stages because `RUN --network`
+does not support argument expansion. Only the selected stage runs. Both stages
+use the same compilation script; keep their mount declarations identical.
+
+To validate preparation from empty dependency caches and fresh builder caches,
+use a new namespace:
+
+```sh
+BAZEL_REMOTE_CACHE_CONFIGURED=false \
+BAZEL_CACHE_NAMESPACE="validation-$(date +%s)" \
+  task bazel-build-image-avalanchego
+```
+
+Persistent caches can hold inputs from earlier builds and hide a missing
+input. A new namespace starts the builder caches empty, so offline compilation
+checks whether preparation supplied the required inputs. CI checks the caches
+prepared by `setup-bazel`. `BAZEL_REPOSITORY_CACHE` and `BAZEL_GO_MOD_CACHE`
+apply to CI only, where they name the prepared host caches.
+
+The [compilation script](../scripts/build_bazel_image_binary.sh) adds a builder
+fingerprint to Bazel's action environment to separate cached outputs when known
+compiler inputs change. The architecture distinguishes images selected from
+the same multi-platform base-image digest; installed package versions account
+for tools added after the base image is pulled. Bazel separately tracks declared
+source files, toolchains, build options, and action environment variables.
+
+This is best-effort cache separation, not a hermetic build environment. The
+fingerprint does not capture every possible compiler input or prevent cache
+poisoning. PR CI accepts the risk of incorrect cached outputs to gain speed;
+scheduled CI checks the merged source without remote or local compilation
+caches. That check can detect problems after merge, but cannot guarantee PR
+results. See the [CI cache policy](./bazel.md#test-platforms-and-cache-policy)
+for the trust boundary and requirements for published artifacts.
+
+When changing the builder, keep its base reference connected to the fingerprint
+and account for compilation tools installed outside Debian packages. Consider a
+prebuilt toolchain image if maintaining this fingerprint becomes insufficient.
 
 ## Conceptual model
 
@@ -52,10 +154,6 @@ The scripts supply inputs such as image tags, target platforms, the Go version,
 the source commit, and host build contexts. The exact inputs depend on the
 image. Builder stages compile source code. Runtime stages receive the required
 artifacts instead of the builder caches.
-
-Local builds prepare required dependencies immediately before Buildx starts. CI
-workflows restore and prepare shared caches before they run an image-build task.
-The build scripts consume those caches in CI instead of preparing them again.
 
 ## Go module dependencies
 

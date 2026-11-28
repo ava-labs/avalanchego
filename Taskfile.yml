@@ -22,6 +22,10 @@ tasks:
     desc: Build avalanchego with Bazel
     cmd: '{{.NIX_RUN}} bazelisk build //main:avalanchego'
 
+  bazel-build-image-avalanchego:
+    desc: Build and smoke-test a native Bazel-based AvalancheGo image
+    cmd: '{{.NIX_RUN}} ./scripts/build_bazel_image.sh'
+
   bazel-build-opt:
     desc: Build avalanchego with Bazel (optimized)
     cmd: '{{.NIX_RUN}} bazelisk build --compilation_mode=opt //main:avalanchego'
