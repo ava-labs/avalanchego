@@ -1,0 +1,87 @@
+name: C-Chain Re-exec / Bazel
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      test:
+        description: 'Test name (e.g., hashdb-101-250k, firewood-33m-33m500k). Leave empty for custom.'
+        default: ''
+      config:
+        description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
+        default: ''
+      start-block:
+        description: 'The start block for the benchmark.'
+        default: ''
+      end-block:
+        description: 'The end block for the benchmark.'
+        default: ''
+      block-dir-src:
+        description: 'The source block directory. Supports S3 directory/zip and local directories.'
+        default: ''
+      current-state-dir-src:
+        description: 'The current state directory. Supports S3 directory/zip and local directories.'
+        default: ''
+      runner:
+        description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
+        required: true
+      timeout-minutes:
+        description: 'Timeout in minutes for the job.'
+        default: '30'
+
+jobs:
+  define-matrix:
+    name: define-matrix
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.define-matrix.outputs.matrix }}
+      has-aws-role: ${{ steps.check-aws-role.outputs.available }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check AWS Role Availability
+        id: check-aws-role
+        run: echo "available=${{ secrets.AWS_S3_READ_ONLY_ROLE != '' }}" >> "$GITHUB_OUTPUT"
+      - name: Define Matrix
+        id: define-matrix
+        shell: bash -x {0}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            matrix='{ "include": [{ "test": "${{ github.event.inputs.test }}", "config": "${{ github.event.inputs.config }}", "start-block": "${{ github.event.inputs.start-block }}", "end-block": "${{ github.event.inputs.end-block }}", "block-dir-src": "${{ github.event.inputs.block-dir-src }}", "current-state-dir-src": "${{ github.event.inputs.current-state-dir-src }}", "runner": "${{ github.event.inputs.runner }}", "timeout-minutes": ${{ github.event.inputs.timeout-minutes }} }] }'
+          else
+            matrix='{ "include": [{ "test": "hashdb-101-250k", "runner": "ubuntu-24.04", "timeout-minutes": 30 }] }'
+          fi
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  c-chain-reexecution:
+    name: ${{ matrix.test }}
+    needs: define-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
+    timeout-minutes: ${{ matrix.timeout-minutes }}
+    if: ${{ needs.define-matrix.outputs.has-aws-role == 'true' }}
+    permissions:
+      id-token: write
+      contents: write
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run C-Chain Re-Execution Benchmark with Bazel
+        uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          use-bazel: 'true'
+          test: ${{ matrix.test }}
+          config: ${{ matrix.config }}
+          start-block: ${{ matrix.start-block }}
+          end-block: ${{ matrix.end-block }}
+          block-dir-src: ${{ matrix.block-dir-src }}
+          current-state-dir-src: ${{ matrix.current-state-dir-src }}
+          prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          push-github-action-benchmark: 'false'
+          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: 'us-east-2'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          runner_type: bazel-${{ matrix.runner }}

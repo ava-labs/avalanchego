@@ -378,6 +378,12 @@ For example, PR checks use:
 
 - `C-Chain Re-exec / native / hashdb-101-250k`
 - `C-Chain Re-exec / container / hashdb-archive-101-250k`
+- `C-Chain Re-exec / Bazel / hashdb-101-250k`
+
+The Bazel workflow runs `bazel-test-cchain-reexecution`, which uses the
+source-built Firewood FFI selected by `MODULE.bazel`. Its `runner_type` metric
+label is prefixed with `bazel-`, so its results can be compared with a
+non-Bazel run on the same runner.
 
 ## Provision CI job dependencies
 
