@@ -86,6 +86,44 @@ func TestValidParameters(t *testing.T) {
 			},
 			expectedErr: simplex.ErrInvalidParameters,
 		},
+		{
+			name: "membershipCAContent on public subnet",
+			s: Config{
+				MembershipCAContent: []string{"-----BEGIN CERTIFICATE-----"},
+				SnowParameters:      &validParameters,
+			},
+			expectedErr: errMembershipCAWhenNotValidatorOnly,
+		},
+		{
+			name: "membershipCAPath and membershipCAContent",
+			s: Config{
+				ValidatorOnly:       true,
+				MembershipCAPath:    "/path/to/membership-ca.pem",
+				MembershipCAContent: []string{"-----BEGIN CERTIFICATE-----"},
+				SnowParameters:      &validParameters,
+			},
+			expectedErr: errTooManyMembershipCASources,
+		},
+		{
+			name: "membershipCRLContent without membershipCAContent",
+			s: Config{
+				ValidatorOnly:        true,
+				MembershipCRLContent: []string{"-----BEGIN X509 CRL-----"},
+				SnowParameters:       &validParameters,
+			},
+			expectedErr: errMembershipCRLWithoutMembershipCA,
+		},
+		{
+			name: "membershipCRLPath and membershipCRLContent",
+			s: Config{
+				ValidatorOnly:        true,
+				MembershipCAContent:  []string{"-----BEGIN CERTIFICATE-----"},
+				MembershipCRLPath:    "/path/to/membership-crl.pem",
+				MembershipCRLContent: []string{"-----BEGIN X509 CRL-----"},
+				SnowParameters:       &validParameters,
+			},
+			expectedErr: errTooManyMembershipCRLSources,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

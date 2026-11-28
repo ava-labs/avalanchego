@@ -8,6 +8,8 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -137,4 +139,62 @@ func TestMembershipCACertifyBoundsPathBuilding(t *testing.T) {
 	withinLimit := slices.Concat(chain[:1], decoys[:maxMembershipChainLen-2], chain[1:])
 	require.Len(withinLimit, maxMembershipChainLen)
 	require.True(verifies(ca, withinLimit))
+}
+
+// TestConfigLoadMembershipCA checks that each CA and CRL key reaches the CA.
+func TestConfigLoadMembershipCA(t *testing.T) {
+	root, intermediate := stakingtest.NewPKI(t)
+	chain := stakingtest.NodeChain(t, intermediate, "rpc-01", testLeafValidity)
+	rootPEM := []string{string(root.CertPEM())}
+	revocations := crlPEM(t, intermediate, 1, chain[0])
+
+	dir := t.TempDir()
+	caPath := filepath.Join(dir, "membership-ca.pem")
+	require.NoError(t, os.WriteFile(caPath, root.CertPEM(), 0o600))
+	crlPath := filepath.Join(dir, "membership-crl.pem")
+	require.NoError(t, os.WriteFile(crlPath, revocations, 0o600))
+
+	tests := map[string]struct {
+		config      Config
+		expectedErr error
+		wantCA      bool // a CA is loaded
+		certifies   bool // and it certifies chain
+	}{
+		"membershipCAPath": {
+			config:    Config{MembershipCAPath: caPath},
+			wantCA:    true,
+			certifies: true,
+		},
+		"membershipCAContent": {
+			config:    Config{MembershipCAContent: rootPEM},
+			wantCA:    true,
+			certifies: true,
+		},
+		"membershipCRLPath": {
+			config: Config{MembershipCAContent: rootPEM, MembershipCRLPath: crlPath},
+			wantCA: true,
+		},
+		"membershipCRLContent": {
+			config: Config{MembershipCAContent: rootPEM, MembershipCRLContent: []string{string(revocations)}},
+			wantCA: true,
+		},
+		"unset": {},
+		"missing file": {
+			config:      Config{MembershipCAPath: filepath.Join(dir, "absent.pem")},
+			expectedErr: os.ErrNotExist,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			ca, err := test.config.LoadMembershipCA()
+			require.ErrorIs(err, test.expectedErr)
+			if !test.wantCA {
+				require.Nil(ca)
+				return
+			}
+			require.Equal(test.certifies, verifies(ca, chain))
+		})
+	}
 }

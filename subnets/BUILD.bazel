@@ -5,6 +5,7 @@ go_library(
     name = "subnets",
     srcs = [
         "config.go",
+        "config_membership.go",
         "membership_ca.go",
         "membership_crl.go",
         "no_op_allower.go",
