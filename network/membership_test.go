@@ -63,7 +63,9 @@ func membershipCAConfig(rootPEM []byte) subnets.Config {
 func mustNewMembership(t *testing.T, configs map[ids.ID]subnets.Config) *membership {
 	t.Helper()
 
-	m, err := newMembership(logging.NoLog{}, configs)
+	cert, err := staking.NewTLSCert()
+	require.NoError(t, err)
+	m, err := newMembership(logging.NoLog{}, peer.TLSConfig(*cert, nil), configs)
 	require.NoError(t, err)
 	return m
 }

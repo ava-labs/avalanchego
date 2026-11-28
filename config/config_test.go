@@ -779,7 +779,7 @@ func TestGetNodeConfigMembershipCA(t *testing.T) {
 			require.NoError(err)
 			require.Equal(config.SubnetConfigs, config.NetworkConfig.SubnetConfigs)
 			subnetConfig := config.NetworkConfig.SubnetConfigs[subnetID]
-			ca, err := subnetConfig.LoadMembershipCA()
+			ca, _, err := subnetConfig.LoadMembershipCA()
 			require.NoError(err)
 			require.NotNil(ca)
 		})
