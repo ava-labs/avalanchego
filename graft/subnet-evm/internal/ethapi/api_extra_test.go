@@ -12,15 +12,23 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
+	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
+	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -207,6 +215,80 @@ func TestBlockChainAPI_stateQueryBlockNumberAllowed(t *testing.T) {
 			} else {
 				require.EqualError(t, err, testCase.wantErrMessage)
 			}
+		})
+	}
+}
+
+func TestBlockChainAPI_CreateAccessListWarpPredicate(t *testing.T) {
+	t.Parallel()
+
+	var (
+		from  = common.Address{'f', 'r', 'o', 'm'}
+		to    = common.Address{'t', 'o'}
+		other = common.Address{'o', 't', 'h', 'e', 'r'}
+	)
+	// STATICCALL(gas, warp, 0, 0, 0, 0)
+	code := append([]byte{
+		byte(vm.PUSH0), byte(vm.PUSH0), byte(vm.PUSH0), byte(vm.PUSH0),
+		byte(vm.PUSH20),
+	}, warpcontract.ContractAddress.Bytes()...)
+	code = append(code, byte(vm.GAS), byte(vm.STATICCALL), byte(vm.STOP))
+
+	config := params.Copy(params.TestChainConfig)
+	params.GetExtra(&config).GenesisPrecompiles = extras.Precompiles{
+		warpcontract.ConfigKey: warpcontract.NewDefaultConfig(utils.PointerTo[uint64](0)),
+	}
+	api := NewBlockChainAPI(newTestBackend(t, 0, &core.Genesis{
+		Config: &config,
+		Alloc: types.GenesisAlloc{
+			from: {Balance: big.NewInt(params.Ether)},
+			to:   {Code: code},
+		},
+	}, dummy.NewCoinbaseFaker(), nil))
+
+	// The zero payload yields identical storage keys, which must not be
+	// deduplicated.
+	addressedCall, err := payload.NewAddressedCall(to.Bytes(), make([]byte, 256))
+	require.NoError(t, err)
+	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(1, ids.GenerateTestID(), addressedCall.Bytes())
+	require.NoError(t, err)
+	msg, err := avalancheWarp.NewMessage(unsignedMsg, &avalancheWarp.BitSetSignature{Signers: []byte{1}})
+	require.NoError(t, err)
+	// Two predicates, interleaved with another address.
+	withPredicates := func() *types.AccessList {
+		return &types.AccessList{
+			{Address: warpcontract.ContractAddress, StorageKeys: predicate.New(msg.Bytes())},
+			{Address: other, StorageKeys: []common.Hash{{1}}},
+			{Address: warpcontract.ContractAddress, StorageKeys: predicate.New(msg.Bytes())},
+		}
+	}
+	want := *withPredicates()
+
+	tests := []struct {
+		name       string
+		accessList *types.AccessList
+		want       types.AccessList
+	}{
+		{
+			name: "not_generated",
+			want: types.AccessList{},
+		},
+		{
+			name:       "returned_unchanged",
+			accessList: withPredicates(),
+			want:       types.AccessList{want[1], want[0], want[2]},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := api.CreateAccessList(t.Context(), TransactionArgs{
+				From:       &from,
+				To:         &to,
+				AccessList: tt.accessList,
+			}, nil)
+			require.NoError(t, err)
+			require.Empty(t, got.Error)
+			require.Equal(t, tt.want, *got.Accesslist)
 		})
 	}
 }
