@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "membership",
+    srcs = ["membership.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/e2e/membership",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/info",
+        "//api/metrics",
+        "//config",
+        "//ids",
+        "//staking/stakingtest",
+        "//tests",
+        "//tests/fixture/e2e",
+        "//tests/fixture/subnet",
+        "//tests/fixture/tmpnet",
+        "//utils/crypto/secp256k1",
+        "//vms/example/xsvm/api",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+    ],
+)

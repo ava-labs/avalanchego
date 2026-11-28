@@ -19,6 +19,7 @@ import (
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/c"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/faultinjection"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/membership"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/p"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
