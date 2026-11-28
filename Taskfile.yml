@@ -629,6 +629,10 @@ tasks:
     desc: Runs C-Chain re-execution test. Run without args to see available tests.
     cmd: '{{.NIX_RUN}} ./scripts/benchmark_cchain_range.sh {{.CLI_ARGS}}'
 
+  bazel-test-cchain-reexecution:
+    desc: Runs C-Chain re-execution test with a Bazel-built binary. Run without args to see available tests.
+    cmd: '{{.NIX_RUN}} env BAZEL_REEXECUTION=1 ./scripts/benchmark_cchain_range.sh {{.CLI_ARGS}}'
+
   test-ci-disk-space:
     desc: Tests CI disk-space check and diagnostics scripts
     cmds:

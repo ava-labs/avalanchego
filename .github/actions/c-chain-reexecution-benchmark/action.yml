@@ -56,6 +56,9 @@ inputs:
   firewood-ref:
     description: 'Firewood revision to use for the benchmark.'
     default: ''
+  use-bazel:
+    description: 'Run the benchmark with the Bazel-built C-Chain reexecution binary.'
+    default: 'false'
   libevm-ref:
     description: 'Libevm revision to use for the benchmark.'
     default: ''
@@ -109,6 +112,9 @@ runs:
         # Required for Nix builds on ARC runners
         TMPDIR: /tmp
         NIX_BUILD_TOP: /tmp
+    - name: Set up Bazel
+      if: inputs.use-bazel == 'true'
+      uses: ./.github/actions/setup-bazel
     # Custom refs require GOPROXY during setup. Disable it before benchmarking.
     - name: Disable the Go module proxy
       if: ${{ steps.dependency-config.outputs.use-custom-refs == 'true' }}
@@ -139,7 +145,7 @@ runs:
       run: echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.json" >> "$GITHUB_ENV"
     - name: Run C-Chain Re-execution Benchmark
       shell: nix develop --impure --command bash -x {0}
-      run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ inputs.test || '' }}"
+      run: ./scripts/run_task.sh ${{ inputs.use-bazel == 'true' && 'bazel-test-cchain-reexecution' || 'test-cchain-reexecution' }} -- "${{ inputs.test || '' }}"
       env:
         # Test configuration overrides
         BLOCK_DIR_SRC: ${{ inputs.block-dir-src }}

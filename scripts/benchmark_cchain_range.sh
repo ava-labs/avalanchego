@@ -285,7 +285,13 @@ if [[ -n "${CHAOS_MODE:-}" ]]; then
         --max-wait-time="${MAX_WAIT_TIME}" \
         --config="${CONFIG}"
 else
-    go run github.com/ava-labs/avalanchego/tests/reexecute/c \
+    if [[ -n "${BAZEL_REEXECUTION:-}" ]]; then
+        REEXECUTE_COMMAND=("${SCRIPT_DIR}/run_bazel_ci_command.sh" run --compilation_mode=opt //tests/reexecute/c --)
+    else
+        REEXECUTE_COMMAND=(go run github.com/ava-labs/avalanchego/tests/reexecute/c)
+    fi
+
+    "${REEXECUTE_COMMAND[@]}" \
         --block-dir="${BLOCK_DIR}" \
         --current-state-dir="${CURRENT_STATE_DIR}" \
         ${RUNNER_TYPE:+--runner="${RUNNER_TYPE}"} \
