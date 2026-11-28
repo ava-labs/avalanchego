@@ -18,16 +18,16 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${REPO_ROOT}/scripts/bazel_ci_dependency_list.sh"
 
-bazel_cmd="${BAZEL:-bazelisk}"
 read -r -a startup_options <<<"${BAZEL_STARTUP_OPTIONS:-}"
+bazel_cmd=("${BAZEL:-bazelisk}" ${startup_options[@]+"${startup_options[@]}"})
 
 while IFS= read -r target_set; do
   [[ -n "${target_set}" ]] || continue
   read -r -a target_args <<<"${target_set}"
-  "${bazel_cmd}" ${startup_options[@]+"${startup_options[@]}"} fetch "${target_args[@]}"
+  "${bazel_cmd[@]}" fetch "${target_args[@]}"
 done < <(bazel_ci_dependency_targets)
 
 # bazel-check-metadata also runs `bazel mod deps`. It has no target patterns,
 # but it must load every repository in the module graph with repository and
 # Go module downloads disabled.
-"${bazel_cmd}" ${startup_options[@]+"${startup_options[@]}"} mod deps --lockfile_mode=error >/dev/null
+"${bazel_cmd[@]}" mod deps --lockfile_mode=error >/dev/null
