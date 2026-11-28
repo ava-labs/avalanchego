@@ -2,7 +2,7 @@
 
 ## Overview
 
-This package implements a client and server that allows for the syncing of a [MerkleDB](../merkledb/README.md).
+This package implements a client and server that allows for the syncing of a MerkleDB.
 The servers have an up-to-date version of the database, and the clients have an out of date version of the database or an empty database.
 
 It's planned that these client and server implementations will eventually be compatible with Firewood.

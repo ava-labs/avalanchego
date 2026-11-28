@@ -499,6 +499,7 @@ tasks:
       - test-setup-task
       - test-sync-task-version
       - test-unit-script
+      - test-lint-links
       - test-workflow-hash-go-unit-inputs
       - test-workflow-prepare-go-unit-cache
       - test-workflow-validate-go-unit-cache
@@ -520,12 +521,14 @@ tasks:
       - task: lint
       - task: lint-evm
       - task: lint-action
+      - task: lint-links
       - task: lint-shell
       - task: test-ci-disk-space
       - task: test-run-task-launcher
       - task: test-setup-task
       - task: test-sync-task-version
       - task: test-unit-script
+      - task: test-lint-links
       - task: test-workflow-hash-go-unit-inputs
       - task: test-workflow-prepare-go-unit-cache
       - task: test-workflow-validate-go-unit-cache
@@ -543,6 +546,10 @@ tasks:
   lint-evm:
     desc: Runs gosec with G115 enabled on vms/evm
     cmd: '{{.NIX_RUN}} ./scripts/run_tool.sh golangci-lint run --config .gosec-golangci.yml ./vms/evm/...'
+
+  lint-links:
+    desc: Checks documentation links
+    cmd: '{{.NIX_RUN}} ./scripts/lint_links.sh'
 
   lint-shell:
     desc: Runs shellcheck to check sanity of shell scripts
@@ -679,6 +686,10 @@ tasks:
     vars:
       FUZZEXECS: '{{.FUZZEXECS| default "10000"}}'
     cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZEXECS}} {{.CLI_ARGS}}'
+
+  test-lint-links:
+    desc: Tests documentation link checker fixtures
+    cmd: '{{.NIX_RUN}} ./scripts/test_lint_links.sh'
 
   test-load-exclusive:
     desc: Runs load tests against kube with exclusive scheduling

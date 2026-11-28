@@ -111,13 +111,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: git reset --hard HEAD && git clean -ffd
 
-      - id: links
-        name: Check links
-        continue-on-error: true
-        uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 # v1.2.5
-        with:
-          fail_level: any
-
       - id: tauseconds
         name: Check for TauSeconds misuse with time.Add()
         continue-on-error: true

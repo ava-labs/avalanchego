@@ -25,7 +25,7 @@ The Avalanche Warp Precompile enables this flow to send a message from blockchai
 
 ### Warp Precompile
 
-The Warp Precompile is broken down into three functions defined in the Solidity interface file [IWarpMessenger.sol](../../../contracts/contracts/interfaces/IWarpMessenger.sol).
+The Warp Precompile is broken down into three functions defined in the Solidity interface file [IWarpMessenger.sol](warpbindings/IWarpMessenger.sol).
 
 #### sendWarpMessage
 
@@ -59,7 +59,7 @@ This leads to the following advantages:
 1. The EVM execution does not need to verify the Warp Message at runtime (no signature verification or external calls to the P-Chain)
 2. The EVM can deterministically re-execute and re-verify blocks assuming the predicate was verified by the network (e.g., in bootstrapping)
 
-This pre-verification is performed using the ProposerVM Block header during [block verification](../../../plugin/evm/wrapped_block.go) & [block building](../../../miner/worker.go).
+This pre-verification is performed using the ProposerVM Block header during block verification and block building.
 
 #### getBlockchainID
 

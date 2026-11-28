@@ -21,9 +21,9 @@ Any changes made to proto definition can be updated by running
 ## Protocol Version Compatibility
 
 The protobuf definitions and generated code are versioned based on the
-[RPCChainVMProtocol](../version/version.go#L13) defined for the RPCChainVM.
+[RPCChainVMProtocol](../version/constants.go) defined for the RPCChainVM.
 Many versions of an Avalanche client can use the same
-[RPCChainVMProtocol](../version/version.go#L13). But each Avalanche client and
+[RPCChainVMProtocol](../version/constants.go). But each Avalanche client and
 subnet vm must use the same protocol version to be compatible.
 
 ## Publishing to Buf Schema Registry
