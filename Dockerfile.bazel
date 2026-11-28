@@ -7,7 +7,8 @@ FROM ${BAZEL_BUILDER_IMAGE} AS builder
 # Re-declare the FROM argument so compilation can include it in its fingerprint.
 ARG BAZEL_BUILDER_IMAGE
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gcc g++ git libc6-dev && \
+# Firewood's vendored jemalloc build invokes make through its Cargo build script.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gcc g++ git libc6-dev make && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
