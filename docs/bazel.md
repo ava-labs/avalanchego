@@ -49,6 +49,7 @@ avalanchego monorepo.
   - [Checked-in Bazel dependency list](#checked-in-bazel-dependency-list)
   - [Enforcement](#enforcement)
   - [Changing this safely](#changing-this-safely)
+  - [Local Bazel configuration](#local-bazel-configuration)
   - [Apple CommandLineTools](#apple-commandlinetools)
   - [The macOS C compiler](#the-macos-c-compiler)
 - [Adding a New Go Module](#adding-a-new-go-module)
@@ -908,20 +909,11 @@ output tree and no disk action cache. Dependency-download caches can still be
 used: this policy concerns reuse of build outputs and test results, not
 downloaded inputs.
 
-The `setup-bazel` action writes its CI configuration to the workspace's
-`.bazelrc.local` and exports `BAZEL_REMOTE_CACHE_CONFIGURED` to indicate
-whether it configured the remote cache. The Bazel AvalancheGo image task uses
-this flag to decide whether compilation can access the network. It derives a
-temporary configuration from that file and mounts it as a secret. It also
-mounts the prepared repository and Gazelle module caches. The builder
-installs the pinned Bazel release before compilation. The image job runs in
-the Linux pre-merge and scheduled workflows with their respective
-remote-cache policies. Compilation runs without network access when the
-remote cache is not configured. See [Bazel-built AvalancheGo
-image](./image-builds.md#bazel-built-avalanchego-image) for configuration and
-validation. This job builds and smoke-tests a CI validation image; it does
-not publish an image. The artifact-build policy above applies when a Bazel
-build is used to produce published artifacts.
+The Linux pre-merge and scheduled workflows also build and smoke-test a
+[Bazel-built AvalancheGo image](./image-builds.md#bazel-built-avalanchego-image)
+under their respective cache policies. This is a CI validation image, not a
+published artifact. The artifact-build policy above applies when a Bazel build
+produces published artifacts.
 
 The remote cache stores results from the cacheable pre-merge unit tests when
 CI provides the remote-cache URL and authorization header. This policy
@@ -1206,6 +1198,14 @@ If the `setup` job fails its metadata check in CI, rebase or merge the target
 branch, run `task bazel-generate-metadata`, commit the resulting changes, and
 rerun CI.
 
+### Local Bazel configuration
+
+`.bazelrc` optionally imports the workspace's `.bazelrc.local` before its
+later settings. Avoid conflicting settings that those lines would override.
+In CI, `setup-bazel` writes its settings to this file so the image task can
+supply them to the container as a secret. The macOS generator replaces the
+file, so do not run it after CI setup.
+
 ### Apple CommandLineTools
 
 On macOS, `.bazelrc` defaults to using the Apple CommandLineTools
@@ -1224,13 +1224,6 @@ entrypoint. The script uses `xcode-select -p` and `xcrun --sdk macosx
 directory and macOS SDK and writes those values to `.bazelrc.local`.
 The script can also be run directly and is invoked automatically by
 direnv. It replaces the whole file.
-
-In CI, the `setup-bazel` action appends dependency-cache, download-restriction,
-and remote-cache settings to `.bazelrc.local`. Keeping these settings in the
-workspace lets the image task supply them to the container as a secret.
-CI jobs do not run the macOS generation script, which would overwrite these
-settings. Because `.bazelrc` imports `.bazelrc.local` before its later settings,
-keep settings in it that do not conflict with those later lines.
 
 Both entrypoints run inside the nix dev shell, whose `DEVELOPER_DIR`
 and `SDKROOT` would make `xcode-select` and `xcrun` report nix's SDK.

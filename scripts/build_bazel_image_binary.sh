@@ -9,14 +9,12 @@ remote_cache_options=()
 if [[ "${BAZEL_BUILD_MODE:?}" == offline ]]; then
   remote_cache_options=(--remote_cache=)
 fi
-# This CI check validates the Bazel build path, not just the packaged binary.
-# Reusing a BuildKit layer would skip Bazel and could hide failures under the
-# current cache settings or download restrictions. Secret changes alone do not
-# invalidate that layer. A unique invocation key forces Bazel to run, while
-# still allowing Bazel to reuse its own cached results.
+# Secret changes do not invalidate a BuildKit layer. The invocation key forces
+# Bazel to run with the current settings; Bazel can still reuse cached results.
+# See docs/image-builds.md#bazel-built-avalanchego-image.
 test -n "${BAZEL_INVOCATION_KEY}"
-# Best-effort cache separation, not a complete record of compiler inputs.
 # Keep the base reference tied to FROM, including its pinned image digest.
+# For fingerprint limitations, see docs/image-builds.md#bazel-built-avalanchego-image.
 builder_identity="$(
   {
     printf 'base=%s\narchitecture=%s\nbazel=%s\n' \

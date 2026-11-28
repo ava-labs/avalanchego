@@ -15,11 +15,8 @@ mkdir -p build
 config_dir="$(mktemp -d "${repo_root}/build/bazel-image-config-XXXXXX")"
 trap 'rm -rf "${config_dir}"' EXIT
 
-# CI consumes the caches that setup-bazel prepared on the host. Elsewhere the
-# Dockerfile's prepare stage fetches dependencies inside the Linux container
-# with network access, so any host can build the image. Bazel repository rules
-# fetch toolchains for the platform they run on, so host preparation would only
-# work on Linux.
+# CI supplies host-prepared caches; local builds prepare them in the builder.
+# See docs/image-builds.md#bazel-built-avalanchego-image.
 if [[ "${GITHUB_ACTIONS:-}" == true ]]; then
   repository_cache="${BAZEL_REPOSITORY_CACHE:-${HOME}/.cache/bazel-repository-cache}"
   go_mod_cache="${BAZEL_GO_MOD_CACHE:-${HOME}/.cache/bazel-go-repository-modcache}"
