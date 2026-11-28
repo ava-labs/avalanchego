@@ -117,8 +117,28 @@ func (vm *VM) pruneOldBlocks() error {
 	//
 	// Note: vm.lastAcceptedHeight is guaranteed to be >= height, so the
 	// subtraction can never underflow.
+	deletedBlocks := 0
 	for vm.lastAcceptedHeight-height > vm.NumHistoricalBlocks {
 		blockToDelete, err := vm.State.GetBlockIDAtHeight(height)
+		if err == database.ErrNotFound {
+			// State sync only indexes the summary block, so a node that state
+			// synced on top of previously accepted blocks has a gap between
+			// that history and the summary. vm.db's iterator hides the
+			// uncommitted deletes above, so this returns the next indexed
+			// height.
+			height, err = vm.State.GetMinimumHeight()
+			if err == database.ErrNotFound {
+				// The index is empty, so every height it held was inside the
+				// prune range and has already been deleted. The pending
+				// deletes must still be committed, otherwise the next startup
+				// would repeat this same walk.
+				break
+			}
+			if err != nil {
+				return err
+			}
+			continue
+		}
 		if err != nil {
 			return err
 		}
@@ -138,7 +158,10 @@ func (vm *VM) pruneOldBlocks() error {
 		// Note: height is < vm.lastAcceptedHeight, so it is guaranteed not to
 		// overflow.
 		height++
-		if height%pruneCommitPeriod != 0 {
+		// Note: deletions are counted rather than keying off height, because
+		// skipping a gap can jump over a commit boundary.
+		deletedBlocks++
+		if deletedBlocks%pruneCommitPeriod != 0 {
 			continue
 		}
 
