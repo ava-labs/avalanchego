@@ -22,8 +22,12 @@ builder_identity="$(
     dpkg-query -W -f='${binary:Package}=${Version}\n' | LC_ALL=C sort
   } | sha256sum | cut -d' ' -f1
 )"
+race_args=()
+if [[ "${BAZEL_IMAGE_RACE:-0}" == 1 ]]; then
+  race_args+=(--config=race)
+fi
 bazel build --compilation_mode=opt --config=release --stamp --announce_rc=false \
   --repository_disable_download --repo_env=GOPROXY=off \
   ${remote_cache_options[@]+"${remote_cache_options[@]}"} \
-  --action_env="BAZEL_IMAGE_BUILDER=${builder_identity}" //main:avalanchego
+  --action_env="BAZEL_IMAGE_BUILDER=${builder_identity}" ${race_args[@]+"${race_args[@]}"} //main:avalanchego
 install -m 0755 bazel-bin/main/main_/main /tmp/avalanchego

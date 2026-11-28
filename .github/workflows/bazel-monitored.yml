@@ -54,6 +54,7 @@ jobs:
         with:
           run: ./scripts/run_task.sh ${{ matrix.task }}
           setup_bazel: 'true'
+          runtime: ${{ matrix.runtime || 'process' }}
           # Load-contract binding generation invokes Go outside Bazel.
           setup_go_module_cache: ${{ matrix.name == 'load' }}
           artifact_prefix: bazel-${{ matrix.name }}${{ inputs.job_suffix }}

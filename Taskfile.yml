@@ -654,6 +654,27 @@ tasks:
     cmds:
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.kube.sh {{.CLI_ARGS}}'
 
+  bazel-test-e2e-kube:
+    desc: Build a Bazel node image and run kube e2e tests without XSVM
+    vars:
+      SERIAL: '{{.SERIAL | default .E2E_SERIAL | default ""}}'
+      IMAGE_RACE: '{{.IMAGE_RACE | default "0"}}'
+    env:
+      BAZEL_IMAGE: localhost:5001/avalanchego:bazel-local
+      BAZEL_IMAGE_RACE: '{{.IMAGE_RACE}}'
+      E2E_SERIAL: '{{.SERIAL}}'
+      E2E_SKIP_XSVM: 1
+      BAZEL_CI_TARGET_PATTERNS: //tests/e2e:e2e_kube_runner
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run "$BAZEL_CI_TARGET_PATTERNS" -- {{.CLI_ARGS}}'
+
+  bazel-test-e2e-kube-race-serial:
+    desc: Run kube e2e tests serially against a race-enabled Bazel node image
+    cmds:
+      - task: bazel-test-e2e-kube
+        vars:
+          SERIAL: '1'
+          IMAGE_RACE: '1'
+
   test-e2e-kube-ci:
     # Free github action runners do not have sufficient resources to reliably run a full e2e run against a kube-hosted network
     desc: Runs the xsvm e2e tests in serial against a network deployed to kube

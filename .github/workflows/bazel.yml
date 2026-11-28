@@ -85,18 +85,6 @@ jobs:
         with:
           is-setup-job: 'true'
 
-  build-image-avalanchego:
-    if: ${{ startsWith(inputs.platform_name, 'linux-') || startsWith(inputs.platform_name, 'ubuntu-') }}
-    needs: setup
-    runs-on: ${{ inputs.runner }}
-    timeout-minutes: ${{ inputs.unit_timeout_minutes }}
-    steps:
-      - uses: actions/checkout@v5
-      - name: Build and smoke-test the Bazel image
-        uses: ./.github/actions/run-bazel-with-disk-space
-        with:
-          run: ./scripts/run_task.sh bazel-build-image-avalanchego
-
   unit:
     needs: setup
     runs-on: ${{ inputs.runner }}
@@ -142,6 +130,7 @@ jobs:
       # See docs/bazel.md#e2e-and-monitored-test-runners for alternatives and rationale.
       test_matrix: |
         {"include": [
+          {"name": "e2e-kube", "task": "bazel-test-e2e-kube-race-serial", "runtime": "kube", "network_owner": "avalanchego-e2e"},
           {"name": "e2e-post-latest", "task": "bazel-test-e2e-post-latest-race-serial", "network_owner": "avalanchego-e2e"},
           {"name": "e2e-schedule-latest", "task": "bazel-test-e2e-schedule-latest-race-serial", "network_owner": "avalanchego-e2e"},
           {"name": "load", "task": "bazel-test-load-ci-race"},
@@ -163,6 +152,7 @@ jobs:
       # The load test has no network owner; leave its dashboard owner filter empty.
       test_matrix: |
         {"include": [
+          {"name": "e2e-kube", "task": "bazel-test-e2e-kube", "runner": "e2e_runner", "runtime": "kube", "network_owner": "avalanchego-e2e"},
           {"name": "e2e-existing-network", "task": "bazel-test-e2e-existing-network", "network_owner": "avalanchego-e2e"},
           {"name": "e2e-post-latest", "task": "bazel-test-e2e-post-latest", "runner": "e2e_runner", "network_owner": "avalanchego-e2e"},
           {"name": "e2e-schedule-latest", "task": "bazel-test-e2e-schedule-latest", "runner": "e2e_runner", "network_owner": "avalanchego-e2e"},

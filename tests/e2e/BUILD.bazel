@@ -41,6 +41,23 @@ genrule(
 )
 
 sh_binary(
+    name = "e2e_kube_runner",
+    testonly = True,
+    srcs = ["//scripts:tests.e2e.kube.bazel.sh"],
+    args = [
+        "$(location :e2e_test_binary)",
+        "$(location @com_github_onsi_ginkgo_v2//ginkgo:ginkgo)",
+        "$(location //tests/fixture/tmpnet/tmpnetctl:tmpnetctl)",
+    ],
+    data = [
+        ":e2e_test_binary",
+        "//tests/fixture/tmpnet/tmpnetctl",
+        "@com_github_onsi_ginkgo_v2//ginkgo",
+    ],
+    tags = ["manual"],
+)
+
+sh_binary(
     name = "e2e_runner",
     testonly = True,
     srcs = ["//scripts:tests.e2e.bazel.sh"],

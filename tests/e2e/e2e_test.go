@@ -57,6 +57,13 @@ func init() {
 	flagVars = e2e.RegisterFlags(e2e.WithDefaultOwner("avalanchego-e2e"))
 }
 
+func e2eSubnets(nodes []*tmpnet.Node) []*tmpnet.Subnet {
+	if os.Getenv("E2E_SKIP_XSVM") != "" {
+		return nil
+	}
+	return vms.XSVMSubnetsOrPanic(nodes...)
+}
+
 // Start the shared network once and give every process its path. Parallel runs
 // also get a directory for coordination, which suite cleanup removes.
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
@@ -67,7 +74,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	nodeCount, err := flagVars.NodeCount()
 	require.NoError(tc, err)
 	nodes := tmpnet.NewNodesOrPanic(nodeCount)
-	subnets := vms.XSVMSubnetsOrPanic(nodes...)
+	subnets := e2eSubnets(nodes)
 
 	upgrades := tmpnet.UpgradeConfig(flagVars.ActivateLatestAfter())
 	tc.Log().Info(

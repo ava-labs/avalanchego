@@ -14,4 +14,4 @@ for arg in "$@"; do
 done
 echo "Starting kind cluster with args: ${START_CLUSTER_ARGS[*]}"
 echo "To cleanup the cluster, run ./scripts/run_task.sh delete-kind-cluster"
-./bin/tmpnetctl start-kind-cluster "${START_CLUSTER_ARGS[@]}"
+"${TMPNETCTL_PATH:-./bin/tmpnetctl}" start-kind-cluster "${START_CLUSTER_ARGS[@]}"

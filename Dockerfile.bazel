@@ -27,6 +27,7 @@ ARG BAZEL_REPOSITORY_CACHE=/tmp/bazel-repository-cache
 ARG BAZEL_GO_MOD_CACHE=/tmp/bazel-go-repository-modcache
 # Invoke Bazel on each build to exercise its own persistent caches.
 ARG BAZEL_INVOCATION_KEY
+ARG BAZEL_IMAGE_RACE=0
 # Local builds prepare dependencies here; CI supplies host-prepared caches.
 # Use a fresh output tree so registry metadata is written to the caches.
 # See docs/image-builds.md#bazel-built-avalanchego-image for validation.
