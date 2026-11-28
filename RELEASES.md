@@ -4,6 +4,8 @@
 
 ### Features
 
+- Added certificate-based subnet membership. A `validatorOnly` subnet can name a membership CA and admit any peer whose staking certificate chains to one of its roots, so admitting a non-validator needs no change on other nodes. See `network/membership.md`.
+
 ### APIs
 
 - Added an `Rpc-Error-Codes` header to C-Chain `/rpc` responses with the count of each JSON-RPC error code in the response, e.g. `-32601;count=1, 3;count=2`.
@@ -16,8 +18,16 @@
 
 ### Configs
 
+- Added the subnet config keys `membershipCAPath`/`membershipCAContent` and `membershipCRLPath`/`membershipCRLContent`, which set a subnet's membership CA and CRL.
+- Deprecated the subnet config key `allowedNodes` in favor of a membership CA. It still works, and the node logs a warning when it is set.
+
+### Metrics
+
+- Added `avalanche_requests_dropped_unallowed`, the number of messages dropped because the sender is not allowed on the chain's subnet.
+
 ### Fixes
 
+- Fixed `--network-require-validator-to-connect` disconnecting the `allowedNodes` of tracked subnets on a node that does not validate the Primary Network. It now keeps every member of a tracked subnet connected, including peers certified by a membership CA.
 - Fixed node shutdown leaving health check and bootstrapper timeout goroutines running. Shutdown now stops them, and waits up to 10 seconds for the health check goroutines to finish.
 - Fixed the C-Chain writing its local transaction journal, `transactions.rlp`, to the process working directory when `local-txs-enabled` is set. The journal is now disabled.
 - Fixed the C-Chain mempool accepting non-local transactions with a gas tip cap of 0. They now need a gas tip cap of at least 1 wei, matching the C-Chain before SAE.

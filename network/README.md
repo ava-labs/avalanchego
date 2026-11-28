@@ -17,6 +17,7 @@
       - [GetPeerList](#getpeerlist)
       - [PeerList](#peerlist)
       - [Avoiding Persistent Network Traffic](#avoiding-persistent-network-traffic)
+- [Subnet Membership](#subnet-membership)
 
 ## Overview
 
@@ -222,3 +223,9 @@ sequenceDiagram
     Rick->>Morty: PeerList - Contains Summer
 ```
 This case is suboptimal, because `Rick` told `Morty` about `Summer` multiple times. If this case were to happen consistently, `Rick` may waste a significant amount of bandwidth trying to teach `Morty` about `Summer`.
+
+## Subnet Membership
+
+A `validatorOnly` subnet can admit nodes that validate nothing by trusting a membership CA: a peer whose staking certificate chains to it is a member, and a revocation list evicts one before its certificate expires. The decision is made once, at the handshake, and read by the subnet's chains and by connection admission.
+
+- [Subnet membership](./membership.md) - who is a member, how the handshake decides it, and revocation

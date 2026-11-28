@@ -280,6 +280,7 @@ func (cr *ChainRouter) handleMessage(ctx context.Context, msg *message.InboundMe
 			zap.Stringer("chainID", chainID),
 			zap.Error(errUnallowedNode),
 		)
+		cr.metrics.droppedUnallowed.Inc()
 		msg.OnFinishedHandling()
 		return
 	}
